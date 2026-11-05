@@ -24,6 +24,7 @@ import com.macrophage.barspeed.model.VoiceCue
 import com.macrophage.barspeed.model.VoidSetPolicy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlin.coroutines.CoroutineContext
@@ -332,13 +333,10 @@ class SessionRepository(
     private val exerciseDao: ExerciseDao,
     private val json: Json = Json { ignoreUnknownKeys = true },
     /**
-     * Where a set's streams are CSV-encoded and gzipped before the insert
-     * (#36). Defaulted last, so every positional call keeps compiling and
-     * keeps meaning what it meant; a test passes its own to see the work
-     * reach it.
-     *
-     * `internal` rather than private so a constructor property that a build
-     * reads nowhere yet is not an unused private member.
+     * Where a set's row and streams are built -- the streams CSV-encoded and
+     * gzipped -- before the insert (#36). Defaulted last, so every positional
+     * call keeps compiling and keeps meaning what it meant; a test passes its
+     * own to see the work reach it, which is why it is `internal`.
      */
     internal val encodeContext: CoroutineContext = Dispatchers.Default,
 ) {
@@ -400,9 +398,15 @@ class SessionRepository(
      * with them now; whether the database commits them together is Room's
      * `@Transaction` on [SessionDao.insertSetWithStreams], which no test here
      * can observe.
+     *
+     * The row and its streams are built on [encodeContext], not on the
+     * caller's thread (#36). Building them CSV-encodes and gzips the whole
+     * capture, and the record screen calls this from the main thread.
      */
-    suspend fun recordSet(sessionId: Long, orderIdx: Int, set: CompletedSet): Long =
-        sessionDao.insertSetWithStreams(setRowOf(sessionId, orderIdx, set), streamsOf(set))
+    suspend fun recordSet(sessionId: Long, orderIdx: Int, set: CompletedSet): Long {
+        val (row, streams) = withContext(encodeContext) { setRowOf(sessionId, orderIdx, set) to streamsOf(set) }
+        return sessionDao.insertSetWithStreams(row, streams)
+    }
 
     /**
      * Every raw stream belonging to [set], CSV-encoded and gzipped. This is
