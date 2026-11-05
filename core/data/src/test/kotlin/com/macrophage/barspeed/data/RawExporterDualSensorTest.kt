@@ -577,8 +577,11 @@ class RawExporterDualSensorTest {
      * set with its `sensors` array, one that fell back to the other role, two
      * units the app could not tell apart, an armed unit that went silent, and
      * a single armed unit that delivered nothing -- because each writes keys
-     * the others do not. The last assertion is the control: a check that
-     * cannot report an undeclared key would pass the first one too.
+     * the others do not. Each is held to the schema's keys and words and to
+     * its `required` and `dependentRequired` rules. The last two assertions
+     * are the controls: a check that cannot report an undeclared key, or a
+     * role list written without the armed count it depends on, would pass
+     * the first ones too.
      */
     @Test
     fun `every sensor key the manifest writes is declared by the published schema`() = runTest {
@@ -606,8 +609,18 @@ class RawExporterDualSensorTest {
                 RawMetaSchema.undeclaredInSet(set),
                 "descriptor $i: keys or words the schema omits",
             )
+            assertEquals(
+                emptyList(),
+                RawMetaSchema.unmetInSet(set),
+                "descriptor $i: required or dependent keys missing",
+            )
         }
         val tampered = JsonObject(descriptors.first() + ("sensorsPlanned" to JsonPrimitive(2)))
         assertEquals(listOf("sensorsPlanned"), RawMetaSchema.undeclaredInSet(tampered), "the control was not reported")
+        val unarmed = JsonObject(descriptors.first() - "sensorsArmed")
+        assertTrue(
+            "sensorRolesExpected needs sensorsArmed" in RawMetaSchema.unmetInSet(unarmed),
+            "a role list written without its armed count was not reported",
+        )
     }
 }

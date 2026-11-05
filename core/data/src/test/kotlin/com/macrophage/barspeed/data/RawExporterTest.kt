@@ -9,6 +9,7 @@ import com.macrophage.barspeed.model.GeometrySource
 import com.macrophage.barspeed.model.GeometrySources
 import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ImuSample
+import com.macrophage.barspeed.model.PrepWindow
 import com.macrophage.barspeed.model.ResolvedGeometry
 import com.macrophage.barspeed.model.StartPhase
 import kotlinx.coroutines.CoroutineDispatcher
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
@@ -234,6 +236,13 @@ class RawExporterTest {
         setId = setId,
         kind = RawStreamEntity.KIND_HRM,
         csvGzip = Gzip.compress(HrCsv.encode(listOf(HrSample(1_000L, 120, listOf(500.0))))),
+    )
+
+    private fun prepStream(setId: Long, window: PrepWindow) = RawStreamEntity(
+        id = 9L,
+        setId = setId,
+        kind = RawStreamEntity.KIND_PREP,
+        csvGzip = Gzip.compress(PrepWindowCsv.encode(window)),
     )
 
     private fun repStream(setId: Long, marks: List<Long>) = RawStreamEntity(
@@ -1225,14 +1234,22 @@ class RawExporterTest {
      * between them set every column the descriptor reads that this file's
      * fixtures can reach -- a plan-prescribed rep set with a declared geometry,
      * a lifter-stated failure and reason, a side, a lifter's warm-up mark and
-     * a prep; a timed set the lifter ended, added and voided; and a set that
-     * never left its prep -- plus the zone pair at the top. The dual-sensor
-     * keys are held to the schema by `RawExporterDualSensorTest`'s twin of
-     * this case.
+     * a prep with its stored prep window; a timed set the lifter ended, added
+     * and voided; and a set that never left its prep -- plus the zone pair at
+     * the top. The dual-sensor keys are held to the schema by
+     * `RawExporterDualSensorTest`'s twin of this case.
      *
-     * The second assertion is the control: one key the schema does not
-     * declare, added to the same manifest, must be reported. A check that
-     * cannot report anything would pass the first assertion too.
+     * The prep window is there so `prepStartedAt_ms` and `workStartedAt_ms`
+     * reach the check: they are written only from a stored KIND_PREP stream,
+     * and the schema ties them to each other (`dependentRequired`). So the
+     * manifest is held to the schema's `required` and `dependentRequired`
+     * rules as well as its keys and words, and the assertion that the first
+     * set carries both prep keys proves the fixture reached them.
+     *
+     * The tampered manifests are the controls: one key the schema does not
+     * declare, and the first set with `prepStartedAt_ms` struck off, must each
+     * be reported. A check that cannot report anything would pass the first
+     * assertions too.
      */
     @Test
     fun `every key the manifest writes is declared by the published schema`() = runTest {
@@ -1283,7 +1300,12 @@ class RawExporterTest {
                 zipOf(
                     listOf(planned, timed, abandoned),
                     mapOf(
-                        5L to listOf(imuStream(5L, stillSamples(45.0), storedRate = 100.0), hrStream(5L)),
+                        5L to
+                            listOf(
+                                imuStream(5L, stillSamples(45.0), storedRate = 100.0),
+                                hrStream(5L),
+                                prepStream(5L, PrepWindow(startedAtMs = 1_000L, workStartedAtMs = 6_000L)),
+                            ),
                         6L to listOf(imuStream(6L, stillSamples(45.0), storedRate = 100.0)),
                     ),
                     "Europe/London",
@@ -1291,12 +1313,26 @@ class RawExporterTest {
                 ).getValue("meta.json"),
             ).jsonObject
         assertEquals(emptyList(), RawMetaSchema.undeclaredInManifest(manifest), "keys or words the schema omits")
+        assertEquals(emptyList(), RawMetaSchema.unmetInManifest(manifest), "required or dependent keys missing")
+        val first = manifest.getValue("sets").jsonArray[0].jsonObject
+        assertTrue(
+            "prepStartedAt_ms" in first && "workStartedAt_ms" in first,
+            "the prep-window fixture did not reach the manifest: $first",
+        )
 
         val tampered = JsonObject(manifest + ("notInTheSchema" to JsonPrimitive(1)))
         assertEquals(
             listOf("notInTheSchema"),
             RawMetaSchema.undeclaredInManifest(tampered),
             "the check reported nothing for a key the schema does not declare",
+        )
+        val sets = manifest.getValue("sets").jsonArray
+        val unpairedSets = listOf(JsonObject(first - "prepStartedAt_ms")) + sets.drop(1)
+        val unpaired = JsonObject(manifest + ("sets" to JsonArray(unpairedSets)))
+        assertEquals(
+            listOf("sets[0].workStartedAt_ms needs prepStartedAt_ms"),
+            RawMetaSchema.unmetInManifest(unpaired),
+            "the check reported nothing for a work start written without its prep start",
         )
     }
 }
