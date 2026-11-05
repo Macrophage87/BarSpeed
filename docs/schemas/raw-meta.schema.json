@@ -586,7 +586,7 @@
           "if": {
             "required": [
               "rollExcursionBasis",
-              "prepStartedAt_ms"
+              "workStartedAt_ms"
             ]
           },
           "then": {
@@ -607,7 +607,7 @@
             ],
             "not": {
               "required": [
-                "prepStartedAt_ms"
+                "workStartedAt_ms"
               ]
             }
           },
@@ -625,7 +625,7 @@
         {
           "if": {
             "required": [
-              "prepStartedAt_ms"
+              "workStartedAt_ms"
             ]
           },
           "then": {
@@ -651,7 +651,7 @@
           "if": {
             "not": {
               "required": [
-                "prepStartedAt_ms"
+                "workStartedAt_ms"
               ]
             }
           },
