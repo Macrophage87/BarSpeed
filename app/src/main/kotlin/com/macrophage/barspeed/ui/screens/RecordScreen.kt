@@ -916,7 +916,7 @@ private fun foregroundRefusalText(failure: ForegroundStartFailure): String {
             ForegroundStartFailure.PERMISSION_REFUSED ->
                 "Android refused the recording service because a permission it needs is not granted."
             ForegroundStartFailure.START_REFUSED ->
-                "Android would not start the recording service at that moment."
+                "Android would not start the recording service."
             ForegroundStartFailure.TYPE_REJECTED ->
                 "Android rejected the kind of recording service this build asks for."
         }
