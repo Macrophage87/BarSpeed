@@ -900,4 +900,22 @@ class SensorCapturePolicyTest {
 
         assertEquals(live, SensorCapturePolicy.shownRoster(live, null, inSet = true))
     }
+
+    /**
+     * DIFFERENTIAL, #171 item 3. During a set the bar draws the roster the set
+     * was ARMED with. Armed dual, then the second unit's label removed mid-set:
+     * the live roster drops to one stream and its second dot, while the set
+     * underneath goes on capturing two -- `beginSet` froze that, and the bar
+     * is the only thing on screen that said otherwise.
+     */
+    @Test
+    fun `during a set the bar keeps the roster the set was armed with`() {
+        val armed = pairedAs(mapOf(a to SensorRole.A, b to SensorRole.B))
+        val relabelled = pairedAs(mapOf(a to SensorRole.A))
+
+        val shown = SensorCapturePolicy.shownRoster(relabelled, armed, inSet = true)
+
+        assertEquals(armed, shown, "the bar followed a relabel the recording set never saw")
+        assertEquals(SensorRole.B, shown.secondary, "the second dot vanished mid-set")
+    }
 }
