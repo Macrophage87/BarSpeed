@@ -51,6 +51,30 @@ class HeartRateMeasurementParserTest {
         assertEquals(SensorContact.NOT_RECORDED, HeartRateMeasurementParser.parse(byteArrayOf(0x02, 72), 10L)!!.contact)
     }
 
+    /**
+     * DIFFERENTIAL, #82. With Sensor Contact Support (bit 2) set, Status
+     * (bit 1) is the strap's own report of skin contact, per notification,
+     * and it is the only evidence left when a strap streams bpm with the R-R
+     * Present flag clear. The parser read the flags byte and discarded it.
+     * Asserted with and without R-R and the 16-bit bpm form, so the bits are
+     * read from the flags byte and not from wherever a payload happens to
+     * put them.
+     */
+    @Test
+    fun `contact is read from the flags when the strap supports it`() {
+        val worn = HeartRateMeasurementParser.parse(byteArrayOf(0x06, 72), 10L)!!
+        val off = HeartRateMeasurementParser.parse(byteArrayOf(0x04, 72), 10L)!!
+        val offWithRr = HeartRateMeasurementParser.parse(byteArrayOf(0x14, 60, 0x00, 0x04), 10L)!!
+        val worn16Bit = HeartRateMeasurementParser.parse(byteArrayOf(0x07, 0x2C, 0x01), 10L)!!
+
+        assertEquals(SensorContact.DETECTED, worn.contact)
+        assertEquals(SensorContact.NOT_DETECTED, off.contact)
+        assertEquals(SensorContact.NOT_DETECTED, offWithRr.contact)
+        assertEquals(1, offWithRr.rrIntervalsMs.size, "reading the contact bits moved the R-R offset")
+        assertEquals(SensorContact.DETECTED, worn16Bit.contact)
+        assertEquals(300, worn16Bit.bpm)
+    }
+
     @Test
     fun `malformed payloads return null`() {
         assertNull(HeartRateMeasurementParser.parse(byteArrayOf(), 0L))
