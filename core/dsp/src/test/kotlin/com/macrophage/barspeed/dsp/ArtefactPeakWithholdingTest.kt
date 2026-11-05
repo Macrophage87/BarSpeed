@@ -276,6 +276,69 @@ class ArtefactPeakWithholdingTest {
     }
 
     /**
+     * ISSUE #255 ITEM 1, ON ITS OWN TWO CAPTURES: the impossible sample inside
+     * a real rep no longer reaches the set's published peak, and the clause
+     * that withholds it is the ARTEFACT clause, not the bound.
+     *
+     * #255 named two figures. `field-assistedpullup-3010-s37-set08` publishes
+     * 407.4 W from the rep at index 6, inflated by one 14.982 g sample at
+     * sample index 4079 that sits in the previous rep's span, not its own; and
+     * `field-ohp-prepinflated-s37-set03` publishes 783.2 W from the rep at
+     * index 6, a 0.533 m rep with a 135.1 W mean drive power. Both figures are
+     * withheld today, and the test above says so -- but every rep of both
+     * captures is also unbounded, so "withheld" there would survive deleting
+     * either artefact clause outright: `RomBound` would hold both figures out
+     * on its own. That is a pin on the wrong clause. A later change that lets
+     * `RomBound` bound these reps would republish 407.4 W and 783.2 W with
+     * nothing red.
+     *
+     * So the bound is masked here and the artefact clauses alone decide:
+     *
+     * - set 8's inflated rep carries `artefactSamples` 0 and
+     *   `guardArtefactSamples` 1. #290's in-span clause keeps it -- which is why
+     *   the test above lists 407.4 W as a survivor of that clause -- and #306's
+     *   guard band is what withholds it. The set's peak power over what is left
+     *   is 69.1 W.
+     * - set 3's inflated rep carries `artefactSamples` 2; the in-span clause
+     *   withholds it, and only one rep of the eleven survives both artefact
+     *   clauses, at 125.4 W.
+     *
+     * WITHHELD, NOT SUBSTITUTED, on the owner's rule that a figure the analysis
+     * cannot bound is withheld or flagged. Substitution is measured and refused
+     * in `ArtefactRuleAlternativesTest`. Each row keeps publishing what its own
+     * window measured -- 407.4 W and 783.2 W are still on those rows -- with the
+     * count beside it that says not to trust the pair; that per-row contract is
+     * session export 1.21's and is not moved here.
+     *
+     * #255 items 2 and 3 -- what produced the 16 g readings, and whether the
+     * 4.5 refusal bound holds past the committed corpus -- are `[Field]` and
+     * nothing here answers them.
+     */
+    @Test
+    fun `issue 255's two inflated peaks are withheld by the artefact clauses, with the bound masked`() {
+        fun withoutBound(reps: List<RepAnalysis>) = reps.map { it.copy(romBounded = true) }
+
+        val set08 = analyse("field-assistedpullup-3010-s37-set08").reps
+        val inflated08 = set08.single { it.index == 6 }
+        assertEquals(407.4, inflated08.peakPowerW, "set 8's inflated row, published as measured")
+        assertEquals(0, inflated08.artefactSamples, "set 8: nothing above the bound inside its own span")
+        assertEquals(1, inflated08.guardArtefactSamples, "set 8: the 14.982 g sample is in its guard band")
+        assertEquals(listOf(0, 1, 2, 3, 4), AccelArtefact.peakEligible(withoutBound(set08)).map { it.index })
+        assertEquals(69.1, AccelArtefact.setPeakPowerW(withoutBound(set08)), "set 8, artefact clauses alone")
+
+        val set03 = analyse("field-ohp-prepinflated-s37-set03").reps
+        val inflated03 = set03.single { it.index == 6 }
+        assertEquals(783.2, inflated03.peakPowerW, "set 3's inflated row, published as measured")
+        assertEquals(2, inflated03.artefactSamples, "set 3: two samples above the bound inside its own span")
+        assertEquals(listOf(4), AccelArtefact.peakEligible(withoutBound(set03)).map { it.index })
+        assertEquals(125.4, AccelArtefact.setPeakPowerW(withoutBound(set03)), "set 3, artefact clauses alone")
+
+        // And what the two sets actually publish: nothing, on all three clauses.
+        assertNull(AccelArtefact.setPeakPowerW(set08), "set 8's published peakPower_w")
+        assertNull(AccelArtefact.setPeakPowerW(set03), "set 3's published peakPower_w")
+    }
+
+    /**
      * A set every one of whose reps carries an artefact publishes NO peak pair
      * rather than a low one, and nothing else about it changes.
      *
