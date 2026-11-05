@@ -21,6 +21,7 @@ import com.macrophage.barspeed.model.SessionHeartRate
 import com.macrophage.barspeed.model.SessionRpe
 import com.macrophage.barspeed.model.SkippedSet
 import com.macrophage.barspeed.model.StartPhase
+import com.macrophage.barspeed.model.StoredExerciseRow
 import com.macrophage.barspeed.model.VoiceCue
 import com.macrophage.barspeed.model.VoidSetPolicy
 import kotlinx.coroutines.Dispatchers
@@ -1084,11 +1085,17 @@ class SessionRepository(
     }
 
     suspend fun ensureExerciseExists(id: String) {
-        if (ExerciseDef.seedById(id) == null && exerciseDao.byId(id) == null) {
-            val row = CustomExerciseRepair.inferredRow(id)
-            exerciseDao.insert(
-                CustomExerciseEntity(id = id, displayName = row.displayName, startsWith = row.startsWith),
-            )
-        }
+        if (ExerciseDef.seedById(id) != null) return
+        val stored = exerciseDao.byId(id)
+        val row =
+            if (stored == null) {
+                CustomExerciseRepair.inferredRow(id)
+            } else {
+                // #59: a row written under an older inference is rewritten
+                // with today's, and a row that already agrees is left alone.
+                CustomExerciseRepair.repaired(id, StoredExerciseRow(stored.displayName, stored.startsWith))
+                    ?: return
+            }
+        exerciseDao.insert(CustomExerciseEntity(id = id, displayName = row.displayName, startsWith = row.startsWith))
     }
 }

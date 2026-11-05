@@ -2,6 +2,7 @@ package com.macrophage.barspeed.data
 
 import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
@@ -227,7 +228,15 @@ interface SessionDao {
 
 @Dao
 interface ExerciseDao {
-    @Insert
+    /**
+     * REPLACE, so the same call that writes a new row also rewrites a stale
+     * one (#59). `custom_exercises` has no foreign-key children, so a replace
+     * deletes nothing else; and the only caller,
+     * `SessionRepository.ensureExerciseExists`, writes an existing id only
+     * when `CustomExerciseRepair.repaired` says the stored row no longer says
+     * what the app infers.
+     */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(exercise: CustomExerciseEntity)
 
     @Query("SELECT * FROM custom_exercises")
