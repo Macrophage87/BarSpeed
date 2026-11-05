@@ -87,7 +87,11 @@ class SchemaExportKeySetContractTest {
     /**
      * Every object in the published document that declares properties is in
      * the table above, so an object added to the schema without a row here
-     * fails rather than going unpinned. Walked, not listed.
+     * fails rather than going unpinned. Walked, not listed. The walk does not
+     * descend into arrays: an object under an array-valued keyword (`anyOf`,
+     * `allOf`, an `if`/`else` inside `allOf`) is a condition on an export
+     * object, not an export object, and is not walked (L1 review round 1,
+     * B-N4: `set/anyOf/2` and `geometry/allOf/0/if` and `/else` at this tree).
      */
     @Test
     fun `no published export object is missing from the table`() {
