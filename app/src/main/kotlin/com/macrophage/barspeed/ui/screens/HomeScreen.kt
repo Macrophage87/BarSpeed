@@ -44,7 +44,6 @@ import androidx.navigation.NavController
 import com.macrophage.barspeed.CrashReport
 import com.macrophage.barspeed.data.InterruptedSetSummary
 import com.macrophage.barspeed.data.OrphanedSet
-import com.macrophage.barspeed.data.RescueCompleteness
 import com.macrophage.barspeed.data.RescuedDatabase
 import com.macrophage.barspeed.model.ArmedDelivery
 import com.macrophage.barspeed.model.ByteSize
@@ -569,6 +568,15 @@ private fun RescuedDatabaseNotice(
     if (rescued.isEmpty()) return
     val clock = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
     var confirmDiscard by remember { mutableStateOf<RescuedDatabase?>(null) }
+    // Every tap goes through rescuedTapEffect (RescuedCard.kt), where the
+    // routing is pinned; this only carries out what it returns.
+    fun onTap(effect: RescuedTapEffect) {
+        when (effect) {
+            is RescuedTapEffect.Share -> onShare(effect.item)
+            is RescuedTapEffect.ConfirmDiscard -> confirmDiscard = effect.item
+            is RescuedTapEffect.Discard -> onDiscard(effect.item)
+        }
+    }
     confirmDiscard?.let { item ->
         AlertDialog(
             onDismissRequest = { confirmDiscard = null },
@@ -579,7 +587,7 @@ private fun RescuedDatabaseNotice(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        onDiscard(item)
+                        onTap(rescuedTapEffect(RescuedTap.CONFIRM_DISCARD, item))
                         confirmDiscard = null
                     },
                 ) { Text("Discard", color = BarColors.Red) }
@@ -591,7 +599,7 @@ private fun RescuedDatabaseNotice(
     }
     Column(modifier = Modifier.fillMaxWidth()) {
         for (item in rescued) {
-            val isBusy = item.directory in busy
+            val buttons = rescuedCardButtons(item, busy)
             Card(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                 Column(Modifier.padding(14.dp)) {
                     Text(
@@ -612,14 +620,10 @@ private fun RescuedDatabaseNotice(
                     SectionCaption("Kept on this phone. Nothing deletes it but you")
                     Spacer(Modifier.height(6.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        // Nothing to send from a rescue that saved no files.
-                        // The old version offered SEND here and produced a
-                        // valid, empty 22-byte zip -- an attachment that
-                        // arrives and looks like a backup.
-                        if (item.completeness != RescueCompleteness.NOTHING) {
+                        if (buttons.showSend) {
                             OutlinedButton(
-                                onClick = { onShare(item) },
-                                enabled = !isBusy,
+                                onClick = { onTap(rescuedTapEffect(RescuedTap.SEND, item)) },
+                                enabled = buttons.sendEnabled,
                                 contentPadding = ButtonDefaults.TextButtonContentPadding,
                             ) {
                                 Text("SEND IT TO ME", color = BarColors.Volt)
@@ -627,7 +631,10 @@ private fun RescuedDatabaseNotice(
                         }
                         // Kept a TextButton (#201): destructive (it asks first), so it stays
                         // quieter than the SEND beside it.
-                        TextButton(onClick = { confirmDiscard = item }, enabled = !isBusy) {
+                        TextButton(
+                            onClick = { onTap(rescuedTapEffect(RescuedTap.DISCARD, item)) },
+                            enabled = buttons.discardEnabled,
+                        ) {
                             Text("DISCARD", color = BarColors.Red)
                         }
                     }
@@ -635,102 +642,4 @@ private fun RescuedDatabaseNotice(
             }
         }
     }
-}
-
-/**
- * Three states, not two, and every string on this card switches on the same
- * one: [RescuedDatabase.completeness], computed in :core:data and pinned by
- * `RescuedDatabaseStoreTest`. Nothing here re-derives it.
- *
- * NO COMPLETENESS CLAIM ON THE COMPLETE CASE. The title used to read "Your
- * training history" flat, which is the claim `RescuedDatabaseStore.zipTo`'s
- * own KDoc contradicts: a `.db` alone can look complete and be stale,
- * because its `-wal` can hold committed transactions the main file does not
- * yet have -- and in a split rescue that `-wal` is a SEPARATE card. A lifter
- * who sent "Your training history" and got a zip that opened cleanly had
- * every reason to believe they had everything, and the file list was
- * suppressed on exactly that card. Both halves are fixed: the title names
- * what the card actually holds, and [rescuedDetail] lists the files on every
- * card that has any.
- */
-private fun rescuedTitle(item: RescuedDatabase): String = when (item.completeness) {
-    RescueCompleteness.COMPLETE -> "Your training history -- the main database file"
-    RescueCompleteness.FRAGMENT -> "Partial rescue -- may hold data your database is missing"
-    RescueCompleteness.NOTHING -> "Nothing survived this rescue attempt"
-}
-
-/**
- * What the discard dialog says, and it cannot be one sentence, because one
- * sentence is not true of all three states.
- *
- * THE EMPTY CASE RENDERED, VERBATIM, "This permanently removes 0 B of
- * rescued data (). This cannot be undone." -- reachable, because DISCARD is
- * offered there. `joinToString` on an empty list is the empty string and the
- * dialog interpolated it inside brackets it had already opened. That is the
- * identical defect the commit which added this dialog found and fixed six
- * lines away in [rescuedDetail], whose own KDoc states the fact that makes
- * this one wrong; tier enumeration had been applied to two of this card's
- * four strings and not to the other two.
- *
- * THE COMPLETE CASE CARRIES THE ONLY-COPY WARNING TOO. `DatabaseRescue`
- * moves rather than copies -- "MOVE, NOT COPY" is its own KDoc's heading
- * -- and `DatabaseRescue.moveOrder` moves the sidecars the same way, so
- * only-copy is a fact on both arms. What separates them is what is lost:
- * on FRAGMENT, whether losing it loses anything is uncertain; on COMPLETE,
- * losing it loses the whole history, because `AppDatabase.build`'s KDoc
- * says what happens next -- Room finds nothing and creates an empty
- * database. The FRAGMENT arm below carried the only-copy clause and this
- * one did not.
- *
- * THE FRAGMENT CASE IS WHY THE DIALOG EXISTS AT ALL. DISCARD is offered
- * there now -- see [RescuedDatabaseNotice]'s own KDoc for why the button came
- * back -- so this text is where the lifter finds out what they are about to
- * destroy. It HEDGES: a sidecar CAN hold sets the live database does not
- * have, which is `RescuedDatabaseStore.zipTo`'s own wording, but nothing on
- * this screen has opened the file and nothing here knows whether this
- * particular one does. `DatabaseRescue.moveOrder` carries -wal, -shm and
- * -journal, and a -shm alone holds nothing worth keeping, so a flat "this
- * holds your missing sets" would be a claim stronger than anything this
- * screen can support.
- */
-private fun rescuedDiscardWarning(item: RescuedDatabase): String = when (item.completeness) {
-    RescueCompleteness.COMPLETE ->
-        "This permanently removes ${ByteSize.format(item.totalBytes)} of rescued data " +
-            "(${item.files.joinToString(", ")}). The rescue MOVED these files rather than " +
-            "copying them, so the app's own database does not have what is in them and nothing " +
-            "here can put them back. Send it to yourself first if you are not sure. " +
-            "This cannot be undone."
-    RescueCompleteness.FRAGMENT ->
-        "This rescue saved no database file -- only ${item.files.joinToString(", ")}, " +
-            "${ByteSize.format(item.totalBytes)} in all. A sidecar like that can hold sets your " +
-            "current database does not have, and nothing else on this phone has a copy. Send it to " +
-            "yourself first if you are not sure. This cannot be undone."
-    RescueCompleteness.NOTHING ->
-        "This rescue attempt saved no files at all, so there is nothing here to lose. " +
-            "Only the card goes."
-}
-
-/**
- * When it was rescued (or that this code cannot say, rather than a made-up
- * time), how large it is, and what is actually in it.
- *
- * THE FILE LIST IS SHOWN ON EVERY CARD THAT HAS ONE, including the complete
- * case, which used to suppress it. That suppression was the near neighbour of
- * the title's completeness claim: in a split rescue the `.db`-only card said
- * "Your training history", sorted to the top, and showed nothing that would
- * let a lifter notice its `-wal` was on a different card. The empty case
- * still contributes null rather than an empty string -- `joinToString` on an
- * empty list is `""`, which `listOfNotNull` would still include, rendering a
- * dangling " · " with nothing after it, and an empty rescue directory is
- * reachable (see `RescuedDatabase.isEmpty`'s own KDoc). Null on emptiness
- * rather than on a state test, so the guard cannot drift from the thing it
- * guards.
- */
-private fun rescuedDetail(item: RescuedDatabase, clock: DateTimeFormatter): String {
-    val whenText =
-        item.rescuedAtMs?.let { "rescued ${clock.format(Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()))}" }
-            ?: "rescued at an unknown time"
-    val sizeText = ByteSize.format(item.totalBytes)
-    val filesText = item.files.joinToString(", ").takeIf { item.files.isNotEmpty() }
-    return listOfNotNull(whenText, sizeText, filesText).joinToString(" · ")
 }

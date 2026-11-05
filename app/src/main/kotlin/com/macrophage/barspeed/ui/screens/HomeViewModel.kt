@@ -404,7 +404,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      * instead of unwinding.
      */
     fun shareRescued(item: RescuedDatabase) {
-        if (item.directory in busyRescuesFlow.value) return
+        if (!rescuedActionAllowed(item, busyRescuesFlow.value)) return
         viewModelScope.launch {
             busyRescuesFlow.update { it + item.directory }
             try {
@@ -449,7 +449,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      * one suspension point.
      */
     fun discardRescued(item: RescuedDatabase) {
-        if (item.directory in busyRescuesFlow.value) return
+        if (!rescuedActionAllowed(item, busyRescuesFlow.value)) return
         viewModelScope.launch {
             busyRescuesFlow.update { it + item.directory }
             try {

@@ -1,0 +1,173 @@
+package com.macrophage.barspeed.ui.screens
+
+import com.macrophage.barspeed.data.DATABASE_NAME
+import com.macrophage.barspeed.data.RescueCompleteness
+import com.macrophage.barspeed.data.RescuedDatabase
+import com.macrophage.barspeed.model.ByteSize
+import java.io.File
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertIs
+import kotlin.test.assertTrue
+
+/**
+ * The rescued-database card's string-to-arm, SEND/DISCARD and busy-gate
+ * mappings. Issue #122.
+ *
+ * #111's gate permuted each of these inside `RescuedDatabaseNotice` -- titles
+ * swapped between arms, SEND's conditional inverted, DISCARD wired straight to
+ * the delete, the busy gate forced open -- and the whole suite stayed green
+ * every time. They now live as pure functions in `RescuedCard.kt` and every
+ * one of those permutations lands on a named test here.
+ *
+ * What this cannot reach: whether the composable CALLS these helpers. A card
+ * that ignored [rescuedCardButtons] or [rescuedTapEffect] would compile and
+ * pass; that step is compile- and lint-gated only. Nothing here renders.
+ */
+class RescuedCardTest {
+    private val wal = "$DATABASE_NAME-wal"
+
+    private fun item(
+        files: List<String>,
+        totalBytes: Long = 1_003L,
+        rescuedAtMs: Long? = 1_700_000_000_000L,
+        dir: String = "db-1700000000000",
+    ) = RescuedDatabase(File("/rescued", dir), rescuedAtMs, files, totalBytes)
+
+    private val complete = item(listOf(DATABASE_NAME, wal))
+    private val fragment = item(listOf(wal), totalBytes = 3L)
+    private val nothing = item(emptyList(), totalBytes = 0L)
+
+    @Test
+    fun `the fixtures are the three states they claim to be`() {
+        assertEquals(RescueCompleteness.COMPLETE, complete.completeness)
+        assertEquals(RescueCompleteness.FRAGMENT, fragment.completeness)
+        assertEquals(RescueCompleteness.NOTHING, nothing.completeness)
+    }
+
+    // ---- the string each arm carries ---------------------------------------
+
+    @Test
+    fun `each state carries its own title, and no two share one`() {
+        assertEquals("Your training history -- the main database file", rescuedTitle(complete))
+        assertEquals("Partial rescue -- may hold data your database is missing", rescuedTitle(fragment))
+        assertEquals("Nothing survived this rescue attempt", rescuedTitle(nothing))
+    }
+
+    @Test
+    fun `the complete discard warning names the size, the files and that nothing else has them`() {
+        val text = rescuedDiscardWarning(complete)
+        assertTrue(ByteSize.format(1_003L) in text, text)
+        assertTrue("($DATABASE_NAME, $wal)" in text, text)
+        assertTrue("MOVED these files rather than copying them" in text, text)
+        assertTrue(text.endsWith("This cannot be undone."), text)
+    }
+
+    @Test
+    fun `the fragment discard warning says no database file was saved and that the sidecar may matter`() {
+        val text = rescuedDiscardWarning(fragment)
+        assertTrue(text.startsWith("This rescue saved no database file -- only $wal, "), text)
+        assertTrue("can hold sets your current database does not have" in text, text)
+        assertTrue(text.endsWith("This cannot be undone."), text)
+    }
+
+    /** The "0 B of rescued data ()" dialog #111 shipped once, pinned shut. */
+    @Test
+    fun `the empty discard warning says there is nothing to lose and opens no empty brackets`() {
+        val text = rescuedDiscardWarning(nothing)
+        assertEquals(
+            "This rescue attempt saved no files at all, so there is nothing here to lose. Only the card goes.",
+            text,
+        )
+        assertFalse("()" in text)
+    }
+
+    @Test
+    fun `the detail line names when, how large, and which files`() {
+        val clock = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+        assertEquals(
+            "rescued 2023-11-14 22:13 · ${ByteSize.format(1_003L)} · $DATABASE_NAME, $wal",
+            rescuedDetail(complete, clock, ZoneOffset.UTC),
+        )
+    }
+
+    @Test
+    fun `an empty rescue's detail line has no dangling separator, and an undatable one says so`() {
+        val clock = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+        assertEquals(
+            "rescued at an unknown time · ${ByteSize.format(0L)}",
+            rescuedDetail(item(emptyList(), totalBytes = 0L, rescuedAtMs = null), clock, ZoneOffset.UTC),
+        )
+    }
+
+    // ---- which buttons, and when they are live -----------------------------
+
+    @Test
+    fun `send is offered on every state that has files, and not on the empty one`() {
+        assertTrue(rescuedCardButtons(complete, emptySet()).showSend)
+        assertTrue(rescuedCardButtons(fragment, emptySet()).showSend)
+        assertFalse(rescuedCardButtons(nothing, emptySet()).showSend, "an empty rescue offered SEND: a 22-byte zip")
+    }
+
+    @Test
+    fun `an idle card has both buttons live`() {
+        for (card in listOf(complete, fragment, nothing)) {
+            val buttons = rescuedCardButtons(card, emptySet())
+            assertTrue(
+                buttons.sendEnabled && buttons.discardEnabled,
+                "idle ${card.completeness} card disabled: $buttons",
+            )
+        }
+    }
+
+    /** #111's race: DISCARD live while SEND's archive streams deletes the corpus mid-copy. */
+    @Test
+    fun `a busy card has both buttons dead`() {
+        val buttons = rescuedCardButtons(complete, setOf(complete.directory))
+        assertFalse(buttons.sendEnabled, "SEND live while this rescue is busy")
+        assertFalse(buttons.discardEnabled, "DISCARD live while this rescue is busy")
+    }
+
+    @Test
+    fun `one busy rescue does not disable another`() {
+        val other = item(listOf(DATABASE_NAME), dir = "db-1")
+        val buttons = rescuedCardButtons(complete, setOf(other.directory))
+        assertTrue(buttons.sendEnabled && buttons.discardEnabled, "an unrelated busy key disabled this card")
+    }
+
+    @Test
+    fun `the view model's guard and the card read the same busy predicate`() {
+        assertTrue(rescuedActionAllowed(complete, emptySet()))
+        assertFalse(rescuedActionAllowed(complete, setOf(complete.directory)))
+        assertTrue(rescuedActionAllowed(complete, setOf(File("/rescued", "db-1"))))
+    }
+
+    // ---- where a tap goes ---------------------------------------------------
+
+    @Test
+    fun `discard on the card opens the dialog and deletes nothing`() {
+        val effect = rescuedTapEffect(RescuedTap.DISCARD, complete)
+        assertIs<RescuedTapEffect.ConfirmDiscard>(effect)
+        assertEquals(complete, effect.item)
+    }
+
+    @Test
+    fun `only the dialog's confirm deletes`() {
+        val effect = rescuedTapEffect(RescuedTap.CONFIRM_DISCARD, complete)
+        assertIs<RescuedTapEffect.Discard>(effect)
+        assertEquals(complete, effect.item)
+        for (tap in RescuedTap.entries - RescuedTap.CONFIRM_DISCARD) {
+            assertFalse(rescuedTapEffect(tap, complete) is RescuedTapEffect.Discard, "$tap deletes without a dialog")
+        }
+    }
+
+    @Test
+    fun `send shares the item it was tapped on`() {
+        val effect = rescuedTapEffect(RescuedTap.SEND, fragment)
+        assertIs<RescuedTapEffect.Share>(effect)
+        assertEquals(fragment, effect.item)
+    }
+}
