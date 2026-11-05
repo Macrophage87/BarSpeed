@@ -31,8 +31,9 @@ import kotlin.test.assertEquals
  * against the median `rom_m` of the reps the batch analysis resolves. #115
  * measured the first three at `5cc641a` as 0.58x, 0.53x and 0.59x; they are
  * unchanged at this tree to two decimals, although #87 and #94 moved the batch
- * path in between. The batch medians land on the leg curl's 0.4-0.5 m rail,
- * which is the only external reference the corpus has for either path.
+ * path in between. The batch medians sit at or next to the leg curl's
+ * 0.4-0.5 m rail (0.394-0.504 m across the four), which is the only external
+ * reference the corpus has for either path.
  *
  * `field-legcurl-1030-10rep` is the fourth leg curl and #115's table leaves
  * it out. Its live median is 2.12x the batch one -- live OVER-reads -- so
@@ -59,11 +60,12 @@ import kotlin.test.assertEquals
  * 11 -- so this is a comparison of two populations from one capture.
  *
  * LOST SAMPLES are excluded ON REPLAY and nowhere else. This file feeds the
- * tracker every committed sample in order; the timestamps are monotone and the
- * largest inter-sample gap is 96-123 ms, which is the burst structure the
- * field-37 archive measured, not a hole. So no part of the replayed shortfall
- * is a dropped sample. Whether a phone drops samples before they reach the
- * live tracker is a different question this file cannot answer: `[Field]`.
+ * tracker every committed sample in order; the timestamps are monotone, the
+ * largest inter-sample gap is 94-123 ms across the four, and `sample_idx` is
+ * contiguous from 0 on all four -- so no index is missing from what is
+ * replayed, and no part of the replayed shortfall is a dropped sample.
+ * Whether a phone drops samples before they reach the live tracker is a
+ * different question this file cannot answer: `[Field]`.
  *
  * ## How the live figures are read, and why that is licensed
  *

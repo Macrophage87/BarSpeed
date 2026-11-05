@@ -165,7 +165,10 @@ class HorizontalAxisOrientationTest {
      * is a real phase by every rule this segmenter has, and it orients the
      * set: the eccentric of the first rep holds the 0.96 s drive. Nothing
      * declared distinguishes a 12 cm settle from a 12 cm rep, which is why no
-     * displacement gate can. The settle is counted as a seventh rep here as
+     * absolute displacement floor can; a set-relative test -- the deciding
+     * run against the set's own runs -- could separate this synthetic case,
+     * and was not tried, because its fraction could only be fitted to these
+     * synthetic samples. The settle is counted as a seventh rep here as
      * well, so the count moves on this one -- unlike the 3 cm case.
      *
      * Synthetic, like everything in this file.

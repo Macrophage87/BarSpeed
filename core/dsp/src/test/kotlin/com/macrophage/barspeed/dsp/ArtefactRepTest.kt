@@ -94,6 +94,14 @@ import kotlin.test.assertTrue
  * and 10 are unchanged, to every digit. The figures below are measured at
  * `41c0c96bbc3be29cc7d705bf3d74c7196a0d12de`, and none of them is quoted from
  * the session archive.
+ *
+ * SINCE THEN #290 and #306 withhold both inflated reps from the SET's peak
+ * (`AccelArtefact.setPeakPowerW`; `ArtefactPeakWithholdingTest` pins which
+ * clause does it), so neither 407.4 W nor 783.2 W is a set-level figure at
+ * this tree. Each still stands on its own `repMetrics` row, beside that
+ * row's artefact counts. Where a test below takes a maximum or a mean over
+ * the reps, it is computed in this file over every row and is labelled so;
+ * it is not the export's `summary`.
  */
 class ArtefactRepTest {
     private fun load(fixture: String): List<ImuSample> =
@@ -234,7 +242,7 @@ class ArtefactRepTest {
         val eight = analyseWithInRangeAccel(set08, 30.25)
         assertEquals(7, eight.reps.size, "set 8 resolves seven either way")
         assertEquals(0.23, round3(eight.reps[6].romM), "its detection 6 survives, ranging this far")
-        assertEquals(69.4, eight.reps[6].peakPowerW, "with this peak power, against the 407.4 W it publishes")
+        assertEquals(69.4, eight.reps[6].peakPowerW, "with this peak power, against the 407.4 W its row publishes")
         assertNotNull(eight.reps[6].eccS, "and it resolved both phases either way")
     }
 
@@ -284,13 +292,13 @@ class ArtefactRepTest {
      * ones.
      */
     @Test
-    fun `set 3 keeps every detection and publishes 783_2 W, worse than the 309_4 W it shipped`() {
+    fun `set 3 keeps every detection and its largest row reads 783_2 W, worse than the 309_4 W it shipped`() {
         val a = analyse(set03, 22.67961850050177)
         assertEquals(11, a.reps.size, "detections")
         assertNull(a.detectionsAfterSetEndCue, "no cue track passed, so nothing is bounded")
-        assertEquals(1.396, a.reps.maxOf { it.peakConVelMps }, "summary peakConVel_mps")
-        assertEquals(783.2, peakPower(a), "summary peakPower_w")
-        assertEquals(0.698, meanRom(a), "summary meanRom_m")
+        assertEquals(1.396, a.reps.maxOf { it.peakConVelMps }, "peakConVel_mps, max over every row")
+        assertEquals(783.2, peakPower(a), "peakPower_w, max over every row; the set's peak withholds it")
+        assertEquals(0.698, meanRom(a), "rom_m, mean over every row")
         // #291 narrowed romSpread_pct onto the reps whose displacement the
         // analysis can bound, and this set has fewer than two, so the figure is
         // WITHHELD where it read 63.5. The mean above is computed in this file

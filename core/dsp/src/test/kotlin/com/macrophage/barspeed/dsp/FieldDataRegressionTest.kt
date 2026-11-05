@@ -230,8 +230,11 @@ class FieldDataRegressionTest {
      * the overhead-press sets of this corpus reproduce under -- the capture
      * pairs ONE rep and its eccentric is 2.46 s: about half the lowering
      * #47 describes. A plausible number well under the measured lowering is
-     * #47's FAIL signature, so this is pinned as what ships, not as a
-     * measurement of the press.
+     * #47's FAIL signature, so this is pinned as what the shipped analyzer
+     * computes under each opening phase, not as a measurement of the press.
+     * `ExerciseDef.inferStartPhase` infers CONCENTRIC for
+     * `seated_overhead_press` (its "overhead" hint), so the 2.46 s reaches a
+     * lifter only under an eccentric-first declaration.
      *
      * The discharge stays `[Field]` and is withdrawn as a gym check by the
      * owner (2026-09-12, "I can't use a stopwatch, my hands are full"):

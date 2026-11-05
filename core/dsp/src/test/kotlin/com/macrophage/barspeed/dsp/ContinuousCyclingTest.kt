@@ -27,6 +27,14 @@ import kotlin.test.assertTrue
  * owner's archive. Nothing here substitutes for them, and nothing here says the
  * dumbbell sets now resolve. Owed, `[Field]`.
  *
+ * The BAR-MOUNTED candidates #138 later named ARE committed and pinned
+ * elsewhere: field-37's `field-bench-3010-6rep-s37-set05` and `-set06` and
+ * `field-ohp-3010-6rep-s37-set02` (its 2026-09-02 comment), and field-36's
+ * `field-rdl-3010-10rep-s36-set05`. `AnchorSupplyByMountTest`'s "what the
+ * two families resolve" pins them at 5, 6, 9 and 11 detections against 6,
+ * 6, 6 and 10 performed, and `BlankAnalysisTest` carries the RDL set's runs.
+ * So "no hand-held stream is committed" is not "no #138 capture is".
+ *
  * ## What a synthetic stream can and cannot say
  *
  * `SyntheticSets` emits ten 0.40 m reps -- a 1.5 s lowering straight into a
@@ -34,16 +42,19 @@ import kotlin.test.assertTrue
  * of noise, so the median gyro magnitude is 46 deg/s and sits inside #138's
  * measured hand-held range, and a constant 0.01 g accelerometer bias on the
  * vertical axis, which is what makes an integrator with no zero run away. The
- * quiet predicate admits 11 of its 2,800 samples, each isolated -- no two
- * adjacent -- four of them in the 1.5 s lead-in and lead-out and seven
- * mid-set. That is #138's SHAPE: a healthy stream with almost nothing to
- * anchor on, and the collapse below is what that supply amounts to.
+ * quiet predicate admits 11 of its 2,800 samples (asserted). Review round 1
+ * measured them isolated -- no two adjacent -- with four in the 1.5 s lead-in
+ * and lead-out and seven mid-set; this file does not assert that placement.
+ * That is #138's SHAPE: a healthy stream with almost nothing to anchor on,
+ * and the over-cap run below is what that supply amounts to.
  *
  * On that shape:
  *
  * - The ANCHORED series alone -- `VelocityEstimator.estimateAnchored`, the
- *   estimator as it stood before `RunawayDrift` (#94) -- collapses into one
- *   run of about 39.4 m, the cap demotes it, and NOTHING pairs: zero spans.
+ *   shipped estimator with `RunawayDrift`'s (#94) correction removed --
+ *   carries a largest run of about 39.4 m, the cap demotes it, and NOTHING
+ *   pairs: zero spans. (Only the largest run is asserted, not how many
+ *   runs the set splits into.)
  *   That is #138's failure, reproduced without a field fixture.
  * - The SHIPPED estimator, which de-trends every run past the cap
  *   (`RunawayDrift.corrected`), resolves TEN of ten.
