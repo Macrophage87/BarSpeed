@@ -22,14 +22,22 @@ import kotlin.test.assertTrue
  * WHAT THIS IS NOT. It is not evidence that the field crash #271 opened with is
  * fixed, and it does not claim to be. The phone's own records traced every
  * v0.1.51 crash to an `OutOfMemoryError` in the interrupted-set listing, which
- * v0.1.52 replaced, and the emulator chain v0.1.41 -> v0.1.51 exported fifteen
- * old sessions without error. What has never run anywhere is a session holding
+ * v0.1.52 replaced, and the emulator chain v0.1.41 -> v0.1.51 exported four
+ * sessions recorded on older builds, and one on v0.1.51, three ways each --
+ * fifteen exports -- without error. What has never run anywhere is a session holding
  * sets recorded on v0.1.50 or earlier exported on the CURRENT build -- the
  * ask field-42's comment closes on. That stays `[Field]`. These pins are the
  * regression floor beneath it: every row shape below is what an older build's
  * own types would have encoded, read off the tag rather than invented, and
  * each one goes through `SessionExporter.buildExport` (summary and detailed)
  * and `RawExporter.buildZip`.
+ *
+ * WHAT THESE DO NOT REACH. Three unguarded seams #271's own source reading
+ * named stay uncovered, because no stored shape is known to reach them: the
+ * cue stream's `CueCsv.decode(Gzip.decompress(...))` in `buildExport`, the
+ * prep stream's `PrepWindowCsv.decode` in the raw-zip loop, and two streams of
+ * one kind and one role on one set, which would write one zip entry name
+ * twice. A green run here says nothing about any of the three.
  *
  * THE SHAPES, each taken from the tag named:
  *
@@ -301,6 +309,25 @@ class HistoricalRowReexportTest {
         assertNull(squat.rpeScale, "a row with no stored rpeScale was given one")
         assertNull(squat.failedByLifter)
         assertEquals("3-1-1-0", squat.prescription.tempoPrescribed)
+    }
+
+    /**
+     * What a 1.0 set publishes today, figure by figure (#38). Each rep's
+     * `ecc_s` is copied out of the stored blob, so the 0.0 an unmeasured 1.0
+     * eccentric was stored as is still published as 0.0. The set's
+     * `velocityLoss_pct` is NOT: it is re-derived from the stored reps at
+     * export (#83, 1.9), so the blob's 67.7 is never read -- the two stored
+     * reps are equally fast, so the last is the fastest and no loss is
+     * published at all. And the row predates database 21, so it names no
+     * contract for either figure.
+     */
+    @Test
+    fun `a 1_0-era set publishes its stored eccentrics but re-derives its loss`() = runTest {
+        val squat = SessionExporter(repository()).buildExport(1L, includeRepDetail = true)!!.set("back_squat")
+        assertEquals(listOf(0.0, 0.0), squat.repMetrics?.map { it.eccS }, "a stored rep figure was not copied out")
+        assertNull(squat.velocityLossPct, "the stored velocityLossPct was published")
+        assertEquals("terminalRepIsFastest", squat.velocityLossBasis)
+        assertNull(squat.analysisSchemaVersion, "a pre-v21 row was given a contract")
     }
 
     /**
