@@ -265,6 +265,40 @@ object VoidSetPolicy {
     const val CHIP = "NOT PERFORMED"
 
     /**
+     * The number a set card's lifter would count to reach [target]: its position
+     * among the sets of its own exercise, from 1, in session order (#232).
+     *
+     * The session's set list carries one counter, `orderIdx`, never reset when
+     * the exercise changes, so this is counted rather than read. Generic over the
+     * caller's row type for [performed]'s reason. [target] must be
+     * one of [sets]; where it is not, the answer is 0, which names no set.
+     */
+    fun <T> setNumberInExercise(sets: List<T>, target: T, exerciseId: (T) -> String, orderIdx: (T) -> Int): Int {
+        if (target !in sets) return 0
+        return sets.count { exerciseId(it) == exerciseId(target) && orderIdx(it) <= orderIdx(target) }
+    }
+
+    /**
+     * Whether taking the void mark off a set asks first (#232).
+     *
+     * The un-void control is one tap with no dialog, and it clears the reason with
+     * the mark -- `SessionRepository.setVoided` is where that is enforced -- so a
+     * mistap on a set that carries the lifter's own words deletes them. [reason]
+     * is the stored reason, or null.
+     *
+     * Today it never asks.
+     */
+    fun unvoidAsks(reason: String?): Boolean = reason?.let { false } ?: false
+
+    /**
+     * The question asked before the mark comes off a set that carries [reason].
+     * The reason is quoted, because it is what the tap deletes.
+     */
+    fun unvoidConfirmation(reason: String): String =
+        "Mark this set as performed? The reason you gave, \"$reason\", is deleted with the mark and cannot be " +
+            "brought back."
+
+    /**
      * What the confirmation says before the mark goes on.
      *
      * It states the two things a lifter cannot see from the card: that nothing
