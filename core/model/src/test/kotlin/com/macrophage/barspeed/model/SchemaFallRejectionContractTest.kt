@@ -21,9 +21,11 @@ import kotlin.test.assertTrue
  * behaviour they describe is red in `:core:dsp` -- `SquatLiveCountFieldTest`,
  * `FallRejectionCorpusTest`, `CycleFallRejectionTest` -- until the fix.
  *
- * THE TIP LITERAL LIVES HERE, on the rule `SchemaSkippedSetContractTest` wrote
- * when it minted 1.21. `SchemaSessionHrvContractTest`, which held it for 1.24,
- * now asserts only that 1.24 is still accepted.
+ * THE TIP LITERAL LIVED HERE, on the rule `SchemaSkippedSetContractTest` wrote
+ * when it minted 1.21, until 1.26 (#289) moved it to
+ * `SchemaInversionSourceContractTest`. This file now asserts only that 1.25
+ * is still accepted, and its example assertion is gone with the literal:
+ * `SchemaContractTest` pins the example against the tip.
  *
  * WHERE THE FIGURES COME FROM, because `:core:model` cannot see `:core:dsp`'s
  * corpus: 6, 4, 5, 5 and 5 and 5, 1, 2, 1 and 5 are `SquatLiveCountFieldTest`'s.
@@ -52,13 +54,13 @@ class SchemaFallRejectionContractTest {
         ) { "GuideScreen.kt is not on the test classpath - see the include filter in core/model/build.gradle.kts" }
             .readBytes().decodeToString()
 
+    /** RENAMED from `the exporter writes 1_25, which the schema accepts, and 1_24 is still readable` at 1.26. */
     @Test
-    fun `the exporter writes 1_25, which the schema accepts, and 1_24 is still readable`() {
+    fun `1_25 is accepted by the code and the schema, and 1_24 is still readable`() {
         val enum = properties().getValue("schemaVersion").jsonObject.getValue("enum").jsonArray
             .map { it.jsonPrimitive.content }
-        assertEquals("1.25", SessionExport.SCHEMA_VERSION, "the version the exporter writes")
-        assertTrue("1.25" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "the version written is not accepted")
-        assertTrue("1.25" in enum, "the published schema rejects the version the exporter writes")
+        assertTrue("1.25" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "1.25, shipped in v0.1.58, left the accepted set")
+        assertTrue("1.25" in enum, "the published schema rejects 1.25")
         assertTrue("1.24" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "1.24, shipped in v0.1.57, left the accepted set")
     }
 
@@ -115,11 +117,5 @@ class SchemaFallRejectionContractTest {
             val text = if (name == "the plan prompt") prompt else readingKey()
             assertFalse(retracted in text, "$name still states: $retracted")
         }
-    }
-
-    @Test
-    fun `the published example declares 1_25`() {
-        val example = document("examples/session-export.example.json")
-        assertEquals("1.25", example.getValue("schemaVersion").jsonPrimitive.content)
     }
 }

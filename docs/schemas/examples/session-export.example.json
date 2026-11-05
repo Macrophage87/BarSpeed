@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.25",
+  "schemaVersion": "1.26",
   "startedAt": "2026-07-18T17:04:00Z",
   "endedAt": "2026-07-18T18:11:00Z",
   "timeZone": { "id": "America/New_York", "utcOffsetMinutes": -240 },
@@ -50,7 +50,8 @@
               "kind": "seeded",
               "travelRatio": "seeded",
               "sensorOnStack": "default",
-              "bodyweight": "default"
+              "bodyweight": "default",
+              "sensorInverted": "default"
             }
           },
           "sensors": {
@@ -176,7 +177,8 @@
               "kind": "seeded",
               "travelRatio": "seeded",
               "sensorOnStack": "default",
-              "bodyweight": "default"
+              "bodyweight": "default",
+              "sensorInverted": "default"
             }
           },
           "summary": { "meanConVel_mps": 0.55, "peakConVel_mps": 0.9, "meanEcc_s": 3.6, "meanCon_s": 0.95, "meanRom_m": 0.6, "romSpread_pct": 3.8 }
@@ -274,7 +276,8 @@
               "kind": "inferred",
               "travelRatio": "default",
               "sensorOnStack": "seeded",
-              "bodyweight": "default"
+              "bodyweight": "default",
+              "sensorInverted": "inferred"
             }
           },
           "repMarks": [1784397124000, 1784397128120, 1784397132060, 1784397136210, 1784397140340, 1784397144290, 1784397148480, 1784397152610, 1784397156900, 1784397161180],
@@ -378,7 +381,8 @@
               "kind": "declared",
               "travelRatio": "default",
               "sensorOnStack": "default",
-              "bodyweight": "declared"
+              "bodyweight": "declared",
+              "sensorInverted": "declared"
             }
           },
           "summary": { "meanConVel_mps": 0.35, "peakConVel_mps": 0.6, "meanEcc_s": 2.4, "meanCon_s": 1.3, "meanRom_m": 0.58 }

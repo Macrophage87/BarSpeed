@@ -442,8 +442,9 @@ class SetGeometryPolicyTest {
     /**
      * The provenance object's published shape, key by key, so a key arriving or
      * leaving is a decision somebody has to make rather than a diff nobody
-     * reads. `sensorOnStack` joined it in #223 and `bodyweight` under 1.19
-     * (#220); this test's name has moved with each of them.
+     * reads. `sensorOnStack` joined it in #223, `bodyweight` under 1.19
+     * (#220) and `sensorInverted` under 1.26 (#289); this test's name has
+     * moved with each of them, from "seven" to "eight" at the last.
      *
      * It caught the second arrival, which is what it is for -- and it did so
      * at the FIX rather than at the differential commit before it, because at
@@ -453,10 +454,19 @@ class SetGeometryPolicyTest {
      * five reds that were pushed alone.
      */
     @Test
-    fun `the published provenance keys are exactly these seven`() {
+    fun `the published provenance keys are exactly these eight`() {
         val g = SetGeometryPolicy.describe(opinionated, null)
         assertEquals(
-            setOf("startsWith", "concentric", "plane", "kind", "travelRatio", "sensorOnStack", "bodyweight"),
+            setOf(
+                "startsWith",
+                "concentric",
+                "plane",
+                "kind",
+                "travelRatio",
+                "sensorOnStack",
+                "bodyweight",
+                "sensorInverted",
+            ),
             json.parseToJsonElement(json.encodeToString(GeometrySources.serializer(), g.sources))
                 .jsonObject.keys,
         )
