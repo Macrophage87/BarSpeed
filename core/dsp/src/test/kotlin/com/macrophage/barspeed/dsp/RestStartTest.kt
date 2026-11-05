@@ -45,6 +45,20 @@ class RestStartTest {
         assertEquals(38_000L, RestStart.of(cues, cadenceGuided = false, emptyList(), 38_000L, endedAtMs))
     }
 
+    /**
+     * A guided set's marks are the guide's calls, made on its own schedule,
+     * never the lifter's taps: where no terminal word is on the record they
+     * must not seed the rest, which then runs from the write.
+     * `SetEnd.terminalCall` writes `Set ended` on every guided set that
+     * reached none, so a live write does not take this path; the pin holds
+     * the rule against a caller that hands the guide's marks in anyway.
+     */
+    @Test
+    fun `a guided set's calls never stand in for the lifter's taps`() {
+        val calls = taps(10)
+        assertEquals(endedAtMs, RestStart.of(emptyList(), cadenceGuided = true, calls, null, endedAtMs))
+    }
+
     /** A sensor-counted set speaks no `Done` and writes no mark: the write instant. */
     @Test
     fun `a set nothing called over and nobody tapped rests from its write`() {

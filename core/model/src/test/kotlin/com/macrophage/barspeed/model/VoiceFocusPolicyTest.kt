@@ -98,7 +98,10 @@ class VoiceFocusPolicyTest {
      */
     @Test
     fun `a start reported for a replaced word is not the set's word`() {
-        val replaced = VoiceFocusPolicy.spoke(VoiceFocusPolicy.spoke(idle, "a"), "b")
+        // Inside a set, so the answer rests on the id alone: outside one a
+        // start marks nothing for any word, and the pin would hold whatever
+        // `started` did with the id.
+        val replaced = VoiceFocusPolicy.spoke(VoiceFocusPolicy.spoke(VoiceFocusPolicy.setStarted(idle), "a"), "b")
         assertEquals(replaced, VoiceFocusPolicy.started(replaced, "a"))
     }
 
