@@ -1,6 +1,8 @@
 package com.macrophage.barspeed.dsp
 
 import com.macrophage.barspeed.model.LeadInPolicy
+import com.macrophage.barspeed.model.SkipSetControl
+import com.macrophage.barspeed.model.VoiceMilestonePolicy
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -172,6 +174,70 @@ class LeadInPlanTest {
         assertEquals(emptySet(), LeadInPlan.RECORDED intersect strokeWords, "lead-in word that is a stroke call")
         val digits = (1..9).map { it.toString() }.toSet()
         assertEquals(emptySet(), LeadInPlan.RECORDED intersect digits, "lead-in word that is a tempo count")
+    }
+
+    /**
+     * The third collision class (#130): no lead-in word may be a word the app
+     * already uses for a SET, on the cue record or on screen.
+     *
+     * This is the class `Brace` was chosen for. The owner took it over `Set`
+     * because `Set` collides with a set of reps -- the screen says which set
+     * of how many, and a cue track is entirely about one set. The two pins
+     * above cannot see that: `Set` is neither a stroke word nor a digit, so
+     * with only them a rename of [LeadInPlan.BRACE] back to `Set` reds
+     * nothing.
+     *
+     * READ FROM THE APP'S OWN STATEMENTS, NOT COPIED, wherever one exists:
+     *
+     * - the cue record: [SetEnd.TERMINAL_CUES], which is the canonical set of
+     *   words that end a set on the track (`Done`, `Set ended`, `Time`), and
+     *   the two halves of a guided rep call, [CadencePlan.LAST_REP] and
+     *   [CadencePlan.REP_CALL_PREFIX];
+     * - the unguided counter's words, rendered by
+     *   `VoiceMilestonePolicy.repMilestone` itself rather than restated;
+     * - the screen: `SkipSetControl.confirmTitle`, the one rendering of a
+     *   set's own name ("Skip Set 3 of ...") that lives in a module this test
+     *   can reach.
+     *
+     * WHAT HAS NO CANONICAL SOURCE, said plainly rather than hand-copied
+     * here: the in-set header that reads `SET 3 OF 5` is a literal inside a
+     * `@Composable` in `:app` (`RecordScreen`), which no test on the CI path
+     * can load. Nothing ties that literal to the copy read here, so a rename
+     * of the screen's word alone is invisible to this pin. What the pin does
+     * hold is every set word the app states in `:core:model` and `:core:dsp`.
+     *
+     * Compared word by word, case-folded: `Brace` against `Set ended` is a
+     * comparison of `brace` against `set` and `ended`, because a lifter
+     * hearing one word and reading another does not match whole strings.
+     */
+    @Test
+    fun `no lead-in word is a word the app uses for a set`() {
+        fun words(s: String): Set<String> =
+            s.split(Regex("[^A-Za-z]+")).filter { it.isNotEmpty() }.map { it.lowercase() }.toSet()
+
+        val placeholder = "Placeholderexercise"
+        val setVocabulary = buildSet {
+            SetEnd.TERMINAL_CUES.forEach { addAll(words(it)) }
+            addAll(words(CadencePlan.LAST_REP))
+            addAll(words(CadencePlan.REP_CALL_PREFIX))
+            listOf(
+                VoiceMilestonePolicy.repMilestone(repCount = 1, announcedRep = 0, plannedReps = null),
+                VoiceMilestonePolicy.repMilestone(repCount = 2, announcedRep = 0, plannedReps = 3),
+                VoiceMilestonePolicy.repMilestone(repCount = 3, announcedRep = 0, plannedReps = 3),
+            ).forEach { addAll(words(requireNotNull(it))) }
+            addAll(words(SkipSetControl.confirmTitle(placeholder, 3)) - words(placeholder))
+        }
+        // The pin is only as good as what it reads; if a source above stopped
+        // saying "set" this would pass vacuously, so the word it exists for is
+        // asserted present.
+        assertTrue("set" in setVocabulary, "the set vocabulary read here must contain the word set: $setVocabulary")
+        LeadInPlan.RECORDED.forEach { word ->
+            assertEquals(
+                emptySet(),
+                words(word) intersect setVocabulary,
+                "lead-in word $word shares a word with the vocabulary the app uses for a set",
+            )
+        }
     }
 
     @Test
