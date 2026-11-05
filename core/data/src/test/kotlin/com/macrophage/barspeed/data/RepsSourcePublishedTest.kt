@@ -305,6 +305,19 @@ class RepsSourcePublishedTest {
     }
 
     /**
+     * field-47 set 4 in miniature (#336): a guided set the lifter stopped at
+     * 8 while the guide called 10. Both writers name the 8 a correction, so
+     * no reader credits the metronome with a count it never made.
+     */
+    @Test
+    fun `a guided set stopped short of the guide's count publishes corrected in both writers`() = runTest {
+        val row = row(repsManual = true, tempo = "3010", geometryKind = ExerciseKind.DYNAMIC, actualReps = 8)
+        val marks = listOf(repMarks(row, 10))
+        assertEquals("corrected", setObject(row, marks).word())
+        assertEquals("corrected", manifestSet(row, marks).word())
+    }
+
+    /**
      * A row with NO stored geometry reads its tempo as the guide, which is the
      * one collapse the derivation cannot avoid.
      *
