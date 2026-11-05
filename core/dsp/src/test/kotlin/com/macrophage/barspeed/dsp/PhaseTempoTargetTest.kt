@@ -84,8 +84,10 @@ import kotlin.test.assertTrue
  * every still period on a squat a top pause -- including the one at the bottom
  * of the squat. That was a tracker defect, not a tempo-digit one, and #134
  * fixed it there; `LivePhaseLabelTest` pins all four shapes. The same change
- * re-measured `the eccentric runs on this set fit digit 3 and not digit 1`
- * below, whose runs had been the drives.
+ * re-measured the test below, whose runs had been the drives; it was named
+ * `the eccentric runs on this set fit digit 3 and not digit 1` and is renamed
+ * `six eccentric runs on this set overrun digit 1 and one overruns digit 3`,
+ * because one re-measured run, 3.61 s, is past digit 3 too.
  */
 class PhaseTempoTargetTest {
     private fun res(n: String) = javaClass.getResourceAsStream("/$n")!!.readBytes().decodeToString()
@@ -317,7 +319,7 @@ class PhaseTempoTargetTest {
     }
 
     @Test
-    fun `the eccentric runs on this set fit digit 3 and not digit 1`() {
+    fun `six eccentric runs on this set overrun digit 1 and one overruns digit 3`() {
         // The size of the error on real data. These are the durations of the
         // runs the live tracker labelled ECCENTRIC; six of the sixteen are more
         // than a tolerance longer than digit 1, and one -- 3.61 s, 0.11 s
