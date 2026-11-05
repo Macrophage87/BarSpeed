@@ -3,6 +3,7 @@ package com.macrophage.barspeed.data
 import com.macrophage.barspeed.dsp.ImuCsv
 import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ImuSample
+import com.macrophage.barspeed.model.SensorContact
 import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.model.VoiceCue
 import kotlinx.coroutines.CoroutineScope
@@ -399,6 +400,25 @@ class SetJournalTest {
         val found = store.orphans().single()
         assertEquals(hr.size.toLong(), found.hr?.rows)
         assertEquals(hr, HrCsv.decode(File(found.directory, SetJournal.HRM).readText()))
+    }
+
+    /**
+     * DIFFERENTIAL, #82. The journal writes heart rate line by line through
+     * `HrCsv.row`, so the contact column reaches the copy an interrupted set is
+     * rebuilt from, not only the exported one. Before the row format was
+     * shared, the journal carried its own copy of the expression.
+     */
+    @Test
+    fun `the strap's contact report survives the journal`() = runTest {
+        val store = store()
+        val journal = requireNotNull(store.open(header()))
+        val worn = HrSample(timestampMs = 1L, bpm = 72, contact = SensorContact.DETECTED)
+        val off = HrSample(timestampMs = 2L, bpm = 72, contact = SensorContact.NOT_DETECTED)
+        journal.appendHr(worn)
+        journal.appendHr(off)
+        journal.sync()
+        val found = store.orphans().single()
+        assertEquals(listOf(worn, off), HrCsv.decode(File(found.directory, SetJournal.HRM).readText()))
     }
 
     @Test

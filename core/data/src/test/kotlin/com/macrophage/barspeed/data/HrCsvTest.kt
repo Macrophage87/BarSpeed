@@ -30,11 +30,30 @@ class HrCsvTest {
                 HrSample(timestampMs = 2L, bpm = 50, rrIntervalsMs = listOf(0.0)),
             )
         val text = HrCsv.encode(samples)
-        assertEquals("timestamp_ms,hr_bpm,rr_ms\n1,50,\n2,50,0.0\n", text)
+        assertEquals("timestamp_ms,hr_bpm,rr_ms,contact\n1,50,,\n2,50,0.0,\n", text)
 
         val decoded = HrCsv.decode(text)
         assertEquals(emptyList(), decoded[0].rrIntervalsMs, "an absent R-R field decoded as a value")
         assertEquals(listOf(0.0), decoded[1].rrIntervalsMs, "a reported zero decoded as absence")
+    }
+
+    /**
+     * DIFFERENTIAL, #82 (export 1.26). The strap's contact report is a fourth
+     * column, `1`, `0` or empty, and all three survive a round trip as
+     * themselves. Empty is NOT_RECORDED: the strap said nothing, which is a
+     * different statement from `0`, "no contact".
+     */
+    @Test
+    fun `the contact report survives a round trip as its own column`() {
+        val samples =
+            listOf(
+                HrSample(timestampMs = 1L, bpm = 72, contact = SensorContact.DETECTED),
+                HrSample(timestampMs = 2L, bpm = 72, contact = SensorContact.NOT_DETECTED),
+                HrSample(timestampMs = 3L, bpm = 72, rrIntervalsMs = listOf(830.0)),
+            )
+        val text = HrCsv.encode(samples)
+        assertEquals("timestamp_ms,hr_bpm,rr_ms,contact\n1,72,,1\n2,72,,0\n3,72,830.0,\n", text)
+        assertEquals(samples, HrCsv.decode(text))
     }
 
     /**
