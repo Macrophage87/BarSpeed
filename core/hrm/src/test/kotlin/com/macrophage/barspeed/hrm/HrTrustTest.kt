@@ -40,6 +40,29 @@ class HrTrustTest {
     }
 
     /**
+     * DIFFERENTIAL, #82. A sample with no R-R interval was trusted on its bpm
+     * alone because `all` over an empty list is true, and the strap's own
+     * contact report was the only other evidence the notification carried.
+     * Where the strap SAYS it has no skin contact and the R-R field is
+     * silent, nothing supports the bpm.
+     */
+    @Test
+    fun `no R-R and a reported loss of contact is not a measurement`() {
+        assertFalse(HrTrust.isTrusted(sample(72).copy(contact = SensorContact.NOT_DETECTED)))
+    }
+
+    /** The stream-level consequence: such a stream publishes no heart rate at all. */
+    @Test
+    fun `a stream reporting no contact and no R-R publishes no heart rate`() {
+        val offSkin = List(5) { sample(72, at = it * 1_000L).copy(contact = SensorContact.NOT_DETECTED) }
+        val summary = HrTrust.summarize(offSkin)
+        assertNull(summary.avgBpm)
+        assertNull(summary.maxBpm)
+        assertEquals(0, summary.trustedSamples)
+        assertEquals(5, summary.totalSamples)
+    }
+
+    /**
      * Contact is consulted only where the R-R field is silent (#82), so a
      * sample whose own reported intervals are possible is not overruled by
      * the contact bit. That is the scope the change was written to, kept
