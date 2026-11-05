@@ -604,20 +604,40 @@ object SetAnalyzer {
      * fragile-signal class has exactly one member and it is this function.
      * Searching for a second one has been done; there is not one.
      *
-     * It is fragile because ANY pre-rep movement decides it: a 3 cm settle
-     * before the first rep inverts the whole set. When that happens the rep
-     * count is unchanged and the published velocities stay positive and
-     * plausible — they simply describe the wrong stroke, and the eccentric and
-     * concentric swap outright. Issue 28, reproduced in
-     * `HorizontalAxisOrientationTest`, not fixed there: no committed capture
-     * can reach this code, so any threshold chosen to harden it would be
-     * calibrated against fabricated samples.
+     * It WAS fragile because any pre-rep movement decided it: a 3 cm settle
+     * before the first rep inverted the whole set, with the rep count
+     * unchanged and the published velocities positive and plausible -- they
+     * described the wrong stroke, and the eccentric and concentric swapped
+     * outright. Issue 28.
+     *
+     * So the deciding run must also have TRAVELLED at least
+     * [DspConfig.minRomM]: the first movement run that is a rep's worth of
+     * displacement, not merely the first one above the speed and duration
+     * gates. That is the floor the pairing stage already uses to call a run a
+     * phase, at the value it already holds, in the SENSOR's frame like the
+     * rest of [RunThresholds.sensorFrame] -- no new constant, and nothing
+     * fitted to the synthetic sets that are the only evidence this path has
+     * (no committed capture reaches it; `HorizontalAxisOrientationTest` says
+     * why). A set in which no run travels that far keeps today's answer:
+     * the series is returned unflipped, as it was when no run existed.
+     *
+     * WHAT THE GATE DOES NOT DO. A settle of a rep's worth still decides the
+     * axis -- a 12 cm movement the other way is a phase by every rule here,
+     * and `HorizontalAxisOrientationTest` pins that it still inverts the set.
+     * Nothing declared tells a 12 cm settle from a 12 cm rep. Whether a real
+     * lifter's settle on a handle-mounted horizontal machine stays under
+     * 0.10 m is `[Field]`: it needs a capture with the sensor on the handle,
+     * which the corpus does not hold.
      */
     private fun orient(series: VelocitySeries, direction: LiftDirection, config: DspConfig): VelocitySeries {
         if (direction.measuredPlane != MovementPlane.HORIZONTAL) return series
+        val thresholds = RunThresholds.sensorFrame(config)
         val firstMove =
-            RepSegmenter.classifyRuns(series, RunThresholds.sensorFrame(config))
-                .firstOrNull { it.type != RunType.STILL } ?: return series
+            RepSegmenter.classifyRuns(series, thresholds)
+                .firstOrNull {
+                    it.type != RunType.STILL &&
+                        RepSegmenter.displacement(series, it.startIdx, it.endIdx) >= thresholds.minRomM
+                } ?: return series
         val expected =
             if (direction.startsWith == StartPhase.CONCENTRIC) direction.concentricRun else direction.eccentricRun
         return if (firstMove.type == expected) series else series.mappedToLifter(-1.0)
