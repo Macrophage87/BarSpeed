@@ -1,5 +1,6 @@
 package com.macrophage.barspeed.dsp
 
+import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.StartPhase
 import kotlin.test.Test
@@ -104,6 +105,52 @@ class LivePhaseCaptionTest {
             words,
             "declared drive-down pushdown on the stack, inverted",
         )
+    }
+
+    @Test
+    fun `a stack-mounted lift left at the default drive names no up or down`() {
+        // ExerciseDef.concentricUp is never inferred from the id, so a
+        // pushdown, pulldown or leg curl no plan declared `concentric: down`
+        // runs with concentricUp = true. On the stack table it rides the stack
+        // and rule 3 does not invert it, so the tracker reads the STACK's
+        // travel: CONCENTRIC is the stack going up, which is the lifter
+        // pulling the handle DOWN. "Driving up" there named the stack's
+        // direction as the lifter's (review round 2 of lane L6, lens A N2).
+        // Uninverted on the stack, the frame is not known to be the lifter's,
+        // so no word says up or down.
+        val undeclared = ExerciseDef(
+            id = "triceps_pushdown",
+            displayName = "Triceps pushdown",
+            startsWith = StartPhase.CONCENTRIC,
+            sensorOnStack = true,
+        ).liftDirection()
+        assertTrue(undeclared.concentricUp && !undeclared.sensorInverted, "the default drive, uninverted")
+        val words = Phase.entries.associateWith { caption(it, undeclared) }
+        assertEquals(
+            mapOf(
+                Phase.IDLE to "Ready",
+                Phase.ECCENTRIC to "Returning",
+                Phase.BOTTOM_PAUSE to "Pause",
+                Phase.CONCENTRIC to "Driving",
+                Phase.TOP_PAUSE to "Pause",
+            ),
+            words,
+            "pushdown on the stack, drive left at the default",
+        )
+    }
+
+    @Test
+    fun `a withheld live count draws no caption`() {
+        // #280's fallback withholds the live count by dropping the tracker and
+        // publishing an empty LiveSetState, whose phase is IDLE with no label
+        // withdrawn. The ring captioned that "Ready" for the rest of the set,
+        // a word that says the set has not started (review round 2 of lane
+        // L6, lens A N4).
+        listOf(squat, pushdown, chestPress).forEach { d ->
+            Phase.entries.forEach { p ->
+                assertEquals(null, caption(p, d, countWithheld = true), "$d, $p, count withheld")
+            }
+        }
     }
 
     @Test
