@@ -328,9 +328,9 @@ class SetJournal internal constructor(
         sample.rollDeg, sample.pitchDeg, sample.yawDeg, index,
     )
 
+    /** One heart-rate row, in [HrCsv.row]'s format: one statement of it, not two. */
     fun appendHr(sample: HrSample) {
-        val rr = sample.rrIntervalsMs.joinToString("|") { String.format(Locale.US, "%.1f", it) }
-        channel.trySend(Row(HRM, "${sample.timestampMs},${sample.bpm},$rr"))
+        channel.trySend(Row(HRM, HrCsv.row(sample)))
     }
 
     fun appendCue(cue: VoiceCue) {

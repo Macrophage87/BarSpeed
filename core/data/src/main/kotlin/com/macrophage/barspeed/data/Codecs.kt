@@ -14,11 +14,21 @@ object HrCsv {
 
     fun encode(samples: List<HrSample>): String {
         val sb = StringBuilder(HEADER).append('\n')
-        for (s in samples) {
-            val rr = s.rrIntervalsMs.joinToString("|") { String.format(Locale.US, "%.1f", it) }
-            sb.append("${s.timestampMs},${s.bpm},$rr\n")
-        }
+        for (s in samples) sb.append(row(s)).append('\n')
         return sb.toString()
+    }
+
+    /**
+     * One sample as one line, with no newline: the single statement of the
+     * row format, shared by [encode] and by `SetJournal.appendHr`, which
+     * writes the same file line by line while a set runs. Until #82 the
+     * journal carried its own copy of this expression, so a column added
+     * here would have reached exported streams and silently not the
+     * journal's -- the one copy a recovered set is rebuilt from.
+     */
+    fun row(sample: HrSample): String {
+        val rr = sample.rrIntervalsMs.joinToString("|") { String.format(Locale.US, "%.1f", it) }
+        return "${sample.timestampMs},${sample.bpm},$rr"
     }
 
     fun decode(text: String): List<HrSample> = text.lineSequence()
