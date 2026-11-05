@@ -31,6 +31,22 @@ class PlanApprovalBodyweightTest {
         assertFalse(exercise("pull_up", ""","bodyweight":false""").approvalBodyweight)
     }
 
+    /**
+     * The differential (#229 item 1). A plan that omits "bodyweight" on an id
+     * the app seeds as body weight is RECORDED as the lifter's body weight plus
+     * the added load -- `resolve()` and the import warning `bodyweightSeeded`
+     * both say so -- and the approval screen drew it as loaded work, so a
+     * pull-up at +10 kg read "10 kg" on the screen where the lifter approves
+     * the plan and "BW + 10 kg" everywhere after it. `dead_hang` is a seed
+     * entry and `pull_up` is not, so both halves of the seed are here.
+     */
+    @Test
+    fun `an omitted declaration on a seeded body-weight id is drawn as body-weight work`() {
+        listOf("pull_up", "chin_up", "dip", "push_up", "dead_hang").forEach { id ->
+            assertTrue(exercise(id).approvalBodyweight, "$id with no declaration")
+        }
+    }
+
     @Test
     fun `an ordinary lift that says nothing is drawn as loaded work`() {
         assertFalse(exercise("back_squat").approvalBodyweight)
