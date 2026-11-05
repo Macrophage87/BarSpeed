@@ -31,4 +31,30 @@ object FailureProvenancePolicy {
      * app derived it, and the lifter did not say so.
      */
     fun published(failed: Boolean, failedByLifter: Boolean?): Boolean? = if (failed) failedByLifter else null
+
+    /** The word for a failure the LIFTER called, on History's chip. */
+    const val TAPPED_WORD = "Failed"
+
+    /**
+     * The word for a failure only the app derived -- the set fell short of its
+     * prescription and the lifter never said it failed (#169, owner default
+     * for 0.2.0).
+     */
+    const val DERIVED_WORD = "Short of target"
+
+    /**
+     * The word History's failure chip draws for one stored row, or null when
+     * it draws none (#169 item 1's display half).
+     *
+     * One decision, in `:core:model` where a test reaches it, rather than a
+     * branch in `SessionDetailScreen`, which nothing under `app/src/test`
+     * reaches.
+     *
+     * AS FIRST WRITTEN this reproduces the chip it replaces -- the stored OR,
+     * one word for both authors -- so moving the screen onto it changes
+     * nothing; [failedByLifter] is read by the change that splits the word,
+     * and the suppression goes with it.
+     */
+    @Suppress("UnusedParameter")
+    fun historyWord(failed: Boolean, failedByLifter: Boolean?): String? = if (failed) TAPPED_WORD else null
 }

@@ -40,6 +40,8 @@ import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.VelocityLoss
 import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.ExerciseKind
+import com.macrophage.barspeed.model.FailureProvenancePolicy
+import com.macrophage.barspeed.model.HistoryKindPolicy
 import com.macrophage.barspeed.model.HistoryTarget
 import com.macrophage.barspeed.model.SaveKind
 import com.macrophage.barspeed.model.VelocityLossRegime
@@ -274,7 +276,7 @@ private fun SetCard(
                 // alone read as a fully compliant one. #56.
                 TempoCoverageNote(a)
                 if (a.reps.isNotEmpty()) {
-                    SetVelocityBars(record, a, target.repSlots)
+                    SetVelocityBars(record, a, target.repSlots, viewModel)
                     // The prescription this set's eccentric was GRADED
                     // against, not a second reading of record.tempo's digits:
                     // digit 1 is the eccentric only while the drive moves up.
@@ -486,7 +488,10 @@ private fun SetChips(
     countChip: String?,
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        if (record.failed) VerdictChip("FAILED", ChipTone.BAD)
+        // Whose failure it was, decided in :core:model (#169): the lifter's
+        // own call and a shortfall only the app derived no longer draw one word.
+        FailureProvenancePolicy.historyWord(record.failed, record.failedByLifter)
+            ?.let { VerdictChip(it.uppercase(), ChipTone.BAD) }
         // The plan's declaration composed with the lifter's own mark (#194),
         // never the raw column. This screen is the LAST consumer of the pair,
         // and reading `record.warmup` alone here would draw the plan's word on
@@ -551,9 +556,21 @@ private fun SetChips(
 }
 
 @Composable
-private fun SetVelocityBars(record: SetRecordEntity, analysis: SetAnalysis, plannedSlots: Int?) {
-    // Olympic-lift style movements are judged on peak velocity, not mean.
-    val explosive = ExerciseDef.seedById(record.exerciseId)?.kind == ExerciseKind.EXPLOSIVE
+private fun SetVelocityBars(
+    record: SetRecordEntity,
+    analysis: SetAnalysis,
+    plannedSlots: Int?,
+    viewModel: SessionDetailViewModel,
+) {
+    // Olympic-lift style movements are judged on peak velocity, not mean. The
+    // kind is the one the set was RECORDED under where the row stores it, so
+    // this chart and the rest screen read one answer (#57); the decision is
+    // HistoryKindPolicy's. Remembered per row: it decodes the stored geometry.
+    val kind =
+        remember(record) {
+            HistoryKindPolicy.of(viewModel.storedKind(record), ExerciseDef.seedById(record.exerciseId)?.kind)
+        }
+    val explosive = kind == ExerciseKind.EXPLOSIVE
     SectionCaption(if (explosive) "Peak velocity (m/s)" else "Mean concentric velocity (m/s)")
     // EVERY REP, and the shading reference is the UNFILTERED maximum of this
     // list -- a rep whose span carries a sample above the physical bound is

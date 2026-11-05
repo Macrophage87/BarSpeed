@@ -12,6 +12,7 @@ import com.macrophage.barspeed.BuildConfig
 import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.data.SetRecordEntity
 import com.macrophage.barspeed.data.repsSourceOf
+import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.RepsCountChip
 import com.macrophage.barspeed.model.SaveKind
 import com.macrophage.barspeed.model.SaveOutcome
@@ -95,6 +96,14 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
      * existed -- and null draws the card exactly as it drew before this
      * existed, which is what makes the absence safe.
      */
+    /**
+     * The kind FROZEN on this row -- `ResolvedGeometry.kind`, the effective
+     * kind the set was analysed under, a plan's declaration included -- or
+     * null where the row carries no geometry (#57). Off the stored row for
+     * [velocityLossRegime]'s reason.
+     */
+    fun storedKind(record: SetRecordEntity): ExerciseKind? = repository.decodeGeometry(record)?.kind
+
     fun velocityLossRegime(record: SetRecordEntity): VelocityLossRegime? {
         val geometry = repository.decodeGeometry(record)
         return VelocityLossRegime.of(record.tempo, geometry?.concentricUp, geometry?.horizontal, geometry?.kind)
