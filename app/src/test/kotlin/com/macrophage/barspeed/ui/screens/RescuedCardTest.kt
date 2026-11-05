@@ -4,6 +4,8 @@ import com.macrophage.barspeed.data.DATABASE_NAME
 import com.macrophage.barspeed.data.RescueCompleteness
 import com.macrophage.barspeed.data.RescuedDatabase
 import com.macrophage.barspeed.model.ByteSize
+import com.macrophage.barspeed.model.RestoreRefusal
+import com.macrophage.barspeed.model.RestoreVerdict
 import java.io.File
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
@@ -11,6 +13,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -169,5 +172,71 @@ class RescuedCardTest {
         val effect = rescuedTapEffect(RescuedTap.SEND, fragment)
         assertIs<RescuedTapEffect.Share>(effect)
         assertEquals(fragment, effect.item)
+    }
+
+    // ---- restore (issue #112) -----------------------------------------------
+
+    @Test
+    fun `restore on the card opens its dialog and moves nothing`() {
+        val effect = rescuedTapEffect(RescuedTap.RESTORE, complete)
+        assertIs<RescuedTapEffect.ConfirmRestore>(effect)
+        assertEquals(complete, effect.item)
+    }
+
+    @Test
+    fun `only the restore dialog's confirm restores`() {
+        assertIs<RescuedTapEffect.Restore>(rescuedTapEffect(RescuedTap.CONFIRM_RESTORE, complete))
+        for (tap in RescuedTap.entries - RescuedTap.CONFIRM_RESTORE) {
+            assertFalse(rescuedTapEffect(tap, complete) is RescuedTapEffect.Restore, "$tap restores without a dialog")
+        }
+    }
+
+    @Test
+    fun `a restorable, fragment or uncomputed card carries no restore note`() {
+        assertNull(rescuedRestoreNote(RestoreVerdict.Restorable(19), 20))
+        assertNull(rescuedRestoreNote(RestoreVerdict.Refused(RestoreRefusal.NO_DATABASE_FILE, null), 20))
+        assertNull(rescuedRestoreNote(null, 20))
+    }
+
+    @Test
+    fun `every other refusal says what stands in the way`() {
+        val notes = (RestoreRefusal.entries - RestoreRefusal.NO_DATABASE_FILE).associateWith {
+            rescuedRestoreNote(RestoreVerdict.Refused(it, 21), 20)
+        }
+        for ((reason, note) in notes) assertTrue(!note.isNullOrBlank(), "$reason has no note")
+        assertEquals(notes.size, notes.values.toSet().size, "two refusals share one note")
+    }
+
+    @Test
+    fun `a rescue too new for this build names both versions`() {
+        assertEquals(
+            "Can't restore into this build: this is database version 21 and this build reads up to 20. " +
+                "Install a build at database version 21 or newer to restore it.",
+            rescuedRestoreNote(RestoreVerdict.Refused(RestoreRefusal.NEWER_THAN_THIS_BUILD, 21), 20),
+        )
+    }
+
+    @Test
+    fun `the restore warning says the database in use is set aside, not deleted`() {
+        val text = rescuedRestoreWarning(complete, version = 20, compiledVersion = 20)
+        assertTrue("set aside as a rescued database of its own -- not deleted" in text, text)
+        assertTrue("with any sessions recorded since the rescue" in text, text)
+        assertTrue(ByteSize.format(1_003L) in text, text)
+        assertFalse("upgraded" in text, "a same-version restore claimed an upgrade: $text")
+    }
+
+    @Test
+    fun `an older rescue's warning says it will be upgraded and what happens if it does not open`() {
+        val text = rescuedRestoreWarning(complete, version = 18, compiledVersion = 20)
+        assertTrue("database version 18 and will be upgraded to 20 when it opens" in text, text)
+        assertTrue("the next start puts both databases back" in text, text)
+    }
+
+    @Test
+    fun `a refused or uncomputed rescue offers no restore`() {
+        for (verdict in listOf(null, RestoreVerdict.Refused(RestoreRefusal.NEWER_THAN_THIS_BUILD, 21))) {
+            val buttons = rescuedCardButtons(complete, emptySet(), verdict)
+            assertFalse(buttons.showRestore || buttons.restoreEnabled, "restore offered on $verdict")
+        }
     }
 }

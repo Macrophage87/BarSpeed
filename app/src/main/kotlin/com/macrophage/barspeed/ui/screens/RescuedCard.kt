@@ -3,6 +3,8 @@ package com.macrophage.barspeed.ui.screens
 import com.macrophage.barspeed.data.RescueCompleteness
 import com.macrophage.barspeed.data.RescuedDatabase
 import com.macrophage.barspeed.model.ByteSize
+import com.macrophage.barspeed.model.RestoreRefusal
+import com.macrophage.barspeed.model.RestoreVerdict
 import java.io.File
 import java.time.Instant
 import java.time.ZoneId
@@ -52,9 +54,26 @@ internal data class RescuedCardButtons(
      * and disabled only while busy.
      */
     val discardEnabled: Boolean,
+    /**
+     * RESTORE is drawn and tappable (issue #112). Not offered yet at this
+     * commit: [rescuedCardButtons] takes the verdict and does not act on it,
+     * so the card is unchanged until the launch-time half is wired.
+     */
+    val showRestore: Boolean = false,
+    /** RESTORE is tappable. False while busy, and whenever it is not drawn. */
+    val restoreEnabled: Boolean = false,
 )
 
-internal fun rescuedCardButtons(item: RescuedDatabase, busy: Set<File>): RescuedCardButtons {
+/**
+ * [restore] is `DatabaseRestore.verdict` for [item], or null when none was
+ * computed.
+ */
+@Suppress("UnusedParameter")
+internal fun rescuedCardButtons(
+    item: RescuedDatabase,
+    busy: Set<File>,
+    restore: RestoreVerdict? = null,
+): RescuedCardButtons {
     val allowed = rescuedActionAllowed(item, busy)
     return RescuedCardButtons(
         showSend = item.completeness != RescueCompleteness.NOTHING,
@@ -63,8 +82,8 @@ internal fun rescuedCardButtons(item: RescuedDatabase, busy: Set<File>): Rescued
     )
 }
 
-/** A button on the card, or the confirm button of its dialog. */
-internal enum class RescuedTap { SEND, DISCARD, CONFIRM_DISCARD }
+/** A button on the card, or the confirm button of one of its dialogs. */
+internal enum class RescuedTap { SEND, DISCARD, CONFIRM_DISCARD, RESTORE, CONFIRM_RESTORE }
 
 /** What a [RescuedTap] does. */
 internal sealed interface RescuedTapEffect {
@@ -78,6 +97,12 @@ internal sealed interface RescuedTapEffect {
 
     /** Delete it. Reached ONLY from the dialog's own confirm button. */
     data class Discard(override val item: RescuedDatabase) : RescuedTapEffect
+
+    /** Open the restore confirmation for [item]. Moves nothing yet. */
+    data class ConfirmRestore(override val item: RescuedDatabase) : RescuedTapEffect
+
+    /** Ask the next launch to restore it, and restart. Reached ONLY from the restore dialog's confirm. */
+    data class Restore(override val item: RescuedDatabase) : RescuedTapEffect
 }
 
 /**
@@ -91,6 +116,67 @@ internal fun rescuedTapEffect(tap: RescuedTap, item: RescuedDatabase): RescuedTa
     RescuedTap.SEND -> RescuedTapEffect.Share(item)
     RescuedTap.DISCARD -> RescuedTapEffect.ConfirmDiscard(item)
     RescuedTap.CONFIRM_DISCARD -> RescuedTapEffect.Discard(item)
+    RescuedTap.RESTORE -> RescuedTapEffect.ConfirmRestore(item)
+    RescuedTap.CONFIRM_RESTORE -> RescuedTapEffect.Restore(item)
+}
+
+/**
+ * Why RESTORE is not on this card, in words the lifter can act on, or null
+ * when there is nothing to say: the card is restorable, it is a fragment or
+ * an empty rescue (whose own title already says it holds no database), or no
+ * verdict was computed. Issue #112.
+ *
+ * Every refusal names what would change it. A version the build cannot take
+ * names both numbers, because "install a newer build" is only actionable with
+ * the number it has to reach.
+ */
+internal fun rescuedRestoreNote(restore: RestoreVerdict?, compiledVersion: Int): String? {
+    if (restore !is RestoreVerdict.Refused) return null
+    val version = restore.version
+    return when (restore.reason) {
+        RestoreRefusal.NO_DATABASE_FILE -> null
+        RestoreRefusal.RESTORE_IN_PROGRESS -> "A restore is waiting for BarSpeed's next start."
+        RestoreRefusal.SPLIT_RESCUE ->
+            "Can't restore yet: a partial rescue holds a log that may belong to this database. " +
+                "Send or discard the partial rescue first."
+        RestoreRefusal.FAILED_BEFORE ->
+            "A restore of this database was tried, it did not open in this build, and both databases were put back."
+        RestoreRefusal.VERSION_UNREADABLE -> "Can't restore: this database's version can't be read."
+        RestoreRefusal.NEWER_THAN_THIS_BUILD ->
+            "Can't restore into this build: this is database version $version and this build reads up to " +
+                "$compiledVersion. Install a build at database version $version or newer to restore it."
+        RestoreRefusal.NO_MIGRATION_PATH ->
+            "Can't restore into this build: it has no upgrade from database version $version."
+    }
+}
+
+/**
+ * What the restore dialog says. Issue #112.
+ *
+ * IT SAYS WHAT HAPPENS TO THE DATABASE IN USE NOW, because that is the
+ * question a restore after a rollback raises: sessions may have been recorded
+ * since. They are not overwritten -- `DatabaseRestore` moves that database
+ * into a rescue of its own before anything comes into its place -- and the
+ * dialog says so rather than leaving the lifter to assume the worst or the
+ * best. It names no session count: nothing on this screen counts the
+ * database in use, and a number from the history list would be a claim
+ * stronger than what that list is.
+ *
+ * AN OLDER RESCUE IS UPGRADED WHEN IT OPENS, and the migrations' first run on
+ * this data is on this phone. The dialog says that too, and what happens if
+ * the open fails.
+ */
+internal fun rescuedRestoreWarning(item: RescuedDatabase, version: Int, compiledVersion: Int): String {
+    val upgrade = if (version < compiledVersion) {
+        " It is database version $version and will be upgraded to $compiledVersion when it opens. " +
+            "If it does not open, the next start puts both databases back as they were."
+    } else {
+        ""
+    }
+    return "BarSpeed will close and reopen to put this rescued database " +
+        "(${ByteSize.format(item.totalBytes)}) back in place.$upgrade " +
+        "The database in use now, with any sessions recorded since the rescue, is set aside as a " +
+        "rescued database of its own -- not deleted -- and can be sent, discarded or restored the same way."
 }
 
 /**
