@@ -41,6 +41,16 @@ class WorkStartPolicyTest {
         assertNull(WorkStartPolicy.publishedAtMs(null, 1_000L, prepS = null, workBegan = null))
     }
 
+    /**
+     * #337: a set that ran no prep began its work at the START SET tap, the
+     * row's own `startedAtMs`. `AbandonedSetPolicy.workBegan` already says the
+     * work began there; the archive now says when.
+     */
+    @Test
+    fun `a set that ran no prep began its work at the tap`() {
+        assertEquals(1_000L, WorkStartPolicy.publishedAtMs(null, 1_000L, prepS = null, workBegan = true))
+    }
+
     /** A set whose work never began has no work start, prep or not. */
     @Test
     fun `a set whose work never began publishes none`() {

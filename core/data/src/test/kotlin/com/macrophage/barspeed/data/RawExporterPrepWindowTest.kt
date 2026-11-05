@@ -221,6 +221,17 @@ class RawExporterPrepWindowTest {
         assertTrue("prepStartedAt_ms" !in set, "a set with no prep published a prep start")
     }
 
+    /**
+     * #337: a straight set that ran no prep publishes its START SET tap as
+     * its work start, and still no prep start -- it had no prep.
+     */
+    @Test
+    fun `a set that ran no prep publishes its tap as its work start`() = runTest {
+        val set = meta(listOf(row(startedAtMs = 7_777L, prepS = null, workBegan = true)), emptyMap()).set(0)
+        assertEquals(7_777.0, set.num("workStartedAt_ms"), "a no-prep set published no work start")
+        assertTrue("prepStartedAt_ms" !in set, "a set with no prep published a prep start")
+    }
+
     // ---- differentials -----------------------------------------------------
 
     /**
