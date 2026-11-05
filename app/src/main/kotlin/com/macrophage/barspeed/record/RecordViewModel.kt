@@ -5633,7 +5633,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     // stream is still written with the row.
                     // RepAnalysisPolicyTest pins which shapes reach here.
                     !RepAnalysisPolicy.segmentsReps(p.isTimed, p.exercise.kind) ->
-                        SetAnalyzer.withheldCarry()
+                        SetAnalyzer.withheldCarry(p.samples.size)
                     p.samples.size >= SensorCapturePolicy.MIN_ANALYSABLE_FRAMES ->
                         // See analysedSetOf: the set's own cue track, work start,
                         // fallback flag and roll signal, all frozen on the write.

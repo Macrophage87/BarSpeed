@@ -3,6 +3,8 @@ package com.macrophage.barspeed.data
 import com.macrophage.barspeed.dsp.NoRepsReason
 import com.macrophage.barspeed.dsp.RepAnalysis
 import com.macrophage.barspeed.dsp.SetAnalysis
+import com.macrophage.barspeed.dsp.SetAnalyzer
+import com.macrophage.barspeed.model.SensorCapturePolicy
 import com.macrophage.barspeed.model.SessionExport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -318,5 +320,29 @@ class SessionExportNoRepsReasonTest {
         val summary = setObject(contradiction).summary()
         assertNull(summary["noRepsReason"], "a set with a rep published a reason for having none")
         assertTrue("meanRom_m" in summary.keys, "the set stopped publishing the figures it does have")
+    }
+
+    // ---- a carry counted in reps (1.26, lane L5's follow-up to #63) --------
+
+    /**
+     * The analysis RecordViewModel stores for a carry prescribed in reps,
+     * taken from the factory it calls rather than rebuilt here, so this pins
+     * what the export does with what the app actually writes.
+     */
+    @Test
+    fun `a carry counted in reps whose stream was recorded says why it has no reps`() = runTest {
+        val withheld = SetAnalyzer.withheldCarry(SensorCapturePolicy.MIN_ANALYSABLE_FRAMES)
+        assertEquals(
+            mapOf("noRepsReason" to "carryNotSegmented"),
+            setObject(withheld, includeRepDetail = false).summary().mapValues { it.value.jsonPrimitive.content },
+            "a measured carry exports the empty summary of a set nobody measured",
+        )
+    }
+
+    /** Its contrast, green on both sides: too short a stream is a set nothing analysed. */
+    @Test
+    fun `a carry counted in reps with no stream to speak of publishes an empty summary`() = runTest {
+        val withheld = SetAnalyzer.withheldCarry(SensorCapturePolicy.MIN_ANALYSABLE_FRAMES - 1)
+        assertEquals(emptyMap(), setObject(withheld).summary(), "an unmeasured carry was given a reason")
     }
 }

@@ -1128,14 +1128,19 @@ object SetAnalyzer {
      * Built here rather than in `:app` so that what such a set records is
      * test-gated: `RecordViewModel` decides WHICH sets reach it, through the
      * policy, and calls this for the analysis.
+     *
+     * @param sampleCount how many samples the set's analysed stream holds.
      */
-    fun withheldCarry(): SetAnalysis = SetAnalysis(
-        reps = emptyList(),
-        sampleRateHz = 0.0,
-        velocityLossPct = null,
-        tempoCompliance = null,
-        verdicts = listOf(RepAnalysisPolicy.WITHHELD_NOTE),
-    )
+    fun withheldCarry(sampleCount: Int): SetAnalysis {
+        require(sampleCount >= 0) { "a stream cannot hold $sampleCount samples" }
+        return SetAnalysis(
+            reps = emptyList(),
+            sampleRateHz = 0.0,
+            velocityLossPct = null,
+            tempoCompliance = null,
+            verdicts = listOf(RepAnalysisPolicy.WITHHELD_NOTE),
+        )
+    }
 
     private fun round1(x: Double) = Math.round(x * 10.0) / 10.0
 
