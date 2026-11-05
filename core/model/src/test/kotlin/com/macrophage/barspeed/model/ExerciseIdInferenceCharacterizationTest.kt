@@ -190,6 +190,23 @@ class ExerciseIdInferenceCharacterizationTest {
             // fixes which phase is counted and announced first. ---
             Row("tricep_pushdown", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
 
+            // --- issue #254's neighbours: ids sharing a token with
+            // "muscle_up", pinned BEFORE that hint lands so the change can be
+            // shown to move none of them. The hint is matched as two adjacent
+            // whole tokens, so "up" alone and "muscle" alone move nothing:
+            // the push-up, sit-up and step-up still lower or load first, the
+            // muscle snatch and muscle clean are concentric already through
+            // their Olympic word, and an upright row through "row". ---
+            Row("push_up", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("sit_up", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("step_up", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("turkish_get_up", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("muscle_snatch", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC),
+            Row("muscle_clean", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC),
+            Row("upright_row", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("triceps_pushdown", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("rope_pushdown", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+
             // --- ordinary ids that must not move ---
             Row("seated_row", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
             Row("pull_up", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
