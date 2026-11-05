@@ -397,10 +397,17 @@ private fun exitBody(prompt: ExitPrompt): String = when (prompt) {
     // deliberately absent while the prompt was unreachable and the claim would
     // have been false. It is the session, not the set, that is still at risk
     // here, and the wording points at that instead.
+    //
+    // The heart-rate summary only, never "and HRV" (#333). endSession
+    // averages the heart rate over the set ROWS, so a set whose row has not
+    // landed is missing from it. The HRV is computed over sessionRrMs, which
+    // the passive collector fills in READY, IN_SET and RESTING alike, so the
+    // set's beats are in it whether or not the row has landed. Read from
+    // source, not observed on a device.
     ExitPrompt.SET_SAVING ->
         "This set is being written to your history now, and it will finish saving even if you leave. " +
             "What will not finish is the session: closing it while a set is still saving leaves that set " +
-            "out of the session's heart-rate and HRV summary, and nothing rewrites it afterwards."
+            "out of the session's heart-rate summary, and nothing rewrites it afterwards."
     ExitPrompt.SET_UNSAVED ->
         "This set could not be written to your history. It is still held in memory, so tapping SAVE THIS " +
             "SET AGAIN on this screen can still store it — freeing some space on the phone first if that " +
