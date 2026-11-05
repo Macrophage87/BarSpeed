@@ -19,15 +19,23 @@ package com.macrophage.barspeed.model
 object RepAnalysisPolicy {
     /**
      * True when the segmenter is handed a set of this shape: a set measured on
-     * reps rather than on the clock.
+     * reps rather than on the clock, of a kind whose reps are strokes of the
+     * load.
+     *
+     * A CARRY is refused in either shape. Timed, it is measured on the clock
+     * as before. Prescribed in reps, it is counted by the lifter
+     * ([CountingPolicy.counterFor] gives it [RepCounter.MANUAL]) and its
+     * stream used to be segmented anyway: the segmenter publishes per-rep
+     * velocity, ROM and power for whatever runs it finds, and on a walker's
+     * gait nothing captured says what those runs are. The figures are
+     * withheld rather than published unbounded; the count is the lifter's.
      */
-    @Suppress("UNUSED_PARAMETER", "UnusedParameter")
-    fun segmentsReps(isTimed: Boolean, kind: ExerciseKind): Boolean = !isTimed
+    fun segmentsReps(isTimed: Boolean, kind: ExerciseKind): Boolean = !isTimed && kind != ExerciseKind.CARRY
 
     /**
      * The note a set kept off the segmenter by [segmentsReps] records, in place
-     * of the figures it does not publish. Never reached on a timed set, which
-     * records its clock verdicts instead.
+     * of the figures it does not publish: a carry prescribed in reps. Never
+     * reached on a timed set, which records its clock verdicts instead.
      */
     const val WITHHELD_NOTE: String =
         "A carry is not measured as reps: no velocity, range or power is published for it. " +
