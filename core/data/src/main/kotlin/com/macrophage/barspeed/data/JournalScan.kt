@@ -195,12 +195,26 @@ object InterruptedSetSummary {
         }
     }
 
+    /**
+     * What the card says about the second unit, or nothing.
+     *
+     * ARMED FOR TWO AND GOT ONE is its own sentence (#171 item 11). The
+     * header records both facts it needs and the card used to read neither:
+     * `sensorRoles` is non-empty exactly when a role was armed, and
+     * `secondaryImuConnected` is false when the second link was down at the
+     * start. Without this branch such a set fell through to nothing and
+     * read exactly like a one-sensor set, which is the one confusion the
+     * lifter deciding on this capture cannot resolve from anywhere else.
+     * Only after rows and the connected case, so a second unit that came up
+     * late and captured still reports its count.
+     */
     private fun secondSensor(orphan: OrphanedSet): String {
         val secondary = orphan.secondaryImu
         return when {
             secondary != null && !secondary.counted -> ", the second sensor's stream could not be read"
             (secondary?.rows ?: 0L) > 0L -> ", ${secondary?.rows} from the second sensor"
             orphan.header.secondaryImuConnected -> ", none from the second sensor"
+            orphan.header.sensorRoles.isNotEmpty() -> ", the second sensor was not connected"
             else -> ""
         }
     }
