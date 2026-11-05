@@ -897,19 +897,15 @@ class SchemaContractTest {
     fun `every geometry key is required, so a dropped false cannot read as unstated`() {
         val geometry = schema("session-export.schema.json")["\$defs"]!!.jsonObject["geometry"]!!.jsonObject
         val required = geometry["required"]!!.jsonArray.map { it.jsonPrimitive.content }.toSet()
-        assertEquals(geometry["properties"]!!.jsonObject.keys, required, "a geometry key is optional")
-        val source = schema("session-export.schema.json")["\$defs"]!!.jsonObject["geometrySource"]!!.jsonObject
-        val sourceRequired = source["required"]!!.jsonArray.map { it.jsonPrimitive.content }.toSet()
-        // The ONE optional source, the one added last (1.26, #289), named so
-        // its optionality is a decision on the record rather than an
-        // oversight; why is stated once at GeometrySourceExport's KDoc. Until
-        // 1.26 this asserted sensorInverted was the one value with NO source;
-        // that every value now has one is SchemaInversionSourceContractTest's.
-        assertEquals(
-            setOf("sensorInverted"),
-            source["properties"]!!.jsonObject.keys - sourceRequired,
-            "the set of optional geometry sources changed",
-        )
+        // Less the two stroke words, absent on a hold or a carry from 1.26 (#297): SchemaHoldStrokeContractTest.
+        val keys = geometry["properties"]!!.jsonObject.keys - setOf("startsWith", "concentric")
+        assertEquals(keys, required, "a geometry key is optional")
+        // The source block's optional set -- the two stroke words and
+        // sensorInverted, the one source added last (1.26, #289) -- and that
+        // every value has a source are asserted in SchemaHoldStrokeContractTest
+        // and SchemaInversionSourceContractTest since 1.26. Until then this
+        // asserted the source block was all required and that sensorInverted
+        // was the one value with NO source.
     }
 
     /**

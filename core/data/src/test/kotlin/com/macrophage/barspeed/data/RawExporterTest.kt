@@ -1008,6 +1008,26 @@ class RawExporterTest {
     }
 
     /**
+     * RED at the commit that writes it (#297, export 1.26). A hold has no
+     * stroke, so the manifest writes no `startsWith`, `concentric` or
+     * `concentricSource` for one -- the split `session.json` takes, through
+     * `GeometryExport.publishesStroke` -- and the same stored geometry as a
+     * dynamic set still writes all three, so the test cannot pass by the keys
+     * being absent in both.
+     */
+    @Test
+    fun `the manifest writes no stroke words for a hold`() = runTest {
+        val hold = meta(listOf(row(id = 5L, geometry = legCurl.copy(kind = ExerciseKind.HOLD))), emptyMap()).set(0)
+        listOf("startsWith", "concentric", "concentricSource").forEach {
+            assertNull(hold.text(it), "a hold's manifest carries $it")
+        }
+        assertEquals("hold", hold.text("kind"))
+        val dynamic = meta(listOf(row(id = 5L, geometry = legCurl)), emptyMap()).set(0)
+        assertEquals("concentric", dynamic.text("startsWith"))
+        assertEquals("declared", dynamic.text("concentricSource"))
+    }
+
+    /**
      * A stated false is written; an unstated geometry writes nothing.
      *
      * `flag()` omits a false, which is right for `warmup` and `failed` where
