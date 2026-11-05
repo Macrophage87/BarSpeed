@@ -1,5 +1,6 @@
 package com.macrophage.barspeed.data
 
+import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.GeometrySource
 import com.macrophage.barspeed.model.GeometrySources
@@ -145,6 +146,7 @@ class SessionExportInversionSourceTest {
             plannedReps = 12,
             startedAtMs = 1_000L,
             endedAtMs = 31_000L,
+            analysisJson = json.encodeToString(SetAnalysis.serializer(), noReps),
             geometryJson = geometryJson,
         )
         val dao = FakeSessionDao(
@@ -155,6 +157,16 @@ class SessionExportInversionSourceTest {
         return Json.parseToJsonElement(text).jsonObject.getValue("exercises").jsonArray[0].jsonObject
             .getValue("sets").jsonArray[0].jsonObject.getValue("geometry").jsonObject
     }
+
+    /** The analysis is beside the point here; a set the segmenter resolved nothing in keeps the fixture small. */
+    private val noReps =
+        SetAnalysis(
+            reps = emptyList(),
+            sampleRateHz = 99.4,
+            velocityLossPct = null,
+            tempoCompliance = null,
+            verdicts = emptyList(),
+        )
 
     private fun stored(g: ResolvedGeometry) = json.encodeToString(ResolvedGeometry.serializer(), g)
 
