@@ -10,7 +10,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -18,6 +20,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /**
  * `tempoCompliance.byPhase` takes the set's grade apart by phase (#66 (c),
@@ -34,6 +37,13 @@ import kotlin.test.assertFalse
  * writes them, because `Exporters` does not populate `byPhase`. "a set that
  * scored nothing" passes on both sides and is what stops a fix publishing an
  * empty list where `scoredPhases` already says nothing was graded.
+ *
+ * "a v0_1_35 row" and "a pre-v0_1_31 row" (L1 review round 1, A-F1/B-B1)
+ * feed the exporter a stored analysis in the shape an older build wrote,
+ * and FAIL while `byPhase` is built from the stored `scored` flag alone: the
+ * first publishes an eccentric "0 of 0", the second lists both pauses. Each
+ * shape is the current serializer's output with the `phases` entries
+ * rewritten, not a row read from a real database.
  *
  * Nothing here executes Room, SQLite or Android.
  */
@@ -124,6 +134,34 @@ class SessionExportTempoByPhaseTest {
             scored = scored,
         )
 
+    private fun analysisJson(reps: List<RepAnalysis>, compliance: TempoComplianceResult) = json.encodeToString(
+        SetAnalysis.serializer(),
+        SetAnalysis(
+            reps = reps,
+            sampleRateHz = 99.4,
+            velocityLossPct = null,
+            tempoCompliance = compliance,
+            verdicts = emptyList(),
+        ),
+    )
+
+    /**
+     * The stored analysis of [reps]/[compliance] with each `tempoCompliance.phases`
+     * entry rewritten by [phaseShape] -- how a row written by an older build
+     * reads, decoded by the current serializer exactly as the exporter decodes it.
+     */
+    private fun storedAs(
+        reps: List<RepAnalysis>,
+        compliance: TempoComplianceResult,
+        phaseShape: (JsonObject) -> JsonObject,
+    ): SetRecordEntity {
+        val tree = Json.parseToJsonElement(analysisJson(reps, compliance)).jsonObject
+        val tc = tree.getValue("tempoCompliance").jsonObject
+        val phases = JsonArray(tc.getValue("phases").jsonArray.map { phaseShape(it.jsonObject) })
+        val stored = JsonObject(tree + ("tempoCompliance" to JsonObject(tc + ("phases" to phases))))
+        return row(reps, compliance).copy(analysisJson = stored.toString())
+    }
+
     private fun row(reps: List<RepAnalysis>, compliance: TempoComplianceResult) = SetRecordEntity(
         id = 14L,
         sessionId = 1L,
@@ -136,17 +174,7 @@ class SessionExportTempoByPhaseTest {
         workBegan = true,
         startedAtMs = 1_791_000_000_000L,
         endedAtMs = 1_791_000_060_000L,
-        analysisJson =
-        json.encodeToString(
-            SetAnalysis.serializer(),
-            SetAnalysis(
-                reps = reps,
-                sampleRateHz = 99.4,
-                velocityLossPct = null,
-                tempoCompliance = compliance,
-                verdicts = emptyList(),
-            ),
-        ),
+        analysisJson = analysisJson(reps, compliance),
     )
 
     private suspend fun tempoCompliance(row: SetRecordEntity): JsonObject {
@@ -226,5 +254,62 @@ class SessionExportTempoByPhaseTest {
         val tc = tempoCompliance(row(reps, compliance))
         assertEquals(0, tc.getValue("scoredPhases").jsonArray.size, "the fixture scored a phase")
         assertFalse("byPhase" in tc, "a set that scored nothing published a byPhase: $tc")
+    }
+
+    private fun assertPublishable(tallies: List<Triple<String, Int, Int>>) {
+        assertTrue(tallies.none { it.first !in setOf("eccentric", "concentric") }, "a pause was listed: $tallies")
+        assertTrue(tallies.none { it.third == 0 }, "an entry was published with of 0: $tallies")
+    }
+
+    @Test
+    fun `a v0_1_35 row's unresolved eccentric publishes no of-0 entry`() = runTest {
+        // v0.1.31 to v0.1.35 wrote scored = scorable, with no check that any
+        // rep resolved the phase: a prescribed eccentric nothing measured is
+        // stored scored, 0 of 0.
+        val reps = (1..6).map { rep(it, eccS = null, conS = 1.0) }
+        val compliance = TempoComplianceResult(
+            prescribed = Tempo.parse("3010"),
+            toleranceS = 0.5,
+            phases = listOf(
+                phase("eccentric", 3.0, within = 0, of = 0, scored = true),
+                phase("bottomPause", 0.0, within = 0, of = 0, scored = false),
+                phase("concentric", 1.0, within = 5, of = 6, scored = true),
+                phase("topPause", 0.0, within = 0, of = 0, scored = false),
+            ),
+            repsFullyCompliant = 5,
+            repsEvaluated = 6,
+        )
+        val stored = storedAs(reps, compliance) { p ->
+            val movement = p.getValue("phase").jsonPrimitive.content in setOf("eccentric", "concentric")
+            JsonObject(p + ("scored" to JsonPrimitive(movement)))
+        }
+        val tallies = tempoCompliance(stored).tallies()
+        assertPublishable(tallies)
+        assertEquals(listOf(Triple("concentric", 5, 6)), tallies)
+    }
+
+    @Test
+    fun `a pre-v0_1_31 row's pauses are not listed`() = runTest {
+        // Before v0.1.31 there was no scored key: every phase of the stored
+        // grade decodes as scored, and that build graded the prescribed
+        // pauses over every rep.
+        val reps = (1..4).map { rep(it, eccS = 3.0, conS = 1.0) }
+        val compliance = TempoComplianceResult(
+            prescribed = Tempo.parse("3010"),
+            toleranceS = 0.5,
+            phases = listOf(
+                phase("eccentric", 3.0, within = 2, of = 4, scored = false),
+                phase("bottomPause", 0.0, within = 1, of = 4, scored = false),
+                phase("concentric", 1.0, within = 3, of = 4, scored = false),
+                phase("topPause", 0.0, within = 4, of = 4, scored = false),
+            ),
+            repsFullyCompliant = 1,
+            repsEvaluated = 4,
+        )
+        val stored = storedAs(reps, compliance) { p -> JsonObject(p - "scored") }
+        assertFalse("\"scored\"" in stored.analysisJson, "the fixture still carries a scored key")
+        val tallies = tempoCompliance(stored).tallies()
+        assertPublishable(tallies)
+        assertEquals(listOf(Triple("eccentric", 2, 4), Triple("concentric", 3, 4)), tallies)
     }
 }
