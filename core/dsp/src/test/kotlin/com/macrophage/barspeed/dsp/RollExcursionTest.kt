@@ -68,6 +68,28 @@ class RollExcursionTest {
         assertEquals(listOf(0.0, 180.0), RollExcursion.unwrap(listOf(0.0, 180.0)))
     }
 
+    /**
+     * ISSUE #35's OWN CASE, through [RollExcursion.of] rather than [RollExcursion.unwrap]:
+     * a sensor resting with its roll at the +-180 seam, jittering a degree
+     * either side of it, on a set that never rotates.
+     *
+     * #35 was filed against `Exporters.kt`'s `rolls.max() - rolls.min()`, which
+     * reads that set as about 360 degrees -- the figure the coach prompt
+     * reads as gravity leaking into every sample. The export has measured the
+     * excursion through [RollExcursion.of] since #133, and this is the
+     * end-to-end pin that the seam no longer reads as a rotation: the tests
+     * above pin `unwrap` alone, and an `of` that stopped calling it would pass
+     * all of them. Synthetic: every roll value is written down here.
+     */
+    @Test
+    fun `a set resting on the seam reports the jitter, not a turn`() {
+        val jitter = listOf(179.4, -179.6, 179.8, -179.2, 179.1, -179.9, 179.5)
+        val resting = samples(*jitter.mapIndexed { i, roll -> (i * 10L) to roll }.toTypedArray())
+        assertEquals(359.7, jitter.max() - jitter.min(), 1e-9, "what max-minus-min over the column reads")
+        val measured = RollExcursion.of(resting, null, SetEnd.NotCued)
+        assertEquals(1.7, measured!!.degrees, 1e-9, "what the archive publishes: the 1.7 degree jitter")
+    }
+
     // ---- the window --------------------------------------------------------
 
     @Test
