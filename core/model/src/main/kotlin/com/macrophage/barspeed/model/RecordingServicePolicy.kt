@@ -144,4 +144,21 @@ object RecordingServicePolicy {
             command = if (remaining.isEmpty() && held.isNotEmpty()) FgsCommand.STOP else FgsCommand.NONE,
         )
     }
+
+    /**
+     * Whether the app may end its own process now, given what is [held].
+     * Issue #112, round 1 review (A2, B4).
+     *
+     * Only with nothing held. [RecordingHold.SET_WRITE] and
+     * [RecordingHold.SESSION_CLOSE] are exactly the windows in which a set's
+     * raw capture, or what a session close writes, is in memory and nowhere
+     * else; ending the process there loses it with no retry, and the lifter
+     * reaches Home -- where the rescued-database card's RESTORE ends the
+     * process -- in both. [RecordingHold.SESSION] refuses too: a live set on
+     * a record screen is capture in progress, and this function does not
+     * second-guess a hold that may have been left held (see its own KDoc);
+     * the cost of that is a refused restore until the app is restarted, which
+     * loses nothing.
+     */
+    fun mayEndProcess(held: Set<RecordingHold>): Boolean = held.isEmpty()
 }

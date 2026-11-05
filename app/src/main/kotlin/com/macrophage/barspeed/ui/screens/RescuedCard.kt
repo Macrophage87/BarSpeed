@@ -3,6 +3,7 @@ package com.macrophage.barspeed.ui.screens
 import com.macrophage.barspeed.data.RescueCompleteness
 import com.macrophage.barspeed.data.RescuedDatabase
 import com.macrophage.barspeed.model.ByteSize
+import com.macrophage.barspeed.model.RecordingHold
 import com.macrophage.barspeed.model.RestoreRefusal
 import com.macrophage.barspeed.model.RestoreVerdict
 import java.io.File
@@ -67,12 +68,16 @@ internal data class RescuedCardButtons(
 
 /**
  * [restore] is `DatabaseRestore.verdict` for [item], or null when none was
- * computed.
+ * computed. [held] is what the recording holds hold now (round 1 review of
+ * #112, A2/B4); NOT READ YET -- this commit adds the parameter and nothing
+ * consults it, so RESTORE stays live while a set-end write is in flight.
  */
+@Suppress("UNUSED_PARAMETER")
 internal fun rescuedCardButtons(
     item: RescuedDatabase,
     busy: Set<File>,
     restore: RestoreVerdict? = null,
+    held: Set<RecordingHold> = emptySet(),
 ): RescuedCardButtons {
     val allowed = rescuedActionAllowed(item, busy)
     return RescuedCardButtons(

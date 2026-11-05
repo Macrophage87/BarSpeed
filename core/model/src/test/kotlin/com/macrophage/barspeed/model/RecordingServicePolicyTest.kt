@@ -2,6 +2,8 @@ package com.macrophage.barspeed.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /**
  * When the recording foreground service runs.
@@ -151,5 +153,22 @@ class RecordingServicePolicyTest {
         val afterScreen = RecordingServicePolicy.release(held, RecordingHold.SESSION).held
         val afterClose = RecordingServicePolicy.release(afterScreen, RecordingHold.SESSION_CLOSE).held
         assertEquals(emptySet(), afterClose)
+    }
+
+    // ---- issue #112, round 1 review (A2, B4): ending the process ------------
+
+    @Test
+    fun `the process may end only with nothing held`() {
+        assertTrue(RecordingServicePolicy.mayEndProcess(emptySet()))
+    }
+
+    @Test
+    fun `no hold may be cut short by the process ending`() {
+        // SET_WRITE and SESSION_CLOSE: the capture or the close is in memory and nowhere else.
+        // SESSION: a set is being recorded.
+        for (hold in RecordingHold.entries) {
+            assertFalse(RecordingServicePolicy.mayEndProcess(setOf(hold)), "$hold alone allowed the process to end")
+        }
+        assertFalse(RecordingServicePolicy.mayEndProcess(RecordingHold.entries.toSet()))
     }
 }

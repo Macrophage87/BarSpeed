@@ -82,6 +82,14 @@ object DatabaseRescue {
      */
     const val DIR_PREFIX = "db-"
 
+    /**
+     * A rescue under way: one line, the directory it is moving into, written
+     * in [RESCUE_DIR] before the first file moves and removed after the last.
+     * Round 1 review of issue #113 (A1, B1). Reserved by this commit; read by
+     * nothing yet.
+     */
+    const val PENDING = "rescue.pending"
+
     private const val WAL_SUFFIX = "-wal"
     private const val SHM_SUFFIX = "-shm"
 
