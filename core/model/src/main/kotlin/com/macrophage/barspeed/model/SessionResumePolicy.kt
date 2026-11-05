@@ -53,22 +53,35 @@ object SessionResumePolicy {
      * set write or a session close from an earlier visit is still running on
      * the process-wide scope.
      *
-     * Never asks today: re-entry has always started a fresh session.
+     * Asks only about a session that is open (no end time), holds at least one
+     * set, and had its last set end no more than [RESUME_WINDOW_MS] before
+     * [nowMs], and only while nothing from the earlier visit is still writing.
+     * A row still being written to could gain a set or an end time after the
+     * question is answered, and the answer would be about a row that no longer
+     * looks like the one asked about.
+     *
+     * The window is measured from the last set rather than from the start,
+     * because a long session left mid-way is as continuable as a short one,
+     * and it ends: a row left open in the morning is not offered in the
+     * evening as though it were the same workout.
      */
-    @Suppress("UnusedParameter") // The rule arrives with its red (#48); today it never asks.
-    fun offer(latest: LatestSession?, nowMs: Long, writeOutstanding: Boolean): LatestSession? = latest?.takeIf {
-        false
+    fun offer(latest: LatestSession?, nowMs: Long, writeOutstanding: Boolean): LatestSession? {
+        if (latest == null || writeOutstanding || latest.endedAtMs != null) return null
+        val last = latest.lastSetEndedAtMs ?: return null
+        return latest.takeIf { it.setCount > 0 && nowMs - last <= RESUME_WINDOW_MS }
     }
 
     /**
      * The R-R intervals a close may compute the session HRV from.
      *
-     * [rrMs] is what this visit to the record screen has received. Today it
-     * is used whole whether or not the session was continued from an earlier
-     * visit.
+     * [rrMs] is what this visit to the record screen has received. A session
+     * continued from an earlier visit gets none: that visit's beats were in its
+     * memory and are gone, so an RMSSD over this visit's alone would describe
+     * part of the session under the whole session's name, by an amount nothing
+     * here can bound. The figure is withheld instead, and `Hrv.rmssdMs`
+     * answers an empty list with null.
      */
-    @Suppress("UnusedParameter") // The rule arrives with its red (#48); today the list is used whole.
-    fun closeRrMs(resumed: Boolean, rrMs: List<Double>): List<Double> = rrMs
+    fun closeRrMs(resumed: Boolean, rrMs: List<Double>): List<Double> = if (resumed) emptyList() else rrMs
 
     /** The prompt's title. */
     const val TITLE = "Continue this session?"

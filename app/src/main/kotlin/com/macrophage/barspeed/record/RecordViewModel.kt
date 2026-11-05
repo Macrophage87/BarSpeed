@@ -5709,8 +5709,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      *
      *  - It would override a choice the lifter just made. The RESTING exit
      *    prompt offers "Leave without finishing" and says in as many words that
-     *    the session stays open and nothing can finish it later. A close on this
-     *    path makes both branches of that prompt do the same thing.
+     *    the session stays open, to be continued from Record or left without an
+     *    end time (#48). A close on this path makes both branches of that prompt
+     *    do the same thing, and leaves nothing to continue.
      *  - The stages that reach here with a session row are IN_SET and RESTING,
      *    and RESTING is exactly the deliberate-abandonment case. There is no
      *    third bucket to close.
