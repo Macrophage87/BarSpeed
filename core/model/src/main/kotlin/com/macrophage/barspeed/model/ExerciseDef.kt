@@ -488,6 +488,11 @@ data class ExerciseDef(
                 // Substring matching reached inside them for free and whole-token
                 // matching cannot, so they are listed rather than lost.
                 "pulldown", "pullup", "chinup", "pushdown",
+                // A muscle-up begins with the pull out of a dead hang and has no
+                // lowering before it (#254). Two adjacent whole tokens, so "up"
+                // alone (push_up, sit_up) and "muscle" alone (muscle_snatch)
+                // move nothing.
+                "muscle_up",
             )
 
         /**
