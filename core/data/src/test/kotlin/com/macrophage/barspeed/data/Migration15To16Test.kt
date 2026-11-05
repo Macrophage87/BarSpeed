@@ -150,6 +150,20 @@ class Migration15To16Test {
         }
     }
 
+    /**
+     * Every table a baseline describes, read off the baseline rather than
+     * typed here (#232). The two differential tests below used to walk a
+     * literal list of five names, so a version that added or dropped a whole
+     * table passed "differ by exactly the void mark" without either loop ever
+     * reaching it.
+     */
+    private fun tableNames(version: Int): Set<String> {
+        val root = json.parseToJsonElement(schema(version).readText()).jsonObject
+        return root.getValue("database").jsonObject.getValue("entities").jsonArray
+            .map { it.jsonObject.getValue("tableName").jsonPrimitive.content }
+            .toSet()
+    }
+
     private fun declaredVersion(version: Int): Int {
         val root = json.parseToJsonElement(schema(version).readText()).jsonObject
         return root.getValue("database").jsonObject.getValue("version").jsonPrimitive.int
@@ -206,13 +220,19 @@ class Migration15To16Test {
      *
      * The whole risk of a hand-written migration is that the entity moved
      * further than the SQL did. This reads the difference off Room's own
-     * generated descriptions, so a third column, a retyped column and a
-     * dropped one are all caught -- none of which the two statements below
-     * would carry.
+     * generated descriptions, so a third ADDED column is caught here -- a
+     * column the two statements below would not carry.
+     *
+     * Only an added one. This test subtracts v15's column names from v16's,
+     * so a column v16 dropped or retyped leaves that difference unchanged and
+     * passes here. Those two are caught by the next test, `no column that
+     * existed at v15 changed its type, nullability or default`. This
+     * paragraph used to claim all three for this test (#232).
      */
     @Test
     fun `the schema baselines differ by exactly the void mark and its reason`() {
-        for (table in listOf("raw_streams", "sessions", "plans", "custom_exercises")) {
+        assertEquals(tableNames(15), tableNames(16), "v16 added or dropped a whole table")
+        for (table in tableNames(16) - "set_records") {
             assertEquals(
                 emptySet(),
                 (columnsOf(16, table) - columnsOf(15, table).keys).keys,
@@ -248,7 +268,8 @@ class Migration15To16Test {
      */
     @Test
     fun `no column that existed at v15 changed its type, nullability or default`() {
-        for (table in listOf("raw_streams", "set_records", "sessions", "plans", "custom_exercises")) {
+        assertEquals(tableNames(15), tableNames(16), "v16 added or dropped a whole table")
+        for (table in tableNames(15)) {
             val before = columnsOf(15, table)
             val after = columnsOf(16, table)
             assertEquals(
