@@ -80,10 +80,11 @@ object RestControlPolicy {
         // close the session would be two ways to launch the same work, from
         // different inputs, and one of them would be the wrong one.
         SessionCloseState.FAILED -> setOf(RestControl.START_NEXT_SET, RestControl.RETRY_FINISH)
-        // The same as FAILED for now. The row this state names is closed, so
-        // a set started from here would be recorded after the session's end
-        // time; that is issue 333's and 49's, fixed with its red.
-        SessionCloseState.REST_UNSAVED -> setOf(RestControl.START_NEXT_SET, RestControl.RETRY_FINISH)
+        // The retry alone (#333). `endSession` has landed, so the row has its
+        // end time and the session is finished; a set started from here would
+        // be recorded after that end. What is left is the final rest window,
+        // and the retry is what writes it.
+        SessionCloseState.REST_UNSAVED -> setOf(RestControl.RETRY_FINISH)
     }
 
     /**
@@ -96,9 +97,17 @@ object RestControlPolicy {
      * it was then, and a retry replays that copy over a set list that has
      * since grown.
      *
-     * Returns [close] unchanged today: the frozen close survives the next set.
+     * So a set started from a [SessionCloseState.FAILED] close drops it: the
+     * answer is [SessionCloseState.NONE], the caller discards the frozen copy,
+     * and the next finish computes from the session as it then is. Nothing of
+     * the failed close had landed, so nothing written is left behind.
+     *
+     * Every other state is returned unchanged. From NONE there is nothing to
+     * drop, and IN_FLIGHT and REST_UNSAVED do not draw START NEXT SET, so no
+     * set is started from them.
      */
-    fun closeOnNextSet(close: SessionCloseState): SessionCloseState = close
+    fun closeOnNextSet(close: SessionCloseState): SessionCloseState =
+        if (close == SessionCloseState.FAILED) SessionCloseState.NONE else close
 
     /**
      * The controls to draw while the close is in [close] and the lifter has

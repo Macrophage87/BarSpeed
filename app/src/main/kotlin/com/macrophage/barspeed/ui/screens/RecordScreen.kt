@@ -380,7 +380,7 @@ private fun ExitButton(
  * than left as a `!!`.
  */
 private val UNKNOWN_UNWRITTEN =
-    UnwrittenClose(sessionRow = true, sessionRating = false, skippedSets = false, finalRest = false)
+    UnwrittenClose(sessionRow = true, sessionRating = true, skippedSets = true, finalRest = true)
 
 private fun exitTitle(prompt: ExitPrompt, unwritten: UnwrittenClose?): String = when (prompt) {
     ExitPrompt.NONE -> ""

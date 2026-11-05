@@ -2,8 +2,9 @@ package com.macrophage.barspeed.model
 
 /**
  * The words the record screen puts in front of a lifter whose finish came back
- * failed: the body of the [ExitPrompt.SESSION_NOT_CLOSED] prompt, and the label
- * of the retry control that prompt names.
+ * failed: the title and body of the [ExitPrompt.SESSION_NOT_CLOSED] and
+ * [ExitPrompt.FINAL_REST_UNSAVED] prompts, worded from what the close did not
+ * write ([UnwrittenClose]), and the label of the retry control they name.
  *
  * Here rather than beside the dialog in `RecordScreen` for the reason
  * [RecordExitPolicy] is here: no test on the CI path can render a
@@ -22,46 +23,62 @@ object SessionNotClosedCopy {
     /** The title of the unfinished-session prompt. */
     const val NOT_FINISHED_TITLE = "This session did not finish"
 
+    /** The title where `endSession` landed and only the final rest window did not (#333). */
+    const val REST_UNSAVED_TITLE = "The last rest did not save"
+
     /**
      * The prompt's title for what [unwritten] says is missing.
      *
-     * Both branches say [NOT_FINISHED_TITLE] today, written out as two so the
-     * false one can be seen: where `endSession` landed and only the final rest
-     * did not, the session DID finish.
+     * Where `endSession` landed the session DID finish, so it is not titled as
+     * unfinished: only the rest after the last set is missing.
      */
-    fun title(unwritten: UnwrittenClose): String = if (unwritten.sessionRow) NOT_FINISHED_TITLE else NOT_FINISHED_TITLE
+    fun title(unwritten: UnwrittenClose): String = if (unwritten.sessionRow) NOT_FINISHED_TITLE else REST_UNSAVED_TITLE
 
     /**
-     * The prompt's body for what [unwritten] says is missing.
+     * The prompt's body for what [unwritten] says is missing (#333).
      *
-     * [EXIT_BODY] in both branches today, which names the end time and the
-     * final rest whatever failed, and never the rating or the skipped sets
-     * the close also holds.
+     * Every item named is one the close carried and did not write; nothing
+     * that was never there is named as at risk. Two shapes, by cause:
+     *
+     *  - `endSession` did not land. The end time is missing always, and the
+     *    rating, the skipped sets and the heart rate after the last set where
+     *    the close held them. What a reader rebuilds for a session with no end
+     *    time (#62) is its heart-rate average and maximum from its set rows,
+     *    and its HRV from its stored heart-rate streams, which
+     *    `SessionHrv.rmssdMs` leaves null where fewer than ten successive
+     *    differences survive -- hence "only where they hold enough usable
+     *    heartbeats".
+     *  - `endSession` landed and the rest window after it did not. The end
+     *    time, the summary, the HRV, the rating and the skips are stored, so
+     *    the body says the session is finished and names only the rest. That
+     *    write runs only where the close captured at least one sample after
+     *    the last set (`SessionCloser`), so in this shape there is always a
+     *    rest to name.
      */
-    fun body(unwritten: UnwrittenClose): String = if (unwritten.sessionRow) EXIT_BODY else EXIT_BODY
-
-    /**
-     * The body of the [ExitPrompt.SESSION_NOT_CLOSED] prompt.
-     *
-     * A failed close has two causes (`SessionCloser`): `endSession` did not
-     * land, or it landed and the final rest window's write after it did not.
-     * Every clause here is meant to be true in both, which is why the body
-     * says "or only that rest", and why the heart-rate and HRV clause speaks
-     * only of figures the finish did not write.
-     *
-     * What a reader rebuilds for a session with no end time (#62): its
-     * heart-rate average and maximum from its set rows, and its HRV from its
-     * stored heart-rate streams, which `SessionHrv.rmssdMs` leaves null where
-     * fewer than ten successive differences survive -- hence "only where they
-     * hold enough usable heartbeats". Whatever the close froze and has not
-     * written -- the end time, the final rest window, the session rating -- is
-     * held in memory only.
-     */
-    const val EXIT_BODY =
-        "Part of this session was not written: the end time and the rest recorded after your last set, " +
-            "or only that rest. Tapping FINISH SESSION AGAIN on this screen can still write them, after " +
-            "freeing some space on the phone if that is what stopped it. Every set is already saved " +
-            "either way, and any of the session's heart-rate and HRV figures the finish did not write " +
-            "are rebuilt from those sets if you leave, the HRV only where they hold enough usable " +
-            "heartbeats. Whatever has not been written is held only here, and leaving now loses it."
+    fun body(unwritten: UnwrittenClose): String {
+        if (!unwritten.sessionRow) {
+            return "The session is finished, and every set is saved with it. Only the heart rate recorded " +
+                "after your last set was not written. Tapping $RETRY_LABEL on this screen can still write " +
+                "it, after freeing some space on the phone if that is what stopped it. It is held only " +
+                "here, and leaving now loses it."
+        }
+        val missing =
+            listOfNotNull(
+                "the end time",
+                "your rating of the session".takeIf { unwritten.sessionRating },
+                "the sets you skipped".takeIf { unwritten.skippedSets },
+                "the heart rate recorded after your last set".takeIf { unwritten.finalRest },
+            )
+        val list =
+            when (missing.size) {
+                1 -> missing.single()
+                else -> missing.dropLast(1).joinToString(", ") + " and " + missing.last()
+            }
+        val them = if (missing.size == 1) "it" else "them"
+        return "The finish was not written: $list. Tapping $RETRY_LABEL on this screen can still write " +
+            "$them, after freeing some space on the phone if that is what stopped it. Every set is already " +
+            "saved either way, and if you leave, the session's heart-rate and HRV figures are rebuilt from " +
+            "those sets, the HRV only where they hold enough usable heartbeats. Whatever has not been " +
+            "written is held only here, and leaving now loses it."
+    }
 }

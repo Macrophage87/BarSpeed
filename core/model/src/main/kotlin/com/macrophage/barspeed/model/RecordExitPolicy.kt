@@ -162,7 +162,7 @@ enum class ExitPrompt(val actions: List<ExitAction>) {
      * claims are false here: the session did finish, and leaving does not
      * leave it open.
      */
-    FINAL_REST_UNSAVED(listOf(ExitAction.LEAVE_SESSION_OPEN, ExitAction.STAY)),
+    FINAL_REST_UNSAVED(listOf(ExitAction.LEAVE_FINISHED_SESSION, ExitAction.STAY)),
 }
 
 /**
