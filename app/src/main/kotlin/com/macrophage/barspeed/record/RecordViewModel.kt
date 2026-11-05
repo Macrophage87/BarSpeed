@@ -2906,10 +2906,43 @@ private fun CoroutineScope.offerResume(
  * [RecordState.sessionId] is already set -- the first-set path is the only one
  * that opens a row, and it is not taken. Where the queue starts is not
  * guessed: the earlier visit's position in it was never stored.
+ *
+ * TWO CONSEQUENCES, NAMED RATHER THAN DESIGNED AWAY. Nothing limits the pick
+ * to the adopted row's own plan session: a lifter who continues and then picks
+ * another session records its sets into the earlier row, whose own
+ * `planSessionName` stays the earlier one (each set row carries the name of
+ * the session it was recorded under). And a plan's queue starts again at its
+ * first slot, so a lifter who picks the same session faces slots the earlier
+ * visit already recorded. Which pick to allow is the owner's call.
  */
 private fun resumedState(s: RecordState): RecordState {
     val offer = s.resumeOffer ?: return s
-    return s.copy(resumeOffer = null, sessionId = offer.sessionId, setsCompleted = offer.nextOrderIdx, resumed = true)
+    val next = offer.nextOrderIdx
+    return s.copy(resumeOffer = null, sessionId = offer.sessionId, setsCompleted = next, resumedAtOrderIdx = next)
+}
+
+/**
+ * The heart rate the close writes as the window after the last set; every
+ * decision is [SessionResumePolicy.closeRestHr]'s (#48, #109). A free function
+ * for [closedState]'s reason.
+ */
+private fun closeRestHrOf(s: RecordState, samples: List<HrSample>): List<HrSample> =
+    SessionResumePolicy.closeRestHr(s.resumedAtOrderIdx, s.setsCompleted, samples)
+
+/**
+ * The state START SET on READY starts from, or null where READY may not start
+ * a set while the close is where it is (#49, #333); every decision is
+ * [RestControlPolicy]'s.
+ *
+ * READY is the second door to a set, beside `startNextSet` on the rest
+ * screen. Both pass through `beginSet`, which asks this first, so the gate
+ * holds whichever door was used; `startNextSet` has already applied the same
+ * close rule through [startedNextSetState], and asking again finds nothing
+ * left to change.
+ */
+internal fun readyStartState(s: RecordState): RecordState? {
+    if (!RestControlPolicy.readyMayStartSet(s.sessionClose)) return null
+    return s
 }
 
 /**
@@ -3374,8 +3407,13 @@ data class RecordState(
      * with separate parameters so that pair stays representable.
      *
      * Written by [SessionCloser] through `onSessionCloseState` -- IN_FLIGHT
-     * when a close starts, FAILED when it comes back failed -- and put back
-     * to NONE by `onSessionClosed` when it lands. So every branch
+     * when a close starts, FAILED or REST_UNSAVED when it comes back failed --
+     * and put back to NONE by `onSessionClosed` when it lands, and by
+     * [startedNextSetState] when the lifter starts another set from the rest
+     * screen over a FAILED close (#49, `RestControlPolicy.closeOnNextSet`).
+     * The list is of every writer; an earlier copy of this paragraph named
+     * only the first two, and the third was added without it (#69's class,
+     * named in review). So every branch
      * `RecordExitPolicy` and [RestControlPolicy] take on it is live. This
      * paragraph used to say nothing set it to anything but NONE yet; that went
      * false when the close moved to `appScope` and is corrected rather than
@@ -3399,11 +3437,15 @@ data class RecordState(
      */
     val resumeOffer: LatestSession? = null,
     /**
-     * Whether this session was continued from an earlier visit rather than
-     * started on this one (#48). Read by the close, whose HRV input covers
-     * only what this visit received.
+     * The `orderIdx` this visit's first set takes, where the session was
+     * continued from an earlier visit (#48), or null where it was started on
+     * this one. Read by the close, whose HRV input covers only what this visit
+     * received ([SessionResumePolicy.closeRrMs]) and whose final rest window
+     * belongs to a set this visit recorded ([SessionResumePolicy.closeRestHr]).
+     * One field for both, so "continued" and "where it was continued from"
+     * cannot disagree.
      */
-    val resumed: Boolean = false,
+    val resumedAtOrderIdx: Int? = null,
     /**
      * True once the lifter has tapped Finish session and before they have
      * answered or skipped the session rating (#159).
@@ -4457,6 +4499,11 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // only door: `startNextSet` writes READY and calls this in the same
         // frame for every set after the first, so a gate on the tap would
         // cover set one and nothing else.
+        //
+        // The close gate comes first of all, for the same reason (#49, #333):
+        // READY draws the session-close controls too, so a close can be in
+        // flight, failed or half-written when this is reached.
+        val gate = readyStartState(stateFlow.value) ?: return
         val before = stateFlow.value
         if (SetLoadPolicy.blocksSetStart(before.currentExercise.bodyweight, before.bodyWeightKg)) {
             stateFlow.value = before.copy(bodyWeightRequiredForSet = true)
@@ -4466,7 +4513,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // backs out of a mistapped Finish, and a flag left set here would
         // reopen the panel the next time they reach the rest screen -- asking
         // about a workout they have carried on with.
-        stateFlow.value = startedFromReadyState(stateFlow.value).copy(askingSessionRpe = false)
+        // A close the set drops goes with its frozen copy, as startNextSet's does.
+        if (gate.sessionClose != before.sessionClose) closer.discard()
+        stateFlow.value = startedFromReadyState(gate).copy(askingSessionRpe = false)
         val s = stateFlow.value
         val exercise = s.currentExercise
         // ONE statement of this set's geometry, read here and frozen below. The
@@ -5589,9 +5638,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             endedAtMs = System.currentTimeMillis(),
             // Snapshotted, not handed the live list: the passive HR collector
             // keeps appending to it for as long as this ViewModel lives.
-            rrMs = SessionResumePolicy.closeRrMs(stateFlow.value.resumed, sessionRrMs.toList()),
+            rrMs = SessionResumePolicy.closeRrMs(stateFlow.value.resumedAtOrderIdx != null, sessionRrMs.toList()),
             sessionRpe = sessionRpe,
-            restHrSamples = restHrBuffer.toList(),
+            restHrSamples = closeRestHrOf(stateFlow.value, restHrBuffer.toList()),
             // Snapshotted with everything else the close freezes (#300). The
             // list is the lifter's own decisions and exists nowhere durable
             // until this write lands.
@@ -5706,12 +5755,20 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      *
      * This writes nothing to the database, and that is now a settled ruling
      * rather than deferred work. The session row is left open with `endedAtMs`
-     * null, which is the honest state and the only signal anywhere that the
-     * session was abandoned rather than finished. `SessionEntity.endedAtMs` has
-     * exactly one reader — `Exporters`, which builds the export under
-     * `explicitNulls = false` and so omits the key entirely while it is null —
-     * and the published schema does not require it, so nothing downstream
-     * breaks on the absence.
+     * null, which is the honest state: the session was left, not finished.
+     * Since #48 a null end time no longer means only "abandoned". A row left
+     * open with a set inside `SessionResumePolicy.RESUME_WINDOW_MS` is offered
+     * for continuing on the next visit to Record, so null now means "left and
+     * not finished, and possibly still to be continued"; the row a lifter
+     * continues gets its end time from the finish they ask for. This
+     * paragraph said null was "the only signal anywhere that the session was
+     * abandoned" and that the column had exactly one reader; both went stale
+     * with #48 and are corrected here rather than deleted.
+     * `SessionEntity.endedAtMs` has two readers: `Exporters`, which builds the
+     * export under `explicitNulls = false` and so omits the key entirely while
+     * it is null, and `SessionRepository.latestSession`, which reads it for
+     * the resume question. The published schema does not require it, so
+     * nothing downstream breaks on the absence.
      *
      * Four reasons, against closing it here:
      *
@@ -5729,9 +5786,10 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      *    `endedAtMs`, means something different from what a deliberate finish
      *    writes into the same column.
      *  - It could not be complete. This function is not called on a task swipe
-     *    or a process kill, so `endedAtMs == null` would stop meaning
-     *    "abandoned" and start meaning "abandoned in one of the ways that
-     *    happen to run this". Today it means one thing.
+     *    or a process kill, so `endedAtMs == null` would stop meaning "left
+     *    without a finish" and start meaning "left in one of the ways that
+     *    happen not to run this". Today every way of leaving writes the same
+     *    null, and the resume question reads it the same whichever way it was.
      *
      * What piece 4 does instead is make the close the lifter DOES ask for
      * survive this screen going away; see [finishSession].

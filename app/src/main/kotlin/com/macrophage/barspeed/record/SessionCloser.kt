@@ -106,7 +106,7 @@ class SessionCloser(
     private val holds: RecordingHolds,
 ) {
     /**
-     * True once a close has been asked for, and never cleared.
+     * True once a close has been asked for, and cleared only by [discard].
      *
      * The rest screen's Finish session control is an undebounced `TextButton`,
      * so two taps would otherwise launch two closes; and because both start
@@ -114,9 +114,10 @@ class SessionCloser(
      * `endSession` before either writes. The repository's own guard closes the
      * sequential case, this closes the concurrent one, and neither needs a lock.
      *
-     * Not cleared on failure. The way forward from there is [retry], which
-     * replays the frozen close rather than freezing a new one -- or [discard],
-     * when the lifter carries on lifting instead (#49).
+     * Not cleared on failure or on landing. The way forward from a failure is
+     * [retry], which replays the frozen close rather than freezing a new one,
+     * or [discard], when the lifter carries on lifting instead (#49) -- the one
+     * place it goes back to false.
      */
     private var asked = false
 

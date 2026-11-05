@@ -1021,8 +1021,14 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
             kind = kind ?: ExerciseKind.DYNAMIC,
             imuConnected = state.imuConnected,
         )
-    Button(onClick = viewModel::beginSet, modifier = Modifier.fillMaxWidth().height(56.dp)) {
-        Text(CountingPolicy.startSetLabel(counter), fontWeight = FontWeight.Bold)
+    // Drawn only where RestControlPolicy says READY may start a set while the
+    // close is where it is (#49, #333). READY draws SessionCloseControls below,
+    // so a close can be asked for here; beginSet asks the same question, so a
+    // tap that reaches it anyway starts nothing.
+    if (RestControlPolicy.readyMayStartSet(state.sessionClose)) {
+        Button(onClick = viewModel::beginSet, modifier = Modifier.fillMaxWidth().height(56.dp)) {
+            Text(CountingPolicy.startSetLabel(counter), fontWeight = FontWeight.Bold)
+        }
     }
     Spacer(Modifier.height(8.dp))
     // The Row went with the demo chip (#262). It spaced two chips; one chip
@@ -3644,11 +3650,15 @@ private fun SessionRpePanel(viewModel: RecordViewModel) {
 }
 
 /**
- * The session did not close: either the end time and the heart-rate and HRV
- * summary never landed, or that write landed and only the rest recorded after
- * the last set did not (#109). Every set is already stored, so what is at risk
- * here is smaller than an unsaved set and is not nothing — whichever half is
- * still missing is held in memory here and in no durable place at all.
+ * A close that came back failed, by cause (#333). Where the session write
+ * did not land (FAILED), the row is still open: no end time, no heart-rate or
+ * HRV summary, no rating and no skips. Where it landed and only the rest
+ * recorded after the last set did not (REST_UNSAVED, #109), the session is
+ * finished and the row has its end time; only that window is missing. Every
+ * set is already stored either way, so what is at risk here is smaller than an
+ * unsaved set and is not nothing -- whatever is still missing is held in memory
+ * here and in no durable place at all. The title says which, from
+ * [SessionNotClosedCopy.title].
  *
  * It replaces Finish session rather than sitting beside it, as
  * [UnsavedSetNotice] replaces the effort grid: two controls that both close the

@@ -83,6 +83,23 @@ object SessionResumePolicy {
      */
     fun closeRrMs(resumed: Boolean, rrMs: List<Double>): List<Double> = if (resumed) emptyList() else rrMs
 
+    /**
+     * The heart rate a close may write as the window after the last set
+     * (`rest_after_hrm`, #109).
+     *
+     * [resumedAtOrderIdx] is the `orderIdx` the first set of this visit takes
+     * in a session continued from an earlier visit, or null where the session
+     * was started on this visit. [setsCompleted] is one past the `orderIdx` of
+     * the last set this visit has written. [samples] is what this visit
+     * captured since its last set ended, or, with no set yet, since the
+     * session was picked.
+     *
+     * Groundwork: passes [samples] through in every case, which is what the
+     * close did before this function existed.
+     */
+    @Suppress("UnusedParameter") // The rule arrives with its red (#48); today the window is written whole.
+    fun closeRestHr(resumedAtOrderIdx: Int?, setsCompleted: Int, samples: List<HrSample>): List<HrSample> = samples
+
     /** The prompt's title. */
     const val TITLE = "Continue this session?"
 
