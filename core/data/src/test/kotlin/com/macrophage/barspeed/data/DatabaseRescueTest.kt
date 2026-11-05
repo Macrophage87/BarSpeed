@@ -527,6 +527,28 @@ class DatabaseRescueTest {
         assertTrue(!File(rescueRoot(), DatabaseRescue.PENDING).exists(), "the finished rescue's marker was left")
     }
 
+    /**
+     * GUARD, added after the fix because a mutation survived it: POSIX
+     * rename replaces its destination silently, so a finish that moved a
+     * file into a name already taken in the rescue directory would destroy
+     * whatever held it. Nothing in a normal rescue puts one there; this
+     * plants one.
+     */
+    @Test
+    fun `a finish never moves a file over one already in the rescue directory`() {
+        val file = staleUnderWal()
+        val target = File(rescueRoot(), "db-1000").apply { mkdirs() }
+        File(target, file.name + "-wal").writeText("a log already here")
+        File(rescueRoot(), DatabaseRescue.PENDING).writeText("db-1000")
+
+        val outcome = DatabaseRescue.rescue(file, rescueRoot(), 20)
+        assertTrue(outcome is RescueOutcome.Failed, "expected Failed, got " + outcome)
+        val inTheWay = File(target, file.name + "-wal").readText()
+        assertEquals("a log already here", inTheWay, "a file in the way was replaced")
+        assertEquals(realWal.toList(), File(file.path + "-wal").readBytes().toList(), "the log at the path was lost")
+        assertTrue(file.isFile, "the main file moved without its log")
+    }
+
     /** A marker whose directory is not there names a rescue that moved nothing: decide afresh. */
     @Test
     fun `a marker naming no directory is dropped and the launch decides afresh`() {

@@ -393,6 +393,28 @@ class DatabaseRestoreTest {
         assertOriginal(before)
     }
 
+    /**
+     * GUARD, added after the fix because a mutation survived it (reading
+     * the displaced directory's contents from the rescue's directory, the
+     * wrong pair): every stuck test above is a refusal, and the wrong pair
+     * refuses too. Here the undo's first move -- the restored main file
+     * going home -- fails, so the restored database is still whole at the
+     * path, and opening it is right.
+     */
+    @Test
+    fun `an undo stuck with the restored database still whole in place may open it`() {
+        val before = standardSetup()
+        restore().request(item("db-1000"))
+        assertEquals(RestoreOutcome.Swapped, restore().prepare())
+        var calls = 0
+        val failingFirst: (File, File) -> Boolean = { from, to -> if (calls++ == 0) false else from.renameTo(to) }
+        assertIs<RestoreOutcome.Stuck>(restore(failingFirst).prepare())
+        assertEquals("old", mainTag(live), "not the state under test")
+        assertTrue(File(liveDir, "$DATABASE_NAME-wal").exists(), "not the state under test")
+        assertTrue(restore().safeToOpen(), "a whole database at the path was refused")
+        assertEquals(before.values.sorted(), contents().values.sorted(), "a stuck undo lost bytes")
+    }
+
     // ---- round 1 review (A4, B3): an undone restore is refused by this build, not every build ----
 
     @Test
