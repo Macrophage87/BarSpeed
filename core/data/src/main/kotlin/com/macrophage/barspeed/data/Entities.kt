@@ -630,6 +630,35 @@ data class SetRecordEntity(
     /** kotlinx-serialized [com.macrophage.barspeed.dsp.SetAnalysis]. */
     val analysisJson: String,
     /**
+     * The session-export schema version current in the build that computed
+     * [analysisJson], or null when the row predates the column (v21, #38).
+     *
+     * WHY IT IS STORED. The blob is computed once, at record time, and every
+     * export afterwards only deserialises it -- nothing re-runs the analyzer.
+     * So the semantics its figures were computed under are those of the build
+     * that RECORDED the set, while every export document stamps the
+     * `schemaVersion` of the build that EXPORTS it. Export 1.1 changed
+     * `velocityLoss_pct` from best-to-worst to best-to-last and made an
+     * unmeasured `ecc_s` null instead of 0.0; a set recorded under 1.0 and
+     * re-exported today carries 1.0's numbers inside a 1.1-or-later document.
+     * This column is what lets the document say which semantics each set's
+     * figures were computed under.
+     *
+     * WHAT IT IS AND IS NOT. It is the EXPORT contract's version constant,
+     * `SessionExport.SCHEMA_VERSION`, read at the write -- the only version
+     * label this app has for what its analysis means. Most bumps of that
+     * constant are additive keys and leave the analysis unchanged, so two
+     * sets carrying different values here may well have identical semantics;
+     * what one value guarantees is the build's contract, not a difference.
+     *
+     * NULL ON EVERY ROW WRITTEN BEFORE v21, and nothing backfills it. The
+     * analysis of such a set was computed by whatever build recorded it, and
+     * no stored fact names that build: guessing from `startedAtMs` against
+     * release dates would publish a version nobody recorded. Null is "before
+     * provenance", which is the truth.
+     */
+    val analysisSchemaVersion: String? = null,
+    /**
      * kotlinx-serialized [com.macrophage.barspeed.model.ResolvedGeometry] — the
      * direction and sensor mounting this set was analysed against.
      *
