@@ -95,4 +95,48 @@ class SessionResumePolicyTest {
         assertEquals(emptyList(), SessionResumePolicy.closeRrMs(resumed = true, rrMs = rr))
         assertEquals(rr, SessionResumePolicy.closeRrMs(resumed = false, rrMs = rr))
     }
+
+    // ---- the final rest window ------------------------------------------------
+
+    private val hr = listOf(HrSample(5_000_000L, bpm = 92, rrIntervalsMs = listOf(650.0)))
+
+    /**
+     * THE DEFECT (review round 1 of 0.2.0's session-lifecycle lane). Continue
+     * it, pick a session, and finish with no set recorded on this visit: the
+     * heart rate captured on READY, up to [SessionResumePolicy.RESUME_WINDOW_MS]
+     * after the earlier visit's last set, was written as that set's
+     * `rest_after_hrm` -- "the window after the last set" -- when it is
+     * nothing of the kind. The close writes no window instead.
+     */
+    @Test
+    fun `a continued session finished with no set this visit writes no final rest window`() {
+        assertEquals(
+            emptyList(),
+            SessionResumePolicy.closeRestHr(resumedAtOrderIdx = 2, setsCompleted = 2, samples = hr),
+        )
+    }
+
+    /** The other side: once this visit has written a set, the window after it is that set's, continued or not. */
+    @Test
+    fun `a continued session's window after a set of this visit is written`() {
+        assertEquals(hr, SessionResumePolicy.closeRestHr(resumedAtOrderIdx = 2, setsCompleted = 3, samples = hr))
+    }
+
+    /** A session started on this visit is untouched by the rule, whatever its count. */
+    @Test
+    fun `a session started on this visit writes its window as before`() {
+        assertEquals(hr, SessionResumePolicy.closeRestHr(resumedAtOrderIdx = null, setsCompleted = 1, samples = hr))
+    }
+
+    /**
+     * The prompt says what continuing does to the queue and to the row's name
+     * (#48, review round 1): the queue starts again at its first slot, and
+     * the sets go into this row whichever session is picked next.
+     */
+    @Test
+    fun `the body says the plan starts again and the sets go into this session whatever is picked`() {
+        val body = SessionResumePolicy.body(open, "18:05")
+        assertTrue("whichever session you pick" in body, body)
+        assertTrue("starts again from its first set" in body, body)
+    }
 }

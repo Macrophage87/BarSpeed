@@ -29,6 +29,9 @@ class SessionFinishedCopyTest {
     fun `a session with no row is not called saved`() {
         val headline = SessionFinishedCopy.headline(sessionWritten = false)
         assertNotEquals(SessionFinishedCopy.SAVED, headline, "no row was written, and the headline says it was saved")
-        assertEquals("Nothing was recorded, so no session was saved.", headline)
+        // "Nothing was recorded" until review round 1: a set that was recorded
+        // and whose write failed and was discarded also reaches here, and was
+        // recorded. What is true in every case is that no set was saved.
+        assertEquals("No set was saved, so no session was saved.", headline)
     }
 }
