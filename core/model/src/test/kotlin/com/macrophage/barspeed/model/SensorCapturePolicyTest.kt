@@ -905,8 +905,10 @@ class SensorCapturePolicyTest {
      * DIFFERENTIAL, #171 item 3. During a set the bar draws the roster the set
      * was ARMED with. Armed dual, then the second unit's label removed mid-set:
      * the live roster drops to one stream and its second dot, while the set
-     * underneath goes on capturing two -- `beginSet` froze that, and the bar
-     * is the only thing on screen that said otherwise.
+     * underneath is still declared as two -- `beginSet` froze that. Its second
+     * link is not frozen: the relabel nulls the live `secondaryAddress` and
+     * `setSecondaryImuAddress` disconnects it, so the B dot is kept to show
+     * that link going down rather than vanishing.
      */
     @Test
     fun `during a set the bar keeps the roster the set was armed with`() {

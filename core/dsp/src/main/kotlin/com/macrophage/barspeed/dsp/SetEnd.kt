@@ -34,8 +34,9 @@ import com.macrophage.barspeed.model.VoiceCue
  * Same clock, not the same instant (#292). A cue is stamped when the app
  * decided to speak; a sample is stamped when its notification ARRIVED, which
  * includes whatever delay the sensor, the link and the phone's stack added.
- * On one session of five a link ran 600 ms behind, which would put a real
- * drive begun up to that long before the cue after it. `ImuSample`'s KDoc is
+ * On one session of five a link ran 600 ms behind the other unit, a floor on
+ * its own delay, which would put a real drive begun within that delay -- at
+ * least 600 ms -- before the cue after it. `ImuSample`'s KDoc is
  * the one statement of what was measured and why no offset is applied.
  *
  * ## The three decisions this type makes, and why

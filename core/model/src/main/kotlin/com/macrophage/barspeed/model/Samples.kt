@@ -37,11 +37,13 @@ package com.macrophage.barspeed.model
  * stream stamp against an APP-CLOCK instant -- `PrepWindow.workStartedAtMs`,
  * a cue's `VoiceCue.timestampMs` -- which is what `WorkStart`, `SetEnd` and
  * `RollExcursion` in `:core:dsp` each do; each points here rather than
- * restating this. On a link like field-42's the motion is stamped about
- * 600 ms after it happened, so against those bounds handling that ended up
- * to that long BEFORE work began can read as inside the working window, and
- * a real drive begun up to that long before the terminal cue can read as
- * after it.
+ * restating this. On a link like field-42's the motion is stamped at least
+ * about 600 ms after it happened: the lag was measured against the other
+ * unit, whose own delay is unknown, and an arrival stamp cannot precede the
+ * motion. So against those bounds handling that ended within that link's
+ * delay -- 600 ms or more -- BEFORE work began can read as inside the
+ * working window, and a real drive begun within it before the terminal cue
+ * can read as after it.
  *
  * [Field]: three rack-pin taps with both units on the bar, on a set where
  * Devices shows both streaming; read each unit's impact instant in the

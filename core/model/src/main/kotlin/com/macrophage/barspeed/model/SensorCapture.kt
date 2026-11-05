@@ -621,10 +621,18 @@ object SensorCapturePolicy {
      * Between sets the live roster is the right one to draw: it is what the
      * next set will be armed with, and the rest screen is where the lifter
      * fixes it. During a set it is the wrong one (#171 item 3). The lifter can
-     * relabel or forget a unit mid-set, and the set already recording keeps
-     * the roster it was armed with -- `beginSet` freezes it for exactly that
-     * reason -- so a bar drawn from the live roster can grow, drop or rename
-     * its second dot while the capture it sits above has not changed.
+     * relabel or forget a unit mid-set, and the set already recording is
+     * STORED as the roster it was armed with -- `beginSet` freezes it for
+     * exactly that reason. The capture underneath is not frozen with it.
+     * Removing the second unit's label, or forgetting it, nulls the live
+     * roster's `secondaryAddress`, and `AutoConnectManager.setSecondaryImuAddress`
+     * then disconnects the second link with no in-set guard, so that unit's
+     * stream can stop mid-set. A swap of the two labels keeps both addresses
+     * and drops nothing; a set armed for one opens no second collector, so a
+     * unit labelled mid-set adds no stream. A bar drawn from the live roster
+     * would drop or rename the dot of a unit the set is still declared to
+     * capture; the frozen roster keeps that dot, and its link state then
+     * shows the stream going quiet.
      *
      * So in a set the frozen roster wins, and only there. A set with nothing
      * frozen -- which no set reaching `inSetState` can be, and is answered

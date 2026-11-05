@@ -18,11 +18,12 @@ no phase lag, and can be re-run when the first method turns out wrong. So:
   no stillness score and no transform.
 - **The app owes an honest capture, and it already delivers one.** Both role-
   tagged IMU streams per set (`setNN_*_imu-a.csv`, `-imu-b.csv`), and, since
-  4116e198753f1e3bae2d8a2eb2914397fa46be1d (v0.1.48), each set's
-  `prepStartedAt_ms` and `workStartedAt_ms` in `meta.json` on the same epoch-ms
-  clock as the CSVs' `timestamp_ms` column, plus a `prep` raw-stream row
-  carrying the same pair. The journal opens before prep begins, so the prep
-  window's samples are in the archive.
+  4116e198753f1e3bae2d8a2eb2914397fa46be1d (v0.1.48), for each set that ran a
+  prep, its `prepStartedAt_ms` and `workStartedAt_ms` in `meta.json` on the
+  same epoch-ms clock as the CSVs' `timestamp_ms` column, plus a `prep`
+  raw-stream row carrying the same pair. `beginSet` clears the IMU buffers
+  before the prep countdown starts, so the prep window's samples are in the
+  stored stream and the archive.
 - **Anything derived is published beside the raw streams, never in place of
   them.** The raw CSVs are the record; a transform is an opinion about them
   that a better method may later replace. If a derived transform is ever
@@ -73,9 +74,11 @@ step 3's yaw estimate and any sample-by-sample comparison do.
 ### 2. Gravity in the pre-set still window: two of three axes
 
 - Window: `prepStartedAt_ms` to `workStartedAt_ms`, taken from `meta.json`
-  rather than inferred from the samples. A set with no stored window (recorded
-  before v0.1.48, or ended during its lead-in, which publishes no window) has
-  no input here.
+  rather than inferred from the samples. A set with no stored window has no
+  input here: one recorded before v0.1.48, one ended during its lead-in, or
+  one that ran no prep at all (no tempo, not timed) -- `PrepWindowPolicy`
+  stores no window for it, and that is the ordinary ad-hoc set, not the
+  exotic one. Expect most sets of an unplanned session to refuse at this step.
 - Within it, keep samples whose gyro magnitude is below a declared still
   threshold (field-34's reading used 8 deg/s) and require a minimum continuous
   still span. Field-34 set 1 b had 3.39 s (340 samples) where it had one at
@@ -117,11 +120,15 @@ set. A unit that rotated on its mount during the set has no single transform,
 and the honest output is a refusal (#185's body), not a transform fitted to a
 blend of two mountings.
 
-- Repeat step 2 over a closing still window, after the set's terminal cue
-  (`Done` or `Stopped` in the cue track) and before the stream ends: a guided
-  set keeps recording 4.3-13.7 s past its cue (session 32, recorded on
-  `SetEnd`). Note that window also holds re-rack handling; it qualifies only
-  where the still threshold holds.
+- Repeat step 2 over a closing still window, after the set's `Done` cue and
+  before the stream ends: the eleven completed sets of session 32 record
+  4.3-13.7 s past it (recorded on `SetEnd`). A set ended by tap (`Stopped`)
+  has no samples after the tap -- `endSet` cancels the sample collectors
+  before it reads the clock, so its last sample is never later than the tap;
+  session 32's five failed sets record only 0.482-0.832 s past their last cue
+  -- so it never has a closing window and the default below refuses it. Note
+  the `Done` window also holds re-rack handling; it qualifies only where the
+  still threshold holds.
 - Compare each unit's opening and closing gravity directions. **Refuse** the
   set when either unit's two directions differ by more than a declared angle,
   and name which unit moved -- field-35 shows the vectors can say so without
