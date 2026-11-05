@@ -80,4 +80,20 @@ class PlanRepositoryWarningsTest {
         val staged = repository.importPlan(plan("""{"reps":5,"load_kg":100}""")) as PlanImportResult.Staged
         assertEquals(emptyList(), repository.reviewSummary(dao.byId(staged.summary.planId)!!)!!.warnings)
     }
+
+    /**
+     * The smaller half of #58: a document with a real error AND a near-miss
+     * key showed the error alone, so the author fixed the error, re-imported,
+     * and only then learned the load key was misspelt -- or, if the second
+     * import's dialog was dismissed, never learned it.
+     */
+    @Test
+    fun `a refused document carries the warnings the same parse produced`() = runTest {
+        val dao = FakePlanDao()
+        val result = PlanRepository(dao, clock = { 0L })
+            .importPlan(plan("""{"reps":5,"tempo":"0010","loadKg":100}""")) as PlanImportResult.Invalid
+        assertTrue(result.errors.isNotEmpty(), "premise: the zero stroke is refused")
+        assertTrue(result.warnings.any { "\"loadKg\" is not a plan key" in it }, "the near miss is lost")
+        assertTrue(dao.rows.isEmpty(), "and a refused document still stores nothing")
+    }
 }
