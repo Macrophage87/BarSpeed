@@ -4972,21 +4972,22 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         val exercise = s.currentExercise
         val slot = s.currentSlot
         val isTimed = s.currentIsTimed
-        val addedKg =
-            SetLoadPolicy.resolve(
+        // Pull-ups and dips move the lifter: the plan's number is what was ADDED
+        // (negative when a band or machine assists), so the load that actually
+        // travelled is body weight plus that; and the planned load is paired
+        // on the same scale, from the same bodyWeightKg reading, so a compliant
+        // set cannot disagree with itself (#25). All three figures are one
+        // call into :core:model (#65), where RecordedLoadTest reaches them.
+        val (addedKg, loadKg, plannedLoadKg) =
+            SetLoadPolicy.recordedLoad(
                 adHoc = s.adHoc,
                 plannedAddedKg = slot?.loadKg,
                 typedAddedKg = s.weightUnit.parseToKg(s.loadInput),
                 statedAddedKg = s.statedLoadKg,
+                bodyweight = exercise.bodyweight,
+                bodyWeightKg = s.bodyWeightKg,
+                declaredPlannedAddedKg = slot?.plannedLoadKg,
             )
-        // Pull-ups and dips move the lifter: the plan's number is what was ADDED
-        // (negative when a band or machine assists), so the load that actually
-        // travelled is body weight plus that.
-        val loadKg = SetLoadPolicy.totalKg(exercise.bodyweight, s.bodyWeightKg, addedKg)
-        // Paired on the same scale as loadKg above, from the same bodyWeightKg
-        // reading, so a compliant set cannot disagree with itself: #25.
-        val plannedLoadKg =
-            SetLoadPolicy.recordedPlannedLoadKg(exercise.bodyweight, s.bodyWeightKg, slot?.plannedLoadKg)
         // THREE numbers, and this is where they part. The plan's PRESCRIPTION
         // comes off the frozen declaration and is what the set is recorded and
         // exported against; the WORKING target is the slot's live count, which

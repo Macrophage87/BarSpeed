@@ -213,6 +213,29 @@ object SetGeometryPolicy {
     }
 
     /**
+     * Everything the record queue resolves once per plan exercise, from the
+     * stored definition and the plan's declaration of it (#65).
+     *
+     * `flattenPlan` in `:app` made these three calls in a row, as a suspend
+     * extension on `SessionRepository` that no test on the CI path calls, so
+     * which definition each was handed -- [resolve] and [stackRuleApplied]
+     * take the STORED one, [describe] the RESOLVED one -- was a rule nothing
+     * enforced. #24's close comment asked for this seam by name, "a
+     * `plannedExercise` seam in `:core:model`, reducing `flattenPlan` to one
+     * call"; `git grep plannedExercise` returned nothing until now.
+     */
+    fun plannedExercise(base: ExerciseDef, declared: PlanExerciseDef): PlannedExercise {
+        val exercise = resolve(base, declared)
+        // Described from the definition that was resolved, not from the plan,
+        // so what the export publishes is what the DSP was handed.
+        return PlannedExercise(
+            exercise = exercise,
+            geometry = describe(exercise, declared),
+            stackRuleApplied = stackRuleApplied(base, declared),
+        )
+    }
+
+    /**
      * Overlay a plan exercise's declarations on the built-in definition.
      *
      * A declaration always wins: machines of the same movement pattern really
@@ -495,3 +518,16 @@ object SetGeometryPolicy {
         else -> GeometrySource.DEFAULT
     }
 }
+
+/**
+ * One plan exercise as the record queue carries it into every one of its
+ * slots ([SetGeometryPolicy.plannedExercise]).
+ */
+data class PlannedExercise(
+    /** The definition the set runs against: the stored one with the plan's declarations overlaid. */
+    val exercise: ExerciseDef,
+    /** What the export publishes about [exercise]'s geometry, and where each value came from. */
+    val geometry: ResolvedGeometry,
+    /** Whether the stack inversion rule, and no written `sensorInverted`, set [exercise]'s inversion. */
+    val stackRuleApplied: Boolean,
+)
