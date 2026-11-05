@@ -290,7 +290,7 @@ class DatabaseRestore(
             val (from, to) = moves[i]
             if (!stepBack(from, to)) return RestoreOutcome.Stuck("could not move ${to.name} back")
         }
-        runCatching { failedFile.appendText("${journal.source} $compiledVersion\n") }
+        runCatching { DatabaseRescue.writeSynced(failedFile, "${journal.source} $compiledVersion\n", append = true) }
         journalFile.delete()
         removeIfEmpty(File(rescueRoot, journal.displaced))
         return RestoreOutcome.Undone

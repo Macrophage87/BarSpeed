@@ -311,9 +311,13 @@ object DatabaseRescue {
      * rename of the marker can still be lost after power loss while a later
      * rename -- a `-wal` into the rescue directory -- survives. That residual
      * is not closed here; it is a `[Field]` question. Round 3 review, B's N3.
+     *
+     * [append] adds [text] to the end of [file] rather than replacing it,
+     * for the restore's record of undone restores, which is appended to and
+     * never renamed. Round 3 review, A's N6.
      */
-    internal fun writeSynced(file: File, text: String) {
-        FileOutputStream(file).use { out ->
+    internal fun writeSynced(file: File, text: String, append: Boolean = false) {
+        FileOutputStream(file, append).use { out ->
             out.write(text.toByteArray(Charsets.UTF_8))
             out.fd.sync()
         }

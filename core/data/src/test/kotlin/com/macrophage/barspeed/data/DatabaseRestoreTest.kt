@@ -463,6 +463,32 @@ class DatabaseRestoreTest {
     }
 
     /**
+     * GUARD, added when the record of undone restores began to be written
+     * through a synced write (round 3 review, A's N6), because a mutation
+     * that made that write replace the record rather than add to it
+     * survived: a second undone restore must not make the first one
+     * restorable again in the build that undid it.
+     */
+    @Test
+    fun `a second undone restore does not forget the first`() {
+        standardSetup()
+        rescue("db-2000", 19, "older")
+        restore().request(item("db-1000"))
+        assertEquals(RestoreOutcome.Swapped, restore().prepare())
+        assertEquals(RestoreOutcome.Undone, restore().prepare())
+        restore().request(item("db-2000"))
+        assertEquals(RestoreOutcome.Swapped, restore().prepare())
+        assertEquals(RestoreOutcome.Undone, restore().prepare())
+        for (name in listOf("db-1000", "db-2000")) {
+            assertEquals(
+                RestoreVerdict.Refused(RestoreRefusal.FAILED_BEFORE, 19),
+                restore().verdict(item(name), store().rescued()),
+                "$name was undone and is offered again by the build that undid it",
+            )
+        }
+    }
+
+    /**
      * POSIX rename replaces its destination silently, so a move into a taken
      * name would destroy whatever held it. Nothing in a normal swap puts a
      * file there; this one is planted between launches to make sure that if
