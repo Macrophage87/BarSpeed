@@ -8,7 +8,6 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
@@ -119,22 +118,19 @@ class RecordingService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     /**
-     * The last hop, and the one nothing pins. Three steps decide the type the
-     * platform is handed: the policy's [FgsTypeChoice], the enum-to-manifest
-     * contract, and this mapping. The first two are pinned by
-     * `BlePermissionPolicyTest` and `ForegroundServiceContractTest`; this one
-     * is not, and swapping the two right-hand sides below is issue #21
-     * verbatim — the policy correctly picks `SPECIAL_USE` and the platform is
-     * handed `connectedDevice`, throwing at the tap. Review swapped them and
-     * ran the full CI sequence green. Carrying the platform int on the enum
-     * would pin it, at the cost of duplicating an `android.content.pm`
-     * constant into a pure-JVM module; that trade is not taken here.
+     * The type the platform is handed. Three steps decide it: the policy's
+     * [FgsTypeChoice], the enum-to-manifest contract, and the enum-to-int
+     * mapping. The first two are pinned by `BlePermissionPolicyTest` and
+     * `ForegroundServiceContractTest`. The third used to be a `when` here that
+     * nothing pinned -- swapping its two right-hand sides was issue #21
+     * verbatim, the policy correctly picking `SPECIAL_USE` and the platform
+     * handed `connectedDevice`, and review ran the full CI sequence green on
+     * that swap (#52). It is now [FgsTypeChoice.platformType], pinned as
+     * literals in `ForegroundServiceContractTest` and against `ServiceInfo`'s
+     * own constants in `FgsTypePlatformTest`, and this reads nothing else.
      */
     private fun foregroundServiceType(): Int =
-        when (BlePermissionPolicy.foregroundServiceType(Build.VERSION.SDK_INT, hasBluetoothConnect())) {
-            FgsTypeChoice.CONNECTED_DEVICE -> ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
-            FgsTypeChoice.SPECIAL_USE -> ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-        }
+        BlePermissionPolicy.foregroundServiceType(Build.VERSION.SDK_INT, hasBluetoothConnect()).platformType
 
     private fun hasBluetoothConnect(): Boolean =
         ContextCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_CONNECT) ==

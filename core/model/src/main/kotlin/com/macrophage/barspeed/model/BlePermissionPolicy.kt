@@ -9,14 +9,20 @@ package com.macrophage.barspeed.model
  * declared, and nothing else in this build checks the pair.
  *
  * [platformType] is the `ServiceInfo.FOREGROUND_SERVICE_TYPE_*` int that
- * `RecordingService` is to hand `ServiceCompat.startForeground` for this
- * choice (#52). DECLARED, NOT YET READ: both members carry 0 here and the
- * service still maps the enum itself; the values this has to carry are
- * pinned by the commit after this one.
+ * `RecordingService` hands `ServiceCompat.startForeground` for this choice,
+ * and the service reads nothing else (#52). It used to map the enum to the
+ * int in a `when` of its own that nothing pinned, and swapping that `when`'s
+ * two arms was #21 verbatim with CI green. Carried here as literals because
+ * this module cannot see `android.content.pm`: `ForegroundServiceContractTest`
+ * pins them as literals and `FgsTypePlatformTest` in `:app` pins them against
+ * the platform's own constants.
  */
 enum class FgsTypeChoice(val manifestToken: String, val platformType: Int) {
-    CONNECTED_DEVICE("connectedDevice", 0),
-    SPECIAL_USE("specialUse", 0),
+    /** `ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE`, `1 shl 4`. */
+    CONNECTED_DEVICE("connectedDevice", 0x10),
+
+    /** `ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE`, `1 shl 30`. */
+    SPECIAL_USE("specialUse", 0x40000000),
 }
 
 /**
