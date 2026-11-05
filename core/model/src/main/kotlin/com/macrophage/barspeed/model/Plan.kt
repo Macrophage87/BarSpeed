@@ -1180,6 +1180,21 @@ data class PlanExerciseDef(
             ?: ExerciseDef.inferKind(exercise)
 
     /**
+     * Whether the plan APPROVAL screen draws this exercise's loads as
+     * body-weight work -- "BW + 10 kg" rather than "10 kg" (#229 item 1).
+     *
+     * Lifted out of `PlanDetailScreen`, where it was the inline expression
+     * `exercise.bodyweight ?: false` beside a comment saying it did not see
+     * the seed default, so that the decision runs here where a test can reach
+     * it. Lifted as it stood, defect included: it reads the RAW declaration,
+     * so an omitted key on a built-in body-weight id displays as loaded work
+     * on the same screen whose import warning says the set will be recorded
+     * as body weight.
+     */
+    val approvalBodyweight: Boolean
+        get() = bodyweight ?: false
+
+    /**
      * Start-phase override, when the plan pins one. Combines the two declared
      * properties: the first phase is the concentric when the direction the lift
      * starts moving is the direction the drive goes.
