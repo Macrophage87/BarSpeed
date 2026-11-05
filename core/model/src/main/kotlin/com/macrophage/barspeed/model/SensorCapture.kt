@@ -610,6 +610,29 @@ object SensorCapturePolicy {
     }
 
     /**
+     * Which roster the record screen's top bar draws its sensor dots from.
+     *
+     * [live] is what a set beginning right now would be armed with, recomputed
+     * from the paired list, the labels and the preferred address whenever any
+     * of them moves. [armedAtBegin] is the roster `beginSet` read, frozen with
+     * the set's state, or null where no set has begun. [inSet] is whether a
+     * set is recording.
+     *
+     * Between sets the live roster is the right one to draw: it is what the
+     * next set will be armed with, and the rest screen is where the lifter
+     * fixes it. During a set it is the wrong one (#171 item 3). The lifter can
+     * relabel or forget a unit mid-set, and the set already recording keeps
+     * the roster it was armed with -- `beginSet` freezes it for exactly that
+     * reason -- so a bar drawn from the live roster can grow, drop or rename
+     * its second dot while the capture it sits above has not changed.
+     *
+     * NOT YET: this still returns [live] in every case, which is what the bar
+     * drew before this function existed. The suppression goes with the fix.
+     */
+    @Suppress("UnusedParameter")
+    fun shownRoster(live: SensorRoster, armedAtBegin: SensorRoster?, inSet: Boolean): SensorRoster = live
+
+    /**
      * What to store on a set the record flow has just finished arming, or null
      * when there is nothing to say.
      *
