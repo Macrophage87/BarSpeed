@@ -239,4 +239,20 @@ class RescuedCardTest {
             assertFalse(buttons.showRestore || buttons.restoreEnabled, "restore offered on $verdict")
         }
     }
+
+    // ---- issue #112: the differential ---------------------------------------
+
+    @Test
+    fun `a restorable rescue offers restore`() {
+        val buttons = rescuedCardButtons(complete, emptySet(), RestoreVerdict.Restorable(19))
+        assertTrue(buttons.showRestore, "a rescue this build can open is not offered back")
+        assertTrue(buttons.restoreEnabled, "an idle restorable card's RESTORE is dead")
+    }
+
+    @Test
+    fun `a busy restorable rescue draws restore but cannot start it`() {
+        val buttons = rescuedCardButtons(complete, setOf(complete.directory), RestoreVerdict.Restorable(19))
+        assertTrue(buttons.showRestore, "busy hid the button rather than disabling it")
+        assertFalse(buttons.restoreEnabled, "RESTORE live while a share or discard is in flight")
+    }
 }
