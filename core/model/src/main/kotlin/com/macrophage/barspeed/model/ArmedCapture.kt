@@ -35,14 +35,23 @@ data class ArmedCapture(
      * unit that turned out to be, and on a one-sensor set as well as a
      * two-unit one.
      *
-     * Asked only where the set declares a stack mount, for the reason
-     * `StackRollSignature` gives: a unit lying still on a bench reads
-     * [StackMountSignal.ON_STACK] as readily as one on a stack. Everywhere
-     * else it is [StackMountSignal.UNMEASURED] -- nothing asked, which is
-     * absence and not a verdict.
+     * Asked where the set declares a stack mount, and -- since #279 -- on
+     * every set whose analysis FELL BACK off the armed unit
+     * ([RecordedSensors.analysedFellBack]), whatever the declaration.
+     * Everywhere else it is [StackMountSignal.UNMEASURED] -- nothing asked,
+     * which is absence and not a verdict. The restriction is
+     * `StackRollSignature`'s reason: a unit lying still on a bench reads
+     * [StackMountSignal.ON_STACK] as readily as one on a stack, so the answer
+     * is only worth having where something acts on it.
      *
-     * `SetGeometryPolicy.analysedUnder` is its one consumer. It is a statement
-     * about a STREAM's reported roll, never about where a magnet was stuck.
+     * Two consumers, each asking about one shape. `SetGeometryPolicy.analysedUnder`
+     * reads it on a stack mount the plan left to the stack table (#323), and
+     * cannot reach a set that declares no stack. `SetAnalyzer.analyze` reads
+     * it on a fallback (#279): a declaration naming no mount describes the
+     * lifter's end, and a fallen-back unit whose roll reads
+     * [StackMountSignal.ON_STACK] may be on a stack it does not describe, so
+     * that set is refused. It is a statement about a STREAM's reported roll,
+     * never about where a magnet was stuck.
      */
     val analysedSignal: StackMountSignal = StackMountSignal.UNMEASURED,
 )
@@ -198,10 +207,10 @@ fun armedCaptureOf(
     // `samples` is: the role's entry in the map above where a role was chosen,
     // and the one unroled buffer otherwise -- measured here, because a
     // one-sensor set has no role to key a signal by and is the set #323 names.
-    // Asked only where the set declares a stack mount; see
-    // [ArmedCapture.analysedSignal].
+    // Asked where the set declares a stack mount, and since #279 on every
+    // frame-count fallback as well; see [ArmedCapture.analysedSignal].
     val analysedSignal = when {
-        !declaresStackMount -> StackMountSignal.UNMEASURED
+        !declaresStackMount && !decision.fellBack -> StackMountSignal.UNMEASURED
         else -> decision.role?.let { signalByRole[it] } ?: stackSignalOf(samples)
     }
     return ArmedCapture(

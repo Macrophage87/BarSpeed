@@ -266,6 +266,15 @@ enum class NoRepsReason(val wireName: String) {
      * volume counts it as 0 and the export publishes `reps: 0`. Raw streams
      * are archived either way.
      *
+     * A SECOND SHAPE SINCE #279 (export 1.26). The declaration names NO
+     * mount -- it describes the lifter's end -- and the unit the analysis fell
+     * back to read [com.macrophage.barspeed.model.StackMountSignal.ON_STACK]
+     * by its own `StackRollSignature`. The partner may then be on a stack the
+     * declaration does not describe, and reading it under the lifter's
+     * geometry publishes the same swap. A sled-mounted or still partner reads
+     * the same and is refused with it; one that moved, or that nothing
+     * measured, is analysed as before.
+     *
      * NOT RETROACTIVE. The value is computed when a set is analysed and
      * frozen into its stored analysis, so no set already on disk gains it.
      */

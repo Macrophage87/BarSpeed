@@ -587,6 +587,13 @@ private data class PendingSetWrite(
     val exercise: ExerciseDef,
     /** [exercise]'s direction and mounting, frozen with everything else. */
     val geometry: ResolvedGeometry,
+    /**
+     * `ArmedCapture.analysedSignal`: what the analysed unit's own roll said
+     * about riding the load, frozen with the samples it was read from. Handed
+     * to `SetAnalyzer.analyze`, which refuses a mount-free fallback onto a unit
+     * it reads as [StackMountSignal.ON_STACK] (#279). Not stored.
+     */
+    val analysedSignal: StackMountSignal,
     val slot: PlannedSlot?,
     val isTimed: Boolean,
     val loadKg: Double,
@@ -994,6 +1001,62 @@ internal fun analysedAs(exercise: ExerciseDef, slot: PlannedSlot?, capture: Arme
         stackRuleApplied = slot?.stackRuleApplied == true,
         analysedSignal = capture.analysedSignal,
     )
+
+/**
+ * The batch analysis of a set that captured enough frames to run on, from
+ * everything frozen onto its pending write. A top-level function rather than
+ * an expression inside `RecordViewModel.runSetWrite` for [liveFeedOf]'s
+ * reason: `RecordViewModel` is the class detekt's `LargeClass` counts, and the
+ * argument #279 added would have put it over. Moved unchanged otherwise; the
+ * comments below are the call site's own.
+ *
+ * Compile- and lint-gated only: nothing on the CI path executes this
+ * function. What it hands over is pinned where it is decided --
+ * `FallbackMountGeometryTest` in `:core:dsp` and `FallbackSignalTest` in
+ * `:core:model`.
+ *
+ * The set's own cue track is frozen into the pending write alongside the
+ * samples. It carries the set's terminal cue -- Done where the guide called
+ * the prescription through, Set ended where it did not -- which is the only
+ * thing that says when the app stopped prescribing, and the stream runs on
+ * past it with the sensor being handled, 4.3 to 13.7 s on the eleven sets of
+ * session 32 that carry both a cue and a stream. See SetEnd.
+ */
+private fun analysedSetOf(p: PendingSetWrite): SetAnalysis = SetAnalyzer.analyze(
+    p.samples,
+    p.exercise.liftDirection(),
+    p.loadKg,
+    p.targets,
+    cues = p.cues,
+    // The instant the prep ended, so movement made
+    // during the countdown is not a rep of the set
+    // (#245). Already on the pending write, built by
+    // PrepWindowPolicy, and null on every set that has
+    // no window -- WorkStart is where that means
+    // "bound nothing".
+    workStartedAtMs = p.prepWindow?.workStartedAtMs,
+    // Whether p.samples came off the unit this set
+    // ARMED, which is what decides whether
+    // p.exercise.liftDirection() describes them
+    // (#247). SensorCapturePolicy.analysedStream moves
+    // the analysis onto the partner when the armed
+    // unit delivered too few frames; the geometry it
+    // is handed is the EXERCISE's and, on a cable
+    // machine, belongs to the armed unit's mount.
+    // Read off the same declaration the row and the
+    // export publish, so the three cannot disagree
+    // about whether the analysis moved.
+    analysedUnitFellBack = p.sensors?.analysedFellBack == true,
+    // The fallen-back unit's own roll, read off the
+    // same buffer as p.samples by armedCaptureOf,
+    // which is where it is measured on a fallback
+    // whatever the declaration: a mount-free set
+    // over a partner reading ON_STACK is refused
+    // rather than read under the lifter's geometry
+    // (#279). Compile- and lint-gated only here; the
+    // decision is pinned in :core:dsp and :core:model.
+    analysedSignal = p.analysedSignal,
+)
 
 /**
  * The four link fields THIS STATE is holding, as `:core:model` wants them.
@@ -5376,6 +5439,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 // the same three values cannot disagree with itself.
                 exercise = analysedAs(exercise, slot, capture).exercise,
                 geometry = analysedAs(exercise, slot, capture).geometry,
+                analysedSignal = capture.analysedSignal,
                 slot = slot,
                 isTimed = isTimed,
                 loadKg = loadKg,
@@ -5568,41 +5632,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     !RepAnalysisPolicy.segmentsReps(p.isTimed, p.exercise.kind) ->
                         SetAnalysis(emptyList(), 0.0, null, null, listOf(RepAnalysisPolicy.WITHHELD_NOTE))
                     p.samples.size >= SensorCapturePolicy.MIN_ANALYSABLE_FRAMES ->
-                        // The set's own cue track, frozen into the pending
-                        // write alongside the samples. It carries the set's
-                        // terminal cue -- Done where the guide called the
-                        // prescription through, Set ended where it did not
-                        // -- which is the only thing that says when the app
-                        // stopped prescribing, and the stream runs on past it
-                        // with the sensor being handled, 4.3 to 13.7 s on the
-                        // eleven sets of session 32 that carry both a cue and a
-                        // stream. See SetEnd.
-                        SetAnalyzer.analyze(
-                            p.samples,
-                            p.exercise.liftDirection(),
-                            p.loadKg,
-                            p.targets,
-                            cues = p.cues,
-                            // The instant the prep ended, so movement made
-                            // during the countdown is not a rep of the set
-                            // (#245). Already on the pending write, built by
-                            // PrepWindowPolicy, and null on every set that has
-                            // no window -- WorkStart is where that means
-                            // "bound nothing".
-                            workStartedAtMs = p.prepWindow?.workStartedAtMs,
-                            // Whether p.samples came off the unit this set
-                            // ARMED, which is what decides whether
-                            // p.exercise.liftDirection() describes them
-                            // (#247). SensorCapturePolicy.analysedStream moves
-                            // the analysis onto the partner when the armed
-                            // unit delivered too few frames; the geometry it
-                            // is handed is the EXERCISE's and, on a cable
-                            // machine, belongs to the armed unit's mount.
-                            // Read off the same declaration the row and the
-                            // export publish, so the three cannot disagree
-                            // about whether the analysis moved.
-                            analysedUnitFellBack = p.sensors?.analysedFellBack == true,
-                        )
+                        // See analysedSetOf: the set's own cue track, work start,
+                        // fallback flag and roll signal, all frozen on the write.
+                        analysedSetOf(p)
                     p.manualReps != null ->
                         SetAnalysis(emptyList(), 0.0, null, null, listOf("Reps counted manually — no bar sensor."))
                     else -> SetAnalysis(emptyList(), 0.0, null, null, listOf("No sensor data recorded."))

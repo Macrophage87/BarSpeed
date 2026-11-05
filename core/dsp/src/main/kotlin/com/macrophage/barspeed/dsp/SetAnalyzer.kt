@@ -466,7 +466,20 @@ object SetAnalyzer {
      * [analysedSignal] is `ArmedCapture.analysedSignal`: what the ANALYSED
      * stream's own roll says about riding the load, from `StackRollSignature`
      * in this module. [StackMountSignal.UNMEASURED] where nothing asked, which
-     * is every caller that passes nothing. Read by nothing yet; issue #279.
+     * is every caller that passes nothing.
+     *
+     * TRUE, MOUNT-FREE AND [StackMountSignal.ON_STACK] IS REFUSED TOO (#279),
+     * the mirror of the case above. A declaration naming no mount says the
+     * ARMED unit was at the lifter's end, and says nothing about the partner;
+     * a partner whose own roll reads as riding a load that does not roll may
+     * be on the stack, where a drive-down cable lift moves it opposite to the
+     * lifter and the same swapped record is published. The signature cannot
+     * tell a stack from a sled or from a unit lying still, so a fallback onto
+     * a sled-mounted partner -- a leg press -- is refused with it: that is the
+     * rule's cost, chosen over publishing a swap nobody can see. Over the
+     * committed corpus every barbell stream reads
+     * [StackMountSignal.NOT_ON_STACK], so a barbell fallback is analysed as
+     * before; so is any fallback whose partner nothing measured.
      */
     fun analyze(
         samples: List<ImuSample>,
@@ -477,7 +490,7 @@ object SetAnalyzer {
         cues: List<VoiceCue> = emptyList(),
         workStartedAtMs: Long? = null,
         analysedUnitFellBack: Boolean = false,
-        @Suppress("UnusedParameter") analysedSignal: StackMountSignal = StackMountSignal.UNMEASURED,
+        analysedSignal: StackMountSignal = StackMountSignal.UNMEASURED,
     ): SetAnalysis {
         val raw = VelocityEstimator.estimate(samples, config, direction.measuredPlane)
         // The analysis moved onto a unit the set did not arm, and [direction]
@@ -495,7 +508,15 @@ object SetAnalyzer {
         // RawStreamEntity.sampleRateHz, and a placeholder 0.0 there would leave
         // the archive publishing "sampleRate_hz": 0.0 over a capture that has a
         // rate. Everything below this line reads `direction`.
-        if (analysedUnitFellBack && direction.mountSpecific) {
+        //
+        // And the mirror (#279): a declaration naming NO mount describes the
+        // lifter's end, so a fallback onto a unit whose own roll reads as
+        // riding a load may be reading a stack the declaration does not
+        // describe. ON_STACK only -- a partner that moved, or that nothing
+        // measured, is not evidence of a mount and is analysed as before.
+        if (analysedUnitFellBack &&
+            (direction.mountSpecific || analysedSignal == StackMountSignal.ON_STACK)
+        ) {
             return SetAnalysis(
                 reps = emptyList(),
                 sampleRateHz = raw.sampleRateHz,

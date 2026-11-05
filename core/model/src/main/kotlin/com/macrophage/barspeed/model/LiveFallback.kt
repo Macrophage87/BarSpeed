@@ -80,7 +80,14 @@ sealed interface LiveFallback {
  * 2. A DECLARATION THAT NAMES NO MOUNT transfers: [LiveFallback.Continue]. The
  *    same gate `LiftDirection.mountSpecific` is, asked live. A barbell
  *    declaration describes the lift, so the partner's stream is described by it
- *    as well as the armed unit's.
+ *    as well as the armed unit's. NOT the whole of the set-end gate since
+ *    #279: after the set, `SetAnalyzer` also refuses a mount-free fallback
+ *    whose partner's roll reads [StackMountSignal.ON_STACK]. That half is
+ *    deliberately not asked here -- at a switch the roll is
+ *    [StackMountSignal.UNMEASURED] on every set with no work start, and a
+ *    window opened moments before reads every still unit, a bar in the rack
+ *    included, as ON_STACK -- so a mount-free live count continues and the
+ *    rest screen may then publish nothing for the same set.
  * 3. A MOUNT TERM NOTHING CAN MEASURE refuses: [LiveFallback.Withhold]. Where
  *    `LiftDirection.mountSpecificBesidesStack` is true -- an inversion, declared
  *    or applied by `SetGeometryPolicy.stackInversion` (#317), or a pulley that
