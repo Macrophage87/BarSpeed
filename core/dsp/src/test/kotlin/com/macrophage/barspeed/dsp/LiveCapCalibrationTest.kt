@@ -315,9 +315,18 @@ class LiveCapCalibrationTest {
     fun `outside the captures the bound was fitted on, five in-cap runs outlast it`() {
         // The test above fits [StreamingSetTracker.MAX_LABELLED_RUN_S] over
         // THIS FILE'S twenty-one captures, and its KDoc used to call the bound
-        // "derived from the committed corpus". The committed corpus is wider:
-        // [CandidateCorpus.ALL] holds sixty-eight captures, the twenty-one
-        // among them. Over all sixty-eight, five in-cap runs last longer than
+        // "derived from the committed corpus". [CandidateCorpus.ALL] is
+        // wider: sixty-eight of the committed captures, the twenty-one among
+        // them. It is not the whole committed corpus either. It lists primary
+        // streams only; the twenty-two `-imu-b` secondary streams committed
+        // beside them are not scored here, and since #210 the tracker can be
+        // fed from either unit. Two of those secondaries were read in review
+        // as holding an in-cap run past the bound, about 6.51 s on
+        // field-ropedeadhang-hold45-s38-set18-imu-b and 6.36 s on
+        // field-deadlift-straight-5rep-s44-set03-imu-b, from published
+        // velocity. The model below has not measured either.
+        //
+        // Over all sixty-eight, five in-cap runs last longer than
         // the bound, on four captures, every one of them outside the fitted
         // twenty-one and every one a tempo-prescribed set. On each, the
         // tracker withdraws the label for the rest of that run.

@@ -492,8 +492,11 @@ class StreamingSetTracker(
          * slow genuine phases or drift under the cap is not measured;
          * `LiveCapCalibrationTest` pins the five. This paragraph used to call
          * the bound "derived from the committed corpus", which claimed the
-         * wider set; it was fitted on the subset.
-
+         * wider set; it was fitted on the subset. `CandidateCorpus.ALL` is
+         * itself a curated set of PRIMARY streams: the twenty-two `-imu-b`
+         * secondary streams committed beside them are scored by neither test,
+         * though since #210 the tracker can be fed from either unit.
+         *
          * NOT [DspConfig.maxRunDisplacementM] and not a second statement of
          * it. That is a displacement, and it gates the COUNT; this is a
          * duration, and it gates a LABEL. #95 records why one constant is not
