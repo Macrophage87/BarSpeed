@@ -101,4 +101,18 @@ class EffortLineUnratedTest {
             }
         }
     }
+
+    /**
+     * #169 item 2, the owner's default: a failure the APP derived from a
+     * short count says so in its own words, and only the lifter's own tap
+     * reads "Failed". The shared word made the app's judgement read as the
+     * lifter's.
+     */
+    @Test
+    fun `an unrated set the app alone judged short reads as short of target`() {
+        assertEquals(
+            EffortCorrectionPolicy.SHORT_OF_TARGET,
+            EffortCorrectionPolicy.lineText(null, failed = true, tappedFailed = false),
+        )
+    }
 }

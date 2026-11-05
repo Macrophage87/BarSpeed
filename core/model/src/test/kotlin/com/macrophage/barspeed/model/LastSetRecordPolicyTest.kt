@@ -285,4 +285,10 @@ class LastSetRecordPolicyTest {
         warmupDeclared = declared,
         warmupMark = mark,
     )
+
+    /** #169 item 2 through the whole box: the derive-only failure's clause and the gap beside it. */
+    @Test
+    fun `a set the app alone judged short says short of target`() {
+        assertEquals("Short of target · Ended: ${SetLimiterPolicy.NOT_GIVEN}", status(failed = true, tapped = false))
+    }
 }
