@@ -82,4 +82,20 @@ class FallbackSignalTest {
         assertSame(a, capture.samples)
         assertEquals(StackMountSignal.UNMEASURED, capture.analysedSignal)
     }
+
+    /**
+     * RED before #279's fix. A declaration naming no stack, written from the
+     * lifter's end, over a fallback: the unit the figures now come from is one
+     * nothing declared, and its own roll is the only thing in the app that can
+     * say whether it rode the stack. Before the fix nothing asked it, so the
+     * signal was UNMEASURED and `SetAnalyzer` had nothing to refuse on.
+     */
+    @Test
+    fun `a fallback under a mount-free declaration carries the unit it fell back to's signal`() {
+        val capture = fellBack(declaresStackMount = false)
+
+        assertSame(partner, capture.samples, "the analysis did not move onto the partner")
+        assertTrue(capture.sensors!!.analysedFellBack, "the move was not recorded as a fallback")
+        assertEquals(StackMountSignal.ON_STACK, capture.analysedSignal, "the fallen-back unit's roll was not read")
+    }
 }

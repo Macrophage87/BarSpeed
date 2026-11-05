@@ -2933,6 +2933,39 @@ data class SessionExport(
          * PINNED. `SchemaSensorContactContractTest` asserts this entry and the
          * `hr` block's sentence; `HrTrustTest`, `HrCsvTest`, `SetJournalTest` and
          * `HeartRateMeasurementParserTest` pin the behaviour.
+         *
+         * 1.26 FURTHER ENTRY (#279, a mount-free fallback onto a unit that rode
+         * a load): ADDS NO KEY, and no key moves. `summary.noRepsReason`
+         * `mountNotDeclared` is written on a second shape of set. It fired
+         * only where the analysis fell back off the armed unit under a
+         * geometry naming a MOUNT (#247); a declaration naming none -- written
+         * from the lifter's end -- was analysed over whatever unit the
+         * analysis fell back to, so a partner clipped to the stack of a
+         * drive-down cable lift was read under the lifter's geometry with the
+         * drive and the return swapped, 1.89 s and 0.98 s exchanged on
+         * `FallbackMountGeometryTest`'s synthetic negation pair. It now also
+         * fires where the declaration names no mount and the fallen-back
+         * unit's own `StackRollSignature` read
+         * [StackMountSignal.ON_STACK]. A sled-mounted or still partner reads
+         * the same and is refused with it -- the cost of a fitted bound, stated
+         * on the word's description -- while all 52 barbell streams in the
+         * committed corpus read moved (measured for this entry over each
+         * stream's cue- and work-start-bounded window and over its whole
+         * capture; the nearest, field-42 set 5's bench press, at 5.685
+         * degrees against a 3.0 bound).
+         *
+         * Under 1.26 and not a mint: 1.26 is unreleased, minted on this branch
+         * for #289 above. NOT RETROACTIVE: the roll verdict is taken when the
+         * set is recorded and is not stored, so a set already on disk keeps
+         * the analysis it was given. A reader of any earlier 1.2x schema
+         * accepts the word, which has existed since 1.20, and rejects a 1.26
+         * document on its version string. Nothing is added, renamed or
+         * retyped, `DATABASE_VERSION` does NOT move, and the plan schema is
+         * untouched.
+         *
+         * PINNED. `SchemaMountFreeFallbackContractTest` asserts this entry's
+         * marker and the word's description; `FallbackMountGeometryTest` in
+         * `:core:dsp` and `FallbackSignalTest` are the behaviour pins.
          */
         const val SCHEMA_VERSION = "1.26"
 
