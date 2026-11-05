@@ -167,9 +167,15 @@ class FieldDataRegressionTest {
     @Test
     fun `slow-eccentric seated press counts on the drive alone`() {
         // 2 real reps of seated OHP at tempo 3010: the ~5 s lowering averages
-        // ~0.08 m/s — under the run threshold — so batch pairing that REQUIRED
-        // a down run used to find 0 reps here. Con-first counting keys on the
-        // drive; the eccentric is optional metric data.
+        // ~0.08 m/s, so batch pairing that REQUIRED a down run used to find 0
+        // reps here. Con-first counting keys on the drive; the eccentric is
+        // optional metric data.
+        //
+        // "-- under the run threshold --" stood after the 0.08 and is deleted:
+        // issue #47's diagnosis measured part of that descent peaking at
+        // 0.234 m/s, 2.3x `startThresholdMps`, which is why a run existed to be
+        // truncated. Whether the eccentric reads null is pinned on its own in
+        // `the seated press's eccentric under both readings`, below.
         //
         // The count reaching 2 here is NOT the count being right, and the
         // assertions below are written so nobody can read it that way. Traced:
@@ -203,6 +209,48 @@ class FieldDataRegressionTest {
         // `maxRunDisplacementM`, so live declines to count a rep it cannot
         // bound. Losing it is the intended cost, not a side effect.
         assertEquals(1, last.repCount, "live reps; the lifter performed 2")
+    }
+
+    /**
+     * WHAT THIS CAPTURE'S ECCENTRIC READS, under both opening phases. Issue
+     * #47, characterization only: nothing here says the figure is right.
+     *
+     * #47 was filed on `eccS = 0.43` from `SetAnalyzer.analyze(field-seated-
+     * ohp-2rep.csv, CONCENTRIC, 20.4)`, a short plausible value for a lowering
+     * the issue's own diagnosis measures at about 5 s by three estimates (raw
+     * integration about 5.6 s, the live tracker 5.34 s, the batch velocity
+     * series about 5.9 s -- relayed from the issue, not re-measured here). That
+     * premise NO LONGER REPRODUCES: read concentric-first, as the test above
+     * does, all three detections carry `eccS == null`, so the analyzer
+     * abstains rather than publishing a short lowering, which is the state
+     * #23's fix assumed. The 0.43 was not pinned anywhere, so nothing recorded
+     * when it went.
+     *
+     * Read eccentric-first -- the reading `FieldDataRegressionTest`'s KDoc says
+     * the overhead-press sets of this corpus reproduce under -- the capture
+     * pairs ONE rep and its eccentric is 2.46 s: about half the lowering
+     * #47 describes. A plausible number well under the measured lowering is
+     * #47's FAIL signature, so this is pinned as what ships, not as a
+     * measurement of the press.
+     *
+     * The discharge stays `[Field]` and is withdrawn as a gym check by the
+     * owner (2026-09-12, "I can't use a stopwatch, my hands are full"):
+     * field-42's co-mounted seated-OHP sets are the offline evidence to work
+     * from, and none of them is committed.
+     */
+    @Test
+    fun `the seated press's eccentric under both readings`() {
+        val samples = load("field-seated-ohp-2rep.csv")
+        val concentricFirst = SetAnalyzer.analyze(samples, StartPhase.CONCENTRIC, loadKg = 20.4)
+        assertEquals(
+            listOf<Double?>(null, null, null),
+            concentricFirst.reps.map { it.eccS },
+            "concentric-first: every detection abstains on the eccentric (#47's 0.43 does not reproduce)",
+        )
+        val eccentricFirst = SetAnalyzer.analyze(samples, StartPhase.ECCENTRIC, loadKg = 20.4)
+        assertEquals(1, eccentricFirst.reps.size, "eccentric-first: detections")
+        assertEquals(2.46, eccentricFirst.reps.single().eccS!!, 1e-3, "eccentric-first: eccS for a ~5 s lowering")
+        assertMeasured(listOf(1.73), eccentricFirst.reps.map { it.conS }, "eccentric-first: concentric seconds")
     }
 
     @Test
