@@ -4216,19 +4216,26 @@ data class SetSensorsExport(
  * those, [SetExport.tempoCompliance] is a verdict whose input the reader
  * cannot see.
  *
- * **Every field is required, and none has a Kotlin default.** The exporter
- * writes JSON with `encodeDefaults = false`, so a field defaulted to `false`
- * would be dropped from the wire and its absence would read as "not stated"
- * when it meant "stated false" — the exact defect this object exists to fix.
- * Contrast [SetExport.failed] and [SetExport.warmup], where false is the
- * unremarkable normal and omission reads correctly.
+ * **Every field but [startsWith] and [concentric] is required, and none of
+ * the rest has a Kotlin default.** The exporter writes JSON with
+ * `encodeDefaults = false`, so a field defaulted to `false` would be dropped
+ * from the wire and its absence would read as "not stated" when it meant
+ * "stated false" — the exact defect this object exists to fix. Contrast
+ * [SetExport.failed] and [SetExport.warmup], where false is the unremarkable
+ * normal and omission reads correctly. The two stroke words default to null
+ * rather than to a value, so a dropped one is an absence and never a
+ * fabricated direction (#297).
  */
 @Serializable
 data class GeometryExport(
-    /** Which phase opened each rep: "eccentric" or "concentric". */
-    val startsWith: String,
-    /** Which way the driving phase moved: "up" or "down". */
-    val concentric: String,
+    /**
+     * Which phase opened each rep: "eccentric" or "concentric". Nullable so
+     * that a kind with no stroke can publish none ([publishesStroke], #297);
+     * every set this build exports writes it.
+     */
+    val startsWith: String? = null,
+    /** Which way the driving phase moved: "up" or "down". Nullable on [startsWith]'s terms. */
+    val concentric: String? = null,
     /** The plane the LIFTER moved in: "vertical" or "horizontal". */
     val plane: String,
     /**
@@ -4251,7 +4258,23 @@ data class GeometryExport(
     val bodyweight: Boolean,
     /** Where each of the resolvable values came from. */
     val source: GeometrySourceExport,
-)
+) {
+    companion object {
+        /**
+         * Whether a set of [kind] has a STROKE -- an eccentric, a concentric
+         * and a direction the drive moved in -- for [startsWith] and
+         * [concentric] to describe (#297).
+         *
+         * False for a hold and a carry, the two kinds measured on the clock:
+         * a static hold has no eccentric and no concentric, and a carry's
+         * walk is not a stroke of the load. True for a dynamic and an
+         * explosive lift. The same split `VelocityLossRegime.of` draws
+         * when it withholds its word on a hold or a carry; one statement of
+         * the split for the two stroke words, read by both writers.
+         */
+        fun publishesStroke(kind: ExerciseKind): Boolean = kind != ExerciseKind.HOLD && kind != ExerciseKind.CARRY
+    }
+}
 
 /**
  * Declared, seeded, inferred or default, per value.
@@ -4285,8 +4308,10 @@ data class GeometryExport(
  */
 @Serializable
 data class GeometrySourceExport(
-    val startsWith: String,
-    val concentric: String,
+    /** Nullable on [GeometryExport.startsWith]'s terms (#297). */
+    val startsWith: String? = null,
+    /** Nullable on [GeometryExport.startsWith]'s terms (#297). */
+    val concentric: String? = null,
     val plane: String,
     val kind: String,
     val travelRatio: String,
