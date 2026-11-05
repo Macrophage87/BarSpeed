@@ -44,17 +44,19 @@ object RestClockPolicy {
     /**
      * The instant the rest period runs from.
      *
-     * [setOverCueAtMs] is the stamp of the cue that called the set over --
-     * `SetEnd.calledOver` in `:core:dsp` reads it off the set's own frozen cue
-     * track -- or null when nothing on the record says when the set ended.
+     * [setOverCueAtMs] is the instant the record says the set was over, or
+     * null when nothing on it does. `RestStart.of` in `:core:dsp` reads it off
+     * the set's own frozen record: the cue `SetEnd.of` admits, or on a set no
+     * cadence ran, the lifter's last `+1 REP` tap. [endedAtMs] is the instant
+     * the set write froze, which every set has.
      *
-     * `calledOver` and NOT `SetEnd.of`, which is the narrower question of what
-     * may bound the ANALYSED REP LIST and excludes the rep-count milestone a
-     * lifter counting their own set hears at the planned count (#285). The two
-     * differ on exactly that set, and this one wants the milestone: the rest
-     * begins when the lifter stopped lifting, whoever said so, and the tap at
-     * the planned count is the best instant on the record for that. [endedAtMs]
-     * is the instant the set write froze, which every set has.
+     * The paragraph that stood here chose `SetEnd.calledOver` over `SetEnd.of`
+     * because "the tap at the planned count is the best instant on the record"
+     * for when a lifter counting their own set stopped. That is true only of a
+     * lifter who stopped AT the plan with the cues on; one who tapped past it
+     * had their rest start at the planned tap, and with the cues off the same
+     * set started its rest at the write. #284's H1 round moves the choice to
+     * `RestStart`, and the paragraph is DELETED rather than reworded.
      *
      * The cue when there is one, because that is when the lifter stopped
      * lifting; the write instant otherwise. Nullable rather than defaulted at
