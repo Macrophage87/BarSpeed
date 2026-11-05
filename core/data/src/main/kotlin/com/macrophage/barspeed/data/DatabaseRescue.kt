@@ -102,9 +102,11 @@ object DatabaseRescue {
      *
      * THE MAIN FILE'S HEADER ALONE WAS STALE, and that was measured, not
      * supposed: a migration's `user_version` bump sits in the `-wal` until a
-     * checkpoint, and a package installer's force-stop does not wait for one.
-     * Against real SQLite files the main header read 0 while SQLite reported
-     * 21 through the log. Read that way, a rollback past such an upgrade
+     * checkpoint, and a force-stop is expected not to wait for one (reasoned;
+     * a `[Field]` item). Against real SQLite files copied with the writer
+     * still open, the main header read 0 (and in a second copy 10) while
+     * SQLite reported 21 through the log; [SqliteWal]'s KDoc has the
+     * measurement. Read that way, a rollback past such an upgrade
      * decided Open, and Room -- seeing the real version -- threw on every
      * launch. So when `<name>-wal` holds a committed page 1, its header is the
      * one read ([SqliteWal.effectiveUserVersion]); otherwise the main file's
@@ -117,6 +119,19 @@ object DatabaseRescue {
      * was read at all. A log page 1 that is not a database header is the one
      * exception and goes the safe way: null, so Open, so Room throws rather
      * than anything moving on a guess.
+     *
+     * A HOT ROLLBACK JOURNAL IS NOT CONSULTED, and that is a known false
+     * rescue, not fixed here. In TRUNCATE or DELETE mode (a low-RAM device's
+     * AUTOMATIC) a migration writes page 1 into the main file in place and
+     * keeps the old page in `<name>-journal` until it commits. A process
+     * killed mid-migration can leave the main header at the NEWER version while
+     * SQLite, opening it, would roll the journal back to the older one. This
+     * reads the newer header, so the database is moved aside although this
+     * build could have opened it. Nothing is lost -- the journal moves with
+     * it -- but the rescue reads the same newer header, so the card refuses
+     * to restore it here (newer than this build) and it can only be sent off
+     * the phone. Reasoned from SQLite's rollback-journal design, not
+     * reproduced.
      *
      * Every failure of the MAIN file is still null: absent, unreadable, too
      * short, not a database, permission denied, a directory where a file was

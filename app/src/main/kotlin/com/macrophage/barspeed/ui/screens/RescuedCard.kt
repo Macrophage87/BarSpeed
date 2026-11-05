@@ -30,8 +30,9 @@ import java.time.format.DateTimeFormatter
  */
 
 /**
- * Whether an action may start on [item] now: false while a share or a discard
- * is already in flight on the same directory. Issue #111's race -- SEND, then
+ * Whether an action may start on [item] now: false while a share, a discard
+ * or a restore request is already in flight on the same directory (the
+ * restore request joined this set with issue #112). Issue #111's race -- SEND, then
  * DISCARD while the archive streams -- is closed by this one predicate, read
  * by the card for `enabled` and by `HomeViewModel` as the guard at the top of
  * each action, so the two cannot disagree about what "busy" means.
@@ -136,10 +137,12 @@ internal fun rescuedRestoreNote(restore: RestoreVerdict?, compiledVersion: Int):
     val version = restore.version
     return when (restore.reason) {
         RestoreRefusal.NO_DATABASE_FILE -> null
-        RestoreRefusal.RESTORE_IN_PROGRESS -> "A restore is waiting for BarSpeed's next start."
+        RestoreRefusal.RESTORE_IN_PROGRESS ->
+            "Can't restore yet: an earlier restore is waiting for BarSpeed's next start or has not " +
+                "finished being checked."
         RestoreRefusal.SPLIT_RESCUE ->
             "Can't restore yet: a partial rescue holds a log that may belong to this database. " +
-                "Send or discard the partial rescue first."
+                "Send the partial rescue to yourself, then discard it, to restore this one."
         RestoreRefusal.FAILED_BEFORE ->
             "A restore of this database was tried, it did not open in this build, and both databases were put back."
         RestoreRefusal.VERSION_UNREADABLE -> "Can't restore: this database's version can't be read."
