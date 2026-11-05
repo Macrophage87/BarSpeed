@@ -275,7 +275,7 @@
             "vertical",
             "horizontal"
           ],
-          "description": "The plane the LIFTER moves in. 'horizontal' for seated rows, chest-press machines and horizontal cable work. This also changes how the tempo digits are read: vertical work reads them positionally (digit 1 = down stroke), while horizontal work has no up or down and reads them by phase (digit 1 = eccentric, digit 3 = concentric). Note this is the lifter's plane, not the sensor's — see sensorOnStack."
+          "description": "The plane the LIFTER moves in. 'horizontal' for seated rows, chest-press machines and horizontal cable work. This also changes how the tempo digits are read: vertical work reads them positionally (digit 1 = down stroke), while horizontal work has no up or down and reads them by phase (digit 1 = eccentric, digit 3 = concentric). Note this is the lifter's plane, not the sensor's — see sensorOnStack. On farmers_walk and suitcase_carry, the carries the app ships, an omitted plane resolves to horizontal, because the load travels with the walker (#63); declare vertical to override it. This adds no key and did not move the plan format."
         },
         "sensorOnStack": {
           "type": [

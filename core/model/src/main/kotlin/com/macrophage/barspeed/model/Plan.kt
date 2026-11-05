@@ -936,9 +936,11 @@ data class PlanExerciseDef(
      */
     val travelRatio: Double? = null,
     /**
-     * Which plane the movement travels in: `"vertical"` (default — squats,
-     * presses, curls) or `"horizontal"` (seated rows, chest-press machines,
-     * horizontal cable work). Vertical analysis measures the wrong axis
+     * Which plane the movement travels in: `"vertical"` (the default --
+     * squats, presses, curls -- except on the two built-in carries,
+     * `farmers_walk` and `suitcase_carry`, which are seeded horizontal, #63)
+     * or `"horizontal"` (seated rows, chest-press machines, horizontal cable
+     * work). Vertical analysis measures the wrong axis
      * entirely on a horizontal machine, so declare it.
      */
     val plane: String? = null,
