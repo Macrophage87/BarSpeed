@@ -34,7 +34,6 @@ object WorkStartPolicy {
      *   prep (and on every row written before v10).
      * @param workBegan the row's `workBegan`, null on every row written before v15.
      */
-    @Suppress("UNUSED_PARAMETER", "UnusedParameter")
     fun publishedAtMs(stored: PrepWindow?, startedAtMs: Long, prepS: Int?, workBegan: Boolean?): Long? =
-        stored?.workStartedAtMs
+        stored?.workStartedAtMs ?: startedAtMs.takeIf { prepS == null && workBegan == true }
 }
