@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.hrm
 
 import com.macrophage.barspeed.model.HrSample
+import com.macrophage.barspeed.model.SensorContact
 
 /** Standard BLE Heart Rate Profile constants (works with Garmin HRM 600 and any compliant strap). */
 object HeartRateProfile {
@@ -13,6 +14,8 @@ object HeartRateProfile {
 /** Parser for the Heart Rate Measurement characteristic (0x2A37). */
 object HeartRateMeasurementParser {
     private const val FLAG_HR_16_BIT = 0x01
+    private const val FLAG_CONTACT_STATUS = 0x02
+    private const val FLAG_CONTACT_SUPPORTED = 0x04
     private const val FLAG_ENERGY_EXPENDED = 0x08
     private const val FLAG_RR_PRESENT = 0x10
 
@@ -44,6 +47,18 @@ object HeartRateMeasurementParser {
                 offset += 2
             }
         }
-        return HrSample(timestampMs = timestampMs, bpm = bpm, rrIntervalsMs = rrIntervals)
+        return HrSample(timestampMs = timestampMs, bpm = bpm, rrIntervalsMs = rrIntervals, contact = contactOf(flags))
+    }
+
+    /**
+     * The Sensor Contact bits (#82). Status means nothing without Support, so
+     * Support clear is [SensorContact.NOT_RECORDED] whatever Status holds;
+     * the strap is claiming contact, and nothing here measures whether it was
+     * worn.
+     */
+    private fun contactOf(flags: Int): SensorContact = when {
+        flags and FLAG_CONTACT_SUPPORTED == 0 -> SensorContact.NOT_RECORDED
+        flags and FLAG_CONTACT_STATUS != 0 -> SensorContact.DETECTED
+        else -> SensorContact.NOT_DETECTED
     }
 }
