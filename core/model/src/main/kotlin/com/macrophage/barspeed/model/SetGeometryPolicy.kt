@@ -301,9 +301,10 @@ object SetGeometryPolicy {
      * declared and 7 and 8 inverted, which is not a rule, and is raised
      * rather than folded in.
      *
-     * There is no provenance for the answer anywhere in the export -- the key
-     * has no `geometry.source` entry (#289) -- so the import gate's line is the
-     * only place a rule-3 answer is visible before the set is recorded.
+     * The import gate's line is the only place a rule-3 answer is visible
+     * before the set is recorded. Afterwards the export says so too, from
+     * 1.26 (#289): `geometry.source.sensorInverted` reads `inferred`
+     * ([describe]); a set recorded before 1.26 carries no source for it.
      *
      * RULE 3 IS THE PLAN-TIME ANSWER, and since #323 not always the last
      * word. A stack mount left to the stack table names a machine, not where
@@ -452,8 +453,44 @@ object SetGeometryPolicy {
                 travelRatio = source(declared?.travelRatio != null, seeded, inferable = false),
                 sensorOnStack = stackSource(used.sensorOnStack, declared?.sensorOnStack),
                 bodyweight = bodyweightSource(used.bodyweight, declared?.bodyweight),
+                sensorInverted = inversionSource(used, declared),
             ),
         )
+    }
+
+    /**
+     * Provenance for the `sensorInverted` value [used] already carries (1.26,
+     * #289), read off the definition and never re-decided.
+     *
+     * 1. [declared]'s key non-null -- [GeometrySource.DECLARED], either way.
+     * 2. otherwise, under a plan, a `true` that [stackInversion]'s rule 3
+     *    gives on [used]'s own resolved mount, drive and plane --
+     *    [GeometrySource.INFERRED]. The rule reads no words in the id; it is
+     *    inference in the sense that the app reasoned the answer rather than
+     *    being told it. [analysedUnder] may later take such an inversion back
+     *    on the analysed unit's roll, and copies this source with it, so
+     *    `inferred` beside a `false` is that case.
+     * 3. otherwise a `true` -- [GeometrySource.SEEDED]: [resolve] keeps a
+     *    true the base definition carried, and with no plan [used] IS that
+     *    definition. No [ExerciseDef.SEED] entry carries one today.
+     * 4. otherwise [GeometrySource.DEFAULT]: nothing wrote it, no rule set
+     *    it, and it is false.
+     *
+     * Rule 2 asks the rule rather than [stackRuleApplied], which needs the
+     * base definition this function is not given. The two agree on every
+     * base `SessionRepository.exerciseById` can return at this tree, none of
+     * which carries an inversion; a hand-built base that carries one AND
+     * resolves onto the rule's shape reads `inferred` here, which is the
+     * rule's answer for that shape whatever the base said.
+     */
+    private fun inversionSource(used: ExerciseDef, declared: PlanExerciseDef?): GeometrySource {
+        val ruled = stackInversion(null, false, used.sensorOnStack, used.concentricUp, used.horizontal)
+        return when {
+            declared?.sensorInverted != null -> GeometrySource.DECLARED
+            declared != null && used.sensorInverted && ruled -> GeometrySource.INFERRED
+            used.sensorInverted -> GeometrySource.SEEDED
+            else -> GeometrySource.DEFAULT
+        }
     }
 
     /**

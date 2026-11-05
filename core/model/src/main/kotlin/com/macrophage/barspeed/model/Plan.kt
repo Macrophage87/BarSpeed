@@ -562,9 +562,9 @@ data class PlanFile(
      * each set, keeping it only where the analysed unit's own roll says it
      * rode the stack. Where the plan WROTE `sensorOnStack` true the answer
      * stands whatever the roll (plan 1.14, #327), and the line says that
-     * instead. The export publishes no source for
-     * `sensorInverted` (#289), so this line is the only place the inference
-     * shows before the set is recorded.
+     * instead. This line is the only place the inference shows before the
+     * set is recorded; afterwards the export names it, from 1.26 (#289), as
+     * `geometry.source.sensorInverted: "inferred"`.
      *
      * Read against a definition the app does not have here:
      * [SetGeometryPolicy.resolve]'s `base` is the stored exercise, and this has
