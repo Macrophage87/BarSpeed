@@ -78,12 +78,14 @@ import kotlin.test.assertTrue
  *
  * Digit 2 is the pause at the BOTTOM and digit 4 the pause at the TOP, which is
  * exactly what [Phase.BOTTOM_PAUSE] and [Phase.TOP_PAUSE] are named after, so
- * the pause mapping is positional on both sides and agrees. What does not agree
- * is which of those two labels the tracker emits: `StreamingSetTracker` picks
- * it from `startsWith` alone and never consults `concentricUp`, so it calls
+ * the pause mapping is positional on both sides and agrees. Which of those two
+ * labels the tracker emits was a separate defect: `StreamingSetTracker` picked
+ * it from `startsWith` alone and never consulted `concentricUp`, so it called
  * every still period on a squat a top pause -- including the one at the bottom
- * of the squat. That is a tracker defect, not a tempo-digit one, and it is not
- * addressed here.
+ * of the squat. That was a tracker defect, not a tempo-digit one, and #134
+ * fixed it there; `LivePhaseLabelTest` pins all four shapes. The same change
+ * re-measured `the eccentric runs on this set fit digit 3 and not digit 1`
+ * below, whose runs had been the drives.
  */
 class PhaseTempoTargetTest {
     private fun res(n: String) = javaClass.getResourceAsStream("/$n")!!.readBytes().decodeToString()
@@ -317,17 +319,27 @@ class PhaseTempoTargetTest {
     @Test
     fun `the eccentric runs on this set fit digit 3 and not digit 1`() {
         // The size of the error on real data. These are the durations of the
-        // runs the live tracker labelled ECCENTRIC; four of the twelve are more
-        // than a tolerance longer than digit 1, and none is more than a
-        // tolerance longer than digit 3, which is this lift's eccentric.
+        // runs the live tracker labelled ECCENTRIC; six of the sixteen are more
+        // than a tolerance longer than digit 1, and one -- 3.61 s, 0.11 s
+        // past the band -- is more than a tolerance longer than digit 3, which
+        // is this lift's eccentric.
+        //
+        // RE-MEASURED AT #134, and the old figures were measured on the wrong
+        // runs. Until then the tracker named every UPWARD run in the lifter's
+        // frame the concentric, so on this drive-down lift the twelve runs
+        // labelled ECCENTRIC -- 3.35, 0.22, 1.38, 1.51, 3.05, 3.09, 0.98,
+        // 0.37, 0.89, 0.52, 0.69, 1.17 -- were the DRIVES, the runs the
+        // counter itself pairs as concentric. They are labelled through the
+        // counting rule now, and the runs below are the returns. The old
+        // "four past digit 1, none past digit 3" was a property of the drives.
         val ecc = liveRuns().filter { it.first == Phase.ECCENTRIC }.map { it.second }
         assertEquals(
-            listOf(3.35, 0.22, 1.38, 1.51, 3.05, 3.09, 0.98, 0.37, 0.89, 0.52, 0.69, 1.17),
+            listOf(0.82, 1.26, 1.09, 0.61, 0.19, 1.89, 1.08, 0.96, 0.91, 0.8, 2.99, 2.65, 3.61, 1.8, 0.9, 3.18),
             ecc,
             "seconds of each run the live tracker labelled ECCENTRIC",
         )
         assertEquals(
-            4,
+            6,
             ecc.count { it > prescribed.downS + toleranceS },
             "runs more than a tolerance past digit 1",
         )
@@ -336,7 +348,7 @@ class PhaseTempoTargetTest {
             "resolved eccentric target",
         )
         assertEquals(
-            0,
+            1,
             ecc.count { it > resolved + toleranceS },
             "runs more than a tolerance past the eccentric's own digit",
         )

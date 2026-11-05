@@ -78,6 +78,70 @@ class LivePhaseLabelTest {
 
     private fun startsAtTop(s: Shape) = (s.startsWith == StartPhase.ECCENTRIC) == s.concentricUp
 
+    /** The label published at each of [timesS], seconds from the first sample. */
+    private fun labelsAt(s: Shape, timesS: List<Double>): List<Phase> {
+        val samples = SyntheticSets.generate(
+            List(reps) { SyntheticSets.RepSpec(strokeS, pauseS, strokeS, pauseS, romM = 0.5) },
+            leadInS = leadInS,
+            leadOutS = pauseS,
+            eccentricFirst = startsAtTop(s),
+        )
+        val tracker = StreamingSetTracker.forLift(directionOf(s))
+        val wanted = timesS.map { (it * 1000).toLong() }.toSet()
+        val seen = mutableMapOf<Long, Phase>()
+        samples.forEach { sample ->
+            val state = tracker.feed(sample)
+            if (sample.timestampMs in wanted) seen[sample.timestampMs] = state.phase
+        }
+        return timesS.map { seen.getValue((it * 1000).toLong()) }
+    }
+
+    /** One rep's four read points: mid first stroke, mid pause, mid second stroke, mid pause. */
+    private fun repPoints(rep: Int): List<Double> {
+        val base = leadInS + rep * (2 * strokeS + 2 * pauseS)
+        return listOf(
+            base + strokeS / 2,
+            base + strokeS + pauseS / 2,
+            base + strokeS + pauseS + strokeS / 2,
+            base + 2 * strokeS + pauseS + pauseS / 2,
+        )
+    }
+
+    /** What each read point must say, for one rep of shape [s]. */
+    private fun expectedRep(s: Shape): List<Phase> {
+        val firstDown = startsAtTop(s)
+        fun stroke(down: Boolean) = if (down == !s.concentricUp) Phase.CONCENTRIC else Phase.ECCENTRIC
+        fun pauseAfter(down: Boolean) = if (down) Phase.BOTTOM_PAUSE else Phase.TOP_PAUSE
+        return listOf(stroke(firstDown), pauseAfter(firstDown), stroke(!firstDown), pauseAfter(!firstDown))
+    }
+
+    @Test
+    fun `every stroke and every pause is labelled for what it is, on all four shapes`() {
+        shapes.forEach { s ->
+            val times = (0 until reps).flatMap { repPoints(it) }
+            assertEquals(
+                List(reps) { expectedRep(s) }.flatten(),
+                labelsAt(s, times),
+                "$s: first stroke, pause, second stroke, pause, rep by rep",
+            )
+        }
+    }
+
+    @Test
+    fun `before the first stroke the label is where the lift starts`() {
+        val expected = mapOf(
+            // Unchanged: an eccentric-first lift has not begun until it moves.
+            Shape(StartPhase.ECCENTRIC, true) to Phase.IDLE,
+            Shape(StartPhase.ECCENTRIC, false) to Phase.IDLE,
+            // A deadlift waits at the floor; a leg curl waits with the pad up.
+            Shape(StartPhase.CONCENTRIC, true) to Phase.BOTTOM_PAUSE,
+            Shape(StartPhase.CONCENTRIC, false) to Phase.TOP_PAUSE,
+        )
+        shapes.forEach { s ->
+            assertEquals(expected.getValue(s), labelsAt(s, listOf(leadInS / 2)).single(), "$s before any movement")
+        }
+    }
+
     @Test
     fun `the rep count is untouched by the label`() {
         // Labelling is display; the count reads the same pairing rule it did.
