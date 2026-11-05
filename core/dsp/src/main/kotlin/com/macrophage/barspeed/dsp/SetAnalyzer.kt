@@ -4,6 +4,7 @@ import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.PhaseCoverage
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.Tempo
+import com.macrophage.barspeed.model.TempoScoreLabel
 import com.macrophage.barspeed.model.VoiceCue
 import kotlinx.serialization.Serializable
 import kotlin.math.abs
@@ -218,6 +219,29 @@ data class TempoComplianceResult(
      */
     val eccentricPrescribedS: Double?
         get() = phases.firstOrNull { it.phase == PHASE_ECCENTRIC }?.prescribedS
+
+    /**
+     * The phases this grade can state a per-phase count for: the scored
+     * MOVEMENT phases ([TempoScoreLabel.MOVEMENT_PHASES]) that at least one rep resolved,
+     * in [phases] order. This is the list the export publishes as
+     * `tempoCompliance.byPhase` (#66 (c), export 1.26).
+     *
+     * Asked of the stored flags rather than read from [PhaseComplianceResult.scored]
+     * alone, because a stored analysis keeps the flags of the build that wrote
+     * it. A result written before v0.1.31 carries no `scored` key, so every
+     * phase -- the pauses included -- decodes as scored; a result written by
+     * v0.1.31 to v0.1.35 marks a prescribed movement phase scored even when no
+     * rep resolved it, with [PhaseComplianceResult.repsEvaluated] 0. Neither is
+     * a phase with a count behind it, and neither is listed.
+     *
+     * The counts are copied, never re-counted: on a result written before
+     * v0.1.31 a movement phase's [PhaseComplianceResult.repsEvaluated] is every
+     * rep of the set, because that build's reps carried a duration for every
+     * phase and it graded each rep on all of them.
+     */
+    fun tallyPhases(): List<PhaseComplianceResult> = phases.filter {
+        it.scored && it.phase in TempoScoreLabel.MOVEMENT_PHASES && it.repsEvaluated > 0
+    }
 
     companion object {
         /** The phase name [SetAnalyzer.complianceFor] writes, and the export publishes, for the eccentric. */
