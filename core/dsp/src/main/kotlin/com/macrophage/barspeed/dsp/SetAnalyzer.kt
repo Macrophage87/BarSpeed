@@ -135,7 +135,15 @@ data class PhaseComplianceResult(
      * the lifter passed through instantly.
      */
     val actualMeanS: Double?,
-    val worstDeviationS: Double,
+    /**
+     * The signed deviation from [prescribedS] furthest from zero among the
+     * reps that resolved this phase, or null when none did (#66 (a)). A zero
+     * here would read as a phase timed exactly on target. A row stored
+     * before this was nullable carries 0.0 for such a phase; where that row
+     * also stores a null [actualMeanS], the null marks the phase as
+     * unmeasured. Stored rows are not rewritten.
+     */
+    val worstDeviationS: Double?,
     val repsWithinTolerance: Int,
     val repsEvaluated: Int,
     /**
@@ -814,7 +822,7 @@ object SetAnalyzer {
                     phase = def.name,
                     prescribedS = def.prescribed,
                     actualMeanS = if (actuals.isEmpty()) null else round2(actuals.average()),
-                    worstDeviationS = round2(deviations.maxByOrNull { abs(it) } ?: 0.0),
+                    worstDeviationS = deviations.maxByOrNull { abs(it) }?.let { round2(it) },
                     repsWithinTolerance =
                     if (scorable) actuals.count { abs(it - def.prescribed!!) <= toleranceS } else 0,
                     repsEvaluated = if (scorable) actuals.size else 0,
@@ -1036,10 +1044,12 @@ object CoachingRules {
             }
         }
         tempoCompliance?.phases?.forEach { phase ->
-            if (phase.scored && phase.repsEvaluated > 0 && phase.repsWithinTolerance < phase.repsEvaluated) {
-                val direction = if (phase.worstDeviationS < 0) "fast" else "slow"
+            val worst = phase.worstDeviationS
+            val missed = phase.repsEvaluated > 0 && phase.repsWithinTolerance < phase.repsEvaluated
+            if (phase.scored && missed && worst != null) {
+                val direction = if (worst < 0) "fast" else "slow"
                 out += "Tempo (${phase.phase}): ${tempoRatio(phase, reps.size)}; " +
-                    "worst was ${fmt(abs(phase.worstDeviationS))} s too $direction " +
+                    "worst was ${fmt(abs(worst))} s too $direction " +
                     "(target ${fmt(phase.prescribedS ?: 0.0)} s)."
             }
         }
