@@ -248,7 +248,7 @@ class PlansViewModel(app: Application) : AndroidViewModel(app) {
                 // The body weight was written when the plan was imported, and
                 // nothing writes it again here, so the gate does not say it is
                 // being applied.
-                importResult.value = PlanImportResult.Staged(review.copy(bodyWeightKg = null))
+                importResult.value = PlanImportResult.Staged(review.copy(bodyWeightKg = null), stored = true)
             } else {
                 repository.activate(planId)
             }

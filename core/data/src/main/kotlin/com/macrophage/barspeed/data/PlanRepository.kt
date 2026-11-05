@@ -27,7 +27,14 @@ data class PlanImportSummary(
 )
 
 sealed interface PlanImportResult {
-    data class Staged(val summary: PlanImportSummary) : PlanImportResult
+    /**
+     * A plan waiting at the approval gate. [stored] is true when the gate is
+     * reopened on a plan stored earlier, from "Make active" (#58), rather
+     * than shown on a fresh import: the gate's dismiss then closes it and
+     * keeps the plan, where a fresh import's dismiss discards it, so one tap
+     * cannot delete a plan stored weeks ago.
+     */
+    data class Staged(val summary: PlanImportSummary, val stored: Boolean = false) : PlanImportResult
 
     /**
      * A refused document. [warnings] are the non-blocking notes the same
