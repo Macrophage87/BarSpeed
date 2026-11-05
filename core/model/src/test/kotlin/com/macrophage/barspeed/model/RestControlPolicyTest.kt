@@ -425,4 +425,54 @@ class RestControlPolicyTest {
     fun `a finished session whose last rest did not save offers only the retry`() {
         assertEquals(setOf(RestControl.RETRY_FINISH), RestControlPolicy.controls(SessionCloseState.REST_UNSAVED))
     }
+
+    // ---- READY's START SET (#49, #333) ----------------------------------------
+
+    /**
+     * THE DEFECT (review round 1 of 0.2.0's session-lifecycle lane). READY
+     * draws the session-close controls, and it is reached with a session row
+     * by a continued session (#48) and by a body-weight refusal taken from the
+     * rest screen, so a close can be in flight there. Its START SET was drawn
+     * and live anyway: a set started under an in-flight close has FINISHED
+     * written over it, which is the defect this object exists for, through a
+     * door it did not guard.
+     */
+    @Test
+    fun `READY starts no set while the session is closing`() {
+        assertFalse(RestControlPolicy.readyMayStartSet(SessionCloseState.IN_FLIGHT))
+    }
+
+    /**
+     * A close whose session write landed has stamped the row's end time, so
+     * a set started on READY would be recorded into a session that has
+     * already ended (#333).
+     */
+    @Test
+    fun `READY starts no set once the close has written the row`() {
+        assertFalse(RestControlPolicy.readyMayStartSet(SessionCloseState.REST_UNSAVED))
+    }
+
+    /**
+     * The other side: with no close, or after one that failed with nothing
+     * written, READY starts a set as it always has. After a failed close the
+     * caller drops the frozen copy through [RestControlPolicy.closeOnNextSet],
+     * as the rest screen's door does.
+     */
+    @Test
+    fun `READY starts a set with no close and after a failed one`() {
+        assertTrue(RestControlPolicy.readyMayStartSet(SessionCloseState.NONE))
+        assertTrue(RestControlPolicy.readyMayStartSet(SessionCloseState.FAILED))
+    }
+
+    /** One rule for both doors: READY may start a set exactly where the rest screen's close rule draws one. */
+    @Test
+    fun `READY and the rest screen agree on every close state`() {
+        SessionCloseState.entries.forEach { close ->
+            assertEquals(
+                RestControl.START_NEXT_SET in RestControlPolicy.controls(close),
+                RestControlPolicy.readyMayStartSet(close),
+                "$close",
+            )
+        }
+    }
 }

@@ -50,4 +50,39 @@ class SaveToPhonePolicyTest {
     fun `lost bytes with no kind are refused rather than left as an empty file`() {
         assertEquals(SaveOutcome.REFUSE, SaveToPhonePolicy.onPicked(true, bytesHeld = false, kind = null))
     }
+
+    /**
+     * THE DEFECT (#37's second path). Two pickers stacked by a quick second
+     * tap: JSON, then Raw CSV. Each build replaced the one set of held bytes,
+     * so the first picker to return wrote the zip into the .json document,
+     * and the second found nothing held and refused, deleting its file. Bytes
+     * held for another export are not this picker's: it builds its own.
+     */
+    @Test
+    fun `bytes held for another export are not written into this one`() {
+        assertEquals(
+            SaveOutcome.REGENERATE,
+            SaveToPhonePolicy.onPickedFor(true, heldKind = SaveKind.RAW_ZIP, pickedKind = SaveKind.SUMMARY_JSON),
+        )
+        assertEquals(
+            SaveOutcome.REGENERATE,
+            SaveToPhonePolicy.onPickedFor(true, heldKind = SaveKind.DETAILED_JSON, pickedKind = SaveKind.SUMMARY_JSON),
+        )
+    }
+
+    /** The other side: bytes held for this export are written, and a cancelled picker still does nothing. */
+    @Test
+    fun `bytes held for this export are written`() {
+        SaveKind.entries.forEach { kind ->
+            assertEquals(
+                SaveOutcome.WRITE_HELD,
+                SaveToPhonePolicy.onPickedFor(true, heldKind = kind, pickedKind = kind),
+            )
+            assertEquals(
+                SaveOutcome.REGENERATE,
+                SaveToPhonePolicy.onPickedFor(true, heldKind = null, pickedKind = kind),
+            )
+            assertEquals(SaveOutcome.NOTHING, SaveToPhonePolicy.onPickedFor(false, heldKind = kind, pickedKind = kind))
+        }
+    }
 }
