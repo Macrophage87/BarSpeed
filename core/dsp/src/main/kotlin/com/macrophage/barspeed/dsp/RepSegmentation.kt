@@ -210,11 +210,21 @@ data class RepSpan(
  * merged into stillness; qualifying down+up (or up+down) pairs form reps.
  *
  * KNOWN LIMITATION: phase boundaries land where |v| crosses the dead-band, and
- * a slow phase ramps through that band slowly, so the clipping GROWS with the
- * prescribed duration — measured at 0.37 / 0.91 / 1.36 s lost on 2 / 3 / 4 s
- * eccentrics in field data. Graded against an absolute tolerance that alone
- * fails most reps, so reported phase seconds run short on slow tempo work and
- * should not be read as the athlete's timing.
+ * a slow phase ramps through that band slowly, so reported phase seconds run
+ * short on slow tempo work and should not be read as the athlete's timing.
+ * HOW MUCH is not established. This note used to say the clip grows with the
+ * prescribed duration, "measured at 0.37 / 0.91 / 1.36 s lost on 2 / 3 / 4 s
+ * eccentrics in field data"; issue #47 could not reproduce that from any
+ * committed capture. At `1613288` it measured an implied clip of 0.207 s and
+ * 0.905 s on two 3 s captures and 0.397-0.700 s on two 2 s ones -- as much
+ * spread within one prescribed duration as between them -- and the corpus
+ * holds no 4 s capture. Synthetic sets, where duration is set by
+ * construction, do clip more on longer phases (#47's grid: 0.030 s at 1 s to
+ * 0.828 s at 5 s), but a synthetic turnaround is a true still period and a
+ * loaded one is not. Relayed from #47, not re-measured here. #47's own
+ * diagnosis -- a 0.43 s eccentric read off a lowering of about 5 s -- also
+ * names a failure mode other than dead-band clipping, so this note is not
+ * the only way a phase reads short.
  */
 object RepSegmenter {
     /** [segmentDetailed]'s result: the spans, and the census of how they were arrived at. */

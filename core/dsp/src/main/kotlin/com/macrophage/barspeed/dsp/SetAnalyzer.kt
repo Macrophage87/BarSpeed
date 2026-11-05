@@ -618,13 +618,21 @@ object SetAnalyzer {
      * rest of [RunThresholds.sensorFrame] -- no new constant, and nothing
      * fitted to the synthetic sets that are the only evidence this path has
      * (no committed capture reaches it; `HorizontalAxisOrientationTest` says
-     * why). A set in which no run travels that far keeps today's answer:
-     * the series is returned unflipped, as it was when no run existed.
+     * why). A set in which no run travels that far is returned unflipped,
+     * the answer this function already gave when no run existed. Before the
+     * gate such a set was flipped whenever its first sub-floor run pointed
+     * the unexpected way, so its orientation does change. No rep figure
+     * depends on it: both pairing paths in [RepSegmenter] require a drive of
+     * at least `minRomM`, flipping a series changes no run's travel, and so
+     * such a set pairs no rep either way. What can differ is which way its
+     * sub-floor runs are counted in the segmentation census.
      *
      * WHAT THE GATE DOES NOT DO. A settle of a rep's worth still decides the
      * axis -- a 12 cm movement the other way is a phase by every rule here,
      * and `HorizontalAxisOrientationTest` pins that it still inverts the set.
-     * Nothing declared tells a 12 cm settle from a 12 cm rep. Whether a real
+     * Nothing declared tells a 12 cm settle from a 12 cm rep, so no absolute
+     * floor can; a set-relative test was not tried, because its fraction
+     * could only be fitted to synthetic samples. Whether a real
      * lifter's settle on a handle-mounted horizontal machine stays under
      * 0.10 m is `[Field]`: it needs a capture with the sensor on the handle,
      * which the corpus does not hold.
