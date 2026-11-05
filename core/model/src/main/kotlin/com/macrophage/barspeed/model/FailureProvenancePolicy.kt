@@ -60,6 +60,15 @@ object FailureProvenancePolicy {
      *   [TAPPED_WORD], the one word History has always drawn for both, because
      *   splitting it here would guess an author for a set nobody recorded one
      *   for; [published] withholds the author in the export for the same row.
+     *
+     * A DISPLAY COMPROMISE, STATED AS ONE. Beside [DERIVED_WORD], [TAPPED_WORD]
+     * now reads as "the lifter called it", so on a pre-v15 row History draws
+     * the tapped word for a failure that may have been derived: an unknown
+     * author shown as the known one, on the chip only. What "Failed" claims on
+     * such a row is that the set failed, nothing about who said so. The
+     * alternative is a third word for an unknown author, which is the owner's
+     * call and is raised rather than chosen here (L2 review round 1); the
+     * affected rows were all recorded on v0.1.49 or earlier.
      */
     fun historyWord(failed: Boolean, failedByLifter: Boolean?): String? = when {
         !failed -> null
