@@ -35,11 +35,13 @@ import java.util.zip.ZipOutputStream
  * cannot silently reorder the cards a lifter taps on. What the order means
  * is [RescuedDatabaseStore.rescued]'s concern and documented there.
  *
- * WHAT MOVING IT HERE DID NOT BUY: only the CLASSIFICATION is pinned, not
- * the mapping from a state to a string and to a button. Which title, which
- * warning, whether SEND is drawn and whether DISCARD goes through a
- * confirmation are still decided in :app, where nothing can fail, and
- * permuting them leaves the whole suite green.
+ * WHAT MOVING IT HERE DID NOT BUY: only the CLASSIFICATION is pinned here,
+ * not the mapping from a state to a string and to a button. That mapping --
+ * which title, which warning, whether SEND is drawn, whether DISCARD goes
+ * through a confirmation, whether the busy gate is read -- lives in :app's
+ * `RescuedCard.kt` and is pinned by `RescuedCardTest` since issue #122. What
+ * neither reaches is whether the composable calls those helpers at all; that
+ * last step is compile- and lint-gated only.
  */
 enum class RescueCompleteness(val riskOrder: Int) {
     /** The main database file is present. Not a guarantee it is current; see this enum's own KDoc. */
