@@ -2,7 +2,8 @@
 
 **Status.** Design round for release 0.2.0. Nothing here changes `RomBound`, the segmenter, #306's
 peak/velocity-loss gating, or any `DspConfig` constant. It needs no contract number: no export
-key, database column or plan field. The evidence comes from the committed corpus under
+key, database column or plan field. The issue's measure of success is velocity loss (section 5).
+Set peaks, which #306 gates on the same eligibility, stay withheld; nothing here changes them. The evidence comes from the committed corpus under
 `core/dsp/src/test/resources` and nowhere else. The figures are pinned in
 `core/dsp/src/test/kotlin/com/macrophage/barspeed/dsp/RomBoundCauseCorpusTest.kt`.
 
@@ -12,16 +13,17 @@ key, database column or plan field. The evidence comes from the committed corpus
 ./gradlew -PjvmOnly :core:dsp:test --tests "com.macrophage.barspeed.dsp.RomBoundCauseCorpusTest"
 ```
 
-They were measured at `8cbac5b80cbc54f960779839bdadaabcff04700c` (lane branch
+They were measured at `eec77feb41f6d24d4805d55b8fde84e76e8da9c4` (lane branch
 `claude/v020-l15-rom-design`, on top of `claude/release-0.2.0` at
-`4ab115f62738c71763f8012a7d6e4cab825d7507`). The test is a pure characterization pin. It
-asserts what the shipped pipeline does and sets no target.
+`4ab115f62738c71763f8012a7d6e4cab825d7507`), locally with `-PjvmOnly`. CI runs the same class on
+every push to the lane branch. The test is a pure characterization pin. It asserts what the
+shipped pipeline does and sets no target.
 
 ## 1. What the corpus can and cannot answer
 
 | capture named in #316 | enrolled? | what is on the classpath |
 |---|---|---|
-| field-44 (deadlift day, 10 sets / 77 reps in the issue) | **partly** | the five deadlift sets, `field-deadlift-straight-*-s44-set01..05` (raw IMU, role-b IMU, cues), with per-rep truth in `DeadliftTruth` |
+| field-44 (deadlift day, 10 sets / 77 reps in the issue) | **partly** | the five deadlift sets, `field-deadlift-straight-*-s44-set01..05` (raw IMU and role-b IMU on all five; cues on sets 1-4, none for set 5), with per-rep truth in `DeadliftTruth` |
 | field-45 (accessory day, 15 sets / 180 reps) | **no** | no capture. Only two sets' exported rows, typed into `PeakEligibilityTest` |
 | field-43 (deadlift sets 4-6) | yes | raw IMU, cues, truth |
 | field-46 (back squat sets 1-5) | yes | raw IMU, role-b IMU, cues. No per-rep truth |
@@ -87,7 +89,8 @@ against the 0.10 m `anchorAcceptable` licenses. Every one is above the budget.
 ### 2.4 Reading: segmentation, drift, or the bound itself
 
 - **Drift is what refuses the completed deadlift reps.** All 41 REP spans fail a drift clause
-  (AFTER_LAST or UNCAPPED), and the erasure inside each is metres. On a working set the bar never
+  (AFTER_LAST or UNCAPPED). On the 34 UNCAPPED ones the correction erased 0.216 to 5.728 m inside
+  the rep's own span; the 7 AFTER_LAST ones have no closing anchor at all. On a working set the bar never
   goes quiet long enough for an acceptable anchor, so the whole working window is one interval,
   closed by starvation or not closed at all. This agrees with the 2026-09-25 comment on #316 and
   with `RomBound`'s own KDoc. The bound is right to refuse them.
@@ -103,10 +106,11 @@ against the 0.10 m `anchorAcceptable` licenses. Every one is above the budget.
     therefore bounded by the same 0.10 m per crossed interval as a rep alone in it. This
     contradicts `RomBound`'s KDoc sentence that a shared interval "bounds none of them
     individually". Four corpus spans fail on SHARED alone (field-bench-rotating-6rep-ok and
-    field-rdl-3010-10rep, two each) and **none is a deadlift rep**.
-  - Erasure measured per span. 30 UNCAPPED spans had at most 0.10 m erased inside their own span, and **none is a completed deadlift rep** (the
-    minimum there is 0.216 m). Section 3.2 shows why a per-span erasure figure would not license
-    a rep anyway.
+    field-rdl-3010-10rep, two each, pinned by capture) and **none is a deadlift rep**.
+  - Erasure measured per span. 30 UNCAPPED spans had at most 0.10 m erased inside their own
+    span, and **none is a completed deadlift rep** (the minimum there is 0.216 m). A per-span
+    erasure figure also says nothing about closure; section 3.2 states what the corpus does and
+    does not show on that.
 
   So relaxing either would move non-deadlift figures and leave #316's success measure where it
   is. This note does not propose either for 0.2.0. The SHARED-clause observation is raised here
@@ -117,16 +121,30 @@ against the 0.10 m `anchorAcceptable` licenses. Every one is above the budget.
 ### 3.1 Floor-cycle spans from the full-cycle counter (#305)
 
 Each `CycleRepCounter` call on the eight deadlift sets (36 calls, the production rule through
-`ClosingFrames`/`CycleCandidate` as `ClosingRuleCandidateTest` licenses it) gives one span:
+`ClosingFrames`/`CycleCandidate` as `ClosingRuleCandidateTest` licenses it) gives one span. These
+are calls, not reps: by the `DeadliftTruth` window nearest each drive, 35 fall on REP windows and
+1 on a NOT_REP window (field-43 set 6, call 0).
 
-- it opens at the call's drive start: the bar on the floor before a dead-stop pull, on the
-  counter's own premise;
-- it closes at the first sample at or after the call that `isQuietSample` accepts, bounded by
-  the next drive.
+- It opens at the call's drive start: the bar on the floor before a dead-stop pull, on the
+  counter's own premise.
+- It closes at the first sample at or after the call that `isQuietSample` accepts, searching no
+  further than the next call's drive start.
 
-Both ends are taken as rest, so the true velocity change across the span is zero and the raw
-`dv` is integration error. The velocity is detrended linearly to zero at both ends and then
-integrated.
+Both ends are *treated* as rest, so the raw `dv` across the span is read as integration error, and
+the velocity is detrended linearly to zero at both ends and then integrated. The end is at best a
+single quiet sample, not a `minStationaryS` run, which section 3.3 says is not rest. What closed
+the 36 spans:
+
+| span end | calls |
+|---|---|
+| a quiet sample | 25 |
+| the call itself, not quiet: the call came after the next drive had started, so no search ran | 5 |
+| the next call's drive start, with no quiet sample before it | 6 |
+| the capture's end | 0 |
+
+6 spans run past the next drive's start (the 5 above and one that then found a quiet sample). One
+of the counter's closes is the next *armed* drive, and a drive arms after it has started, so such a
+call lands inside the next pull. Those six spans take in part of the next lift.
 
 | measure over the 36 cycles | result |
 |---|---|
@@ -134,33 +152,69 @@ integrated.
 | \|closure\| min / median / max | 0.143 / 1.173 / 2.987 m |
 | rest-to-rest erasure `0.5·|dv|·T` within the `anchorAcceptable` budget | 1 of 36 (field-44 set 2, call 0) |
 
-**The evidence does not support floor-cycle spans as a bounded source on this corpus.** This
-re-measures the 2026-09-25 comment's retraction on a fixed, pinned definition. That comment used
-a 10 cm rise-against-lowering check and found 0 of 5 field-44 sets and 0 of 3 field-43 sets.
+**The evidence does not support floor-cycle spans as a bounded source on this corpus, on this
+span definition.** Every figure is scoped to the definition above, ends included. A scratch
+variant that closed every span at the call instead found 0 of 36 too (minimum \|closure\| 0.200 m);
+that variant is not pinned. This re-measures the 2026-09-25 comment's retraction on a fixed,
+pinned definition. That comment used a 10 cm rise-against-lowering check and found 0 of 5 field-44
+sets and 0 of 3 field-43 sets.
 
-### 3.2 Why the erasure cap alone cannot license a floor-cycle span
+The same comment's leftover, that the last rep of field-44 sets 1 and 4 rises less than it lowers
+to its closing contact, is **not** explained here and stays open under #316.
 
-The one cycle inside the erasure budget, field-44 set 2's first rep, has a net
-`dv = −0.026 m/s` and erases 0.054 m. It still ends **1.094 m** above where it began. Its net
-error is small only because large errors of opposite sign cancel.
+### 3.2 What the one cycle inside the erasure budget shows
 
-A scratch split of each cycle's `dv` illustrates this. It came from an uncommitted harness and
-is not pinned, so treat it as illustration only. The ~0.35 s
-around each floor contact carries +1.0 to +3.3 m/s, and the rest of the cycle −0.4 to −2.8 m/s.
-That split does not separate error from the bar's genuine deceleration at landing, so no claim is
-made about which part is wrong. It only shows why a net figure can understate the error. A rep
-can pass the cap and still fail closure.
+The one cycle inside the budget, field-44 set 2's call 0, has a net `dv = −0.026 m/s` and erases
+0.054 m. Its reconstructed displacement ends 1.094 m from its start and never descends (lowering
+0.000 m). But it is one of the six spans that run past the next drive's start: it ends, not quiet,
+at a call that came after the next pull had begun. It is not a floor-to-floor cycle, so it is no
+evidence either way about whether a span that passes the erasure cap can fail closure. A round-1
+draft of this note and of the pin read it as two large errors cancelling; nothing measured which
+part of `dv` is error, and that reading is withdrawn.
 
-**Any future licence for a floor-cycle span must therefore test closure, not only erasure.**
+A scratch split of each cycle's `dv`, from an uncommitted harness and not pinned: on 30 of the 36
+cycles the samples from 0.05 s before to 0.3 s after a contact carry +1.0 to +3.3 m/s of dv; on the
+other six the split is smaller or has no contact window at all. That split does not separate error
+from the bar's genuine deceleration at landing, so no claim is made about which part is wrong.
+
+**A future licence for a floor-cycle span should test closure as well as erasure, and its span
+must end before the next drive starts.** The first is a design requirement: a net `dv` figure
+cannot by itself show that the displacement closed. This corpus does not supply a clean case of a
+span passing one and failing the other.
 
 ### 3.3 Concentric-only spans (floor rest to lockout rest)
 
 This would integrate only the pull, where less error can accumulate than over the whole cycle:
-the counter's drive runs last 0.29 to 0.98 s on these sets. It needs a rest window, a run of `isQuietSample` at least `minStationaryS`
-(0.30 s) long, both on the floor before the pull and at lockout. Of the 36 calls, **none has
-both**, 2 have only the floor run and 3 only the lockout run. The anchor supply is not there.
-Single quiet samples are not rest: on the scratch run, the first quiet sample after the drive
-often sat within 0.1 m of the floor, which is a bar moving at roughly constant speed.
+the counter's drive runs last 0.29 to 0.98 s on these sets. It needs rest on both sides. Rest is
+read the way `applyZupt` reads it, `VelocityEstimator.quietMask`: a run of anchor-candidate samples
+at least `minStationaryS` (0.30 s) long. Single quiet samples are not rest: an accelerometer cannot
+tell rest from constant velocity (`VelocityEstimator.anchorAcceptable`'s KDoc), which is why rest
+is read as a run.
+
+A call has a floor rest when a mask sample lies between the previous call (the capture's start for
+the first call) and the drive's start, and a top rest when one lies between the drive's end and the
+call. Where the bar was in either window is the counter's premise, not something measured here.
+
+| over the 36 calls | calls |
+|---|---|
+| floor rest and top rest | **4** |
+| floor rest only | 13 |
+| top rest only | 4 |
+
+The four with both are the first call of field-44 sets 4 and 5 and field-43 sets 4 and 6, so the
+floor rest is the setup before the set's first pull. From the last floor-rest sample to the first
+top-rest sample (1.41 to 2.52 s), `0.5·|dv|·T` is **0.236 to 2.123 m**, every one above the
+0.10 m `anchorAcceptable` budget. So the supply is thin, and where it exists the span between the
+two rests does not pass the cap. This route does not bound a completed rep on this corpus either.
+
+Correction, mine: round 1 of this note said "none has both, 2 have only the floor run and 3 only
+the lockout run". That search walked to the quiet sample nearest the drive on each side and judged
+only that run's length, so a short quiet stretch next to the drive hid a longer rest further out.
+It is still pinned, labelled as that definition, and it is not how `applyZupt` reads rest.
+
+Issue #316's 2026-10-03 comment reports 8 of 36 deadlift reps with a quiet window of at least
+0.3 s "on both sides". Its definition and population are not stated, so it is not re-derived here,
+and neither 4 of 36 nor the retracted 0 of 36 is the same claim.
 
 ### 3.4 A drive-gain figure instead of a velocity
 
