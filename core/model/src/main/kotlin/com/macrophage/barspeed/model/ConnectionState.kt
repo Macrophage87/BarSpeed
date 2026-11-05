@@ -35,6 +35,15 @@ sealed interface ConnectionState {
      * KDoc states that revoking BLUETOOTH_CONNECT from Settings kills the
      * process, which is the actual reason these three are harmless -- not
      * anything this policy or its caller does.
+     *
+     * [phoneBluetoothOff] is `false` by default for the same reason (#103):
+     * `true` is claimed only where the producer READ the phone's adapter as
+     * disabled at the moment the connect failed, which is a checkable fact
+     * rather than an inference from `connectGatt` returning null.
      */
-    data class Failed(val reason: String, val linkEstablished: Boolean = false) : ConnectionState
+    data class Failed(
+        val reason: String,
+        val linkEstablished: Boolean = false,
+        val phoneBluetoothOff: Boolean = false,
+    ) : ConnectionState
 }

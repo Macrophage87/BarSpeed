@@ -7,6 +7,13 @@ enum class SensorAdvice {
 
     /** The sensor answered at the GATT level and something else is wrong; pairing or power is not the fix. */
     UNRESPONSIVE,
+
+    /**
+     * The phone's own Bluetooth read disabled when the connect failed (#103).
+     * DECLARED, NOT YET ANSWERED: [SensorAdvicePolicy.forState] does not
+     * return this yet, and nothing sets [ConnectionState.Failed.phoneBluetoothOff].
+     */
+    TURN_ON_PHONE_BLUETOOTH,
 }
 
 /**

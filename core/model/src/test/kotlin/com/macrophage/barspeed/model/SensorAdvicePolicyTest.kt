@@ -61,6 +61,27 @@ class SensorAdvicePolicyTest {
     }
 
     @Test
+    fun `a failure with the phone's Bluetooth read on keeps the generic advice`() {
+        // #103. phoneBluetoothOff false is every producer that did not read
+        // the adapter disabled, so it must leave the existing two answers
+        // exactly where they were.
+        assertEquals(
+            SensorAdvice.PAIR_OR_POWER,
+            SensorAdvicePolicy.forState(ConnectionState.Failed("The link was refused", phoneBluetoothOff = false)),
+        )
+        assertEquals(
+            SensorAdvice.UNRESPONSIVE,
+            SensorAdvicePolicy.forState(
+                ConnectionState.Failed(
+                    "Expected service/characteristic not found",
+                    linkEstablished = true,
+                    phoneBluetoothOff = false,
+                ),
+            ),
+        )
+    }
+
+    @Test
     fun `linkEstablished decides the advice, not the reason string`() {
         // Both calls share one reason string. An implementation that matches
         // on the text -- for example, branching on whether the string

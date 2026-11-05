@@ -871,6 +871,8 @@ private fun imuAdviceText(advice: SensorAdvice): String = when (advice) {
     SensorAdvice.UNRESPONSIVE ->
         "The sensor answered and then stopped responding -- pairing again is unlikely to help. " +
             "Power-cycle it."
+    SensorAdvice.TURN_ON_PHONE_BLUETOOTH ->
+        "Your phone's Bluetooth is off. Turn it on; the app keeps retrying the sensor on its own."
 }
 
 /**
