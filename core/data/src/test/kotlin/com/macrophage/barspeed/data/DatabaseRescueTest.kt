@@ -3,6 +3,7 @@ package com.macrophage.barspeed.data
 import java.io.File
 import java.io.RandomAccessFile
 import java.nio.file.Files
+import java.util.Base64
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -50,6 +51,41 @@ class DatabaseRescueTest {
     }
 
     private fun rescueRoot() = File(root, DatabaseRescue.RESCUE_DIR)
+
+    // ---- issue #113: real SQLite bytes, a main file stale under its -wal -----
+
+    /*
+     * The same two fixtures SqliteWalTest reads, copied rather than shared
+     * because test sources do not cross modules. Made by SQLite 3.53.1, not
+     * by hand and not from field data: a database at user_version 10,
+     * checkpointed, then set to 21 and copied with the connection still open
+     * so nothing checkpointed. SQLite opening the copy reports 21; bytes 60-63
+     * of its main file read 10. SqliteWalTest's KDoc has the full recipe.
+     */
+    /** A real `-wal`, 568 bytes: one committed frame, page 1, user_version 21. */
+    private val realWal: ByteArray = Base64.getDecoder().decode(
+        "N38GggAt4hgAAAIAAAAAAeeSABXUGSwM6suV+q/Rh3MAAAABAAAAAueSABXUGSwMLSJR/JIpPXZTUUxpdGUgZm9ybWF0IDMAAgAC" +
+            "AgBAICAAAAACAAAAAgAAAAAAAAAAAAAAAQAAAAQAAAAAAAAAAAAAAAEAAAAVAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+            "AAIALpXJDQAAAAEB3wAB3wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" +
+            "AAAAAAAAAAAAAB8BBhcPDwEvdGFibGV0dAJDUkVBVEUgVEFCTEUgdCh4KQ==",
+    )
+
+    /** The first 100 bytes of the main file copied beside realWal: user_version 10. */
+    private val realMainHeader: ByteArray = Base64.getDecoder().decode(
+        "U1FMaXRlIGZvcm1hdCAzAAIAAgIAQCAgAAAAAgAAAAIAAAAAAAAAAAAAAAEAAAAEAAAAAAAAAAAAAAABAAAACgAAAAAAAAAAAAAA" +
+            "AAAAAAAAAAAAAAAAAAAAAAAAAAACAC6VyQ==",
+    )
+
+    /** The real stale main file -- its 100-byte header, padded -- with [wal] beside it. */
+    private fun staleUnderWal(wal: ByteArray = realWal, name: String = "accelerometer_lifting.db"): File {
+        val file = File(root, name).apply { writeBytes(realMainHeader + ByteArray(924)) }
+        File(file.path + "-wal").writeBytes(wal)
+        return file
+    }
 
     private fun assertIsRescued(outcome: RescueOutcome): File {
         assertTrue(outcome is RescueOutcome.Rescued, "expected Rescued, got " + outcome)
@@ -374,6 +410,47 @@ class DatabaseRescueTest {
         assertEquals(0L, found.totalBytes)
         assertNotNull(found.rescuedAtMs, "the store could not date a directory the rescue itself named")
         assertTrue(file.isFile, "the main database moved even though every move was made to fail")
+    }
+
+    // ---- issue #113: what the -wal may and may not change -----------------
+
+    /*
+     * GUARDS, NOT DIFFERENTIALS: each passes before and after #113's fix.
+     * They pin the direction the fix must not move in -- a log SQLite would
+     * not use leaves the main file's answer standing, which is the answer
+     * every launch got before the log was read at all.
+     */
+
+    @Test
+    fun `a torn wal leaves the main file's version standing`() {
+        val file = staleUnderWal(realWal.copyOf(realWal.size - 1))
+        assertEquals(10, DatabaseRescue.storedVersion(file))
+        assertEquals(RescueOutcome.NotNeeded, DatabaseRescue.rescue(file, rescueRoot(), 20))
+        assertTrue(file.isFile, "a database was moved on the strength of a log SQLite would not read")
+    }
+
+    @Test
+    fun `a wal that is not a log leaves the main file's version standing`() {
+        val file = staleUnderWal("this is not a write-ahead log".toByteArray())
+        assertEquals(10, DatabaseRescue.storedVersion(file))
+        assertEquals(RescueOutcome.NotNeeded, DatabaseRescue.rescue(file, rescueRoot(), 20))
+    }
+
+    /** A directory where the -wal should be: not a file, so not a log. No exception escapes. */
+    @Test
+    fun `a wal path that is not a file leaves the main file's version standing`() {
+        val file = File(root, "accelerometer_lifting.db").apply { writeBytes(realMainHeader + ByteArray(924)) }
+        File(file.path + "-wal").mkdirs()
+        assertEquals(10, DatabaseRescue.storedVersion(file))
+        assertEquals(RescueOutcome.NotNeeded, DatabaseRescue.rescue(file, rescueRoot(), 20))
+    }
+
+    /** At the version the log names, the log is the current database, not a newer one. */
+    @Test
+    fun `a database whose wal holds the compiled version is not a rescue`() {
+        val file = staleUnderWal()
+        assertEquals(RescueOutcome.NotNeeded, DatabaseRescue.rescue(file, rescueRoot(), 21))
+        assertTrue(file.isFile && File(file.path + "-wal").isFile, "a current database was moved")
     }
 
     private fun opens(file: File): Boolean = runCatching { file.inputStream().use { it.read() } }.isSuccess
