@@ -284,6 +284,32 @@ class LiveCapCalibrationTest {
     }
 
     @Test
+    fun `the phase label bound clears every in-cap live run on the corpus`() {
+        // Where [StreamingSetTracker.MAX_LABELLED_RUN_S] comes from (#95). A
+        // run still in progress past it stops being named a movement phase;
+        // this pins what that bound was derived from, over the runs of the
+        // licensed model above.
+        //
+        // IN-CAP means at or below [DspConfig.maxRunDisplacementM]: a run that
+        // displaces more is not a phase by that constant's own definition, and
+        // the over-cap runs are the population #95 is about. Every in-cap run
+        // counts here, qualified or not, because the label is published for
+        // every run while it lasts -- a jitter run carries a label too.
+        val c = DspConfig()
+        val all = corpus.flatMap { (file, d, _) -> liveRuns(load(file), d, c) }
+        val inCap = all.filter { it.displacementM <= c.maxRunDisplacementM }
+        val overCap = all.filter { it.displacementM > c.maxRunDisplacementM }
+        val bound = StreamingSetTracker.MAX_LABELLED_RUN_S
+        assertEquals(394, inCap.size, "in-cap live runs across the corpus")
+        assertEquals(5.941, inCap.maxOf { it.durationS }, 5e-3, "the longest in-cap run, seconds")
+        assertEquals(0, inCap.count { it.durationS > bound }, "in-cap runs that would lose their label")
+        // What the bound buys, on the population it exists for.
+        assertEquals(22, overCap.size, "over-cap live runs across the corpus")
+        assertEquals(11, overCap.count { it.durationS > bound }, "of those, ones that outlast the bound")
+        assertEquals(51.14, overCap.maxOf { it.durationS }, 5e-2, "the longest, on field-reardeltfly-s32-set06")
+    }
+
+    @Test
     fun `every counted rep the bound removes is far outside its own set (pre-fix)`() {
         val c = DspConfig()
         var removed = 0

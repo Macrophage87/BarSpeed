@@ -433,6 +433,38 @@ class StreamingSetTracker(
 
         /** No accepted anchor for this long → next flat window re-anchors (s). */
         const val ANCHOR_STARVATION_S = 6.0
+
+        /**
+         * The longest a movement run in progress may be NAMED a movement
+         * phase, s (#95). Past it [LiveSetState.phase] withdraws the label --
+         * [Phase.IDLE], the state that names no phase -- until the run ends.
+         *
+         * Without it a drift run holds `Lowering` or `Driving up` for as long
+         * as the drift lasts: 24.3 s on `field-bench-rotating-6rep`, 51.1 s on
+         * `field-reardeltfly-s32-set06`, on sets whose reps take two seconds.
+         * A bound applied when the run ENDS, as #86's displacement cap is,
+         * cannot help, because the label is on screen while the run is still
+         * in progress; so this is tested on every sample, against the run's
+         * own duration on the reconstructed clock.
+         *
+         * DERIVED FROM THE COMMITTED CORPUS, AND FITTED WITH A SMALL MARGIN.
+         * Over the twenty-one captures `LiveCapCalibrationTest` scores, the
+         * longest live run at or under [DspConfig.maxRunDisplacementM] lasts
+         * 5.94 s; this is the first whole second above it, and that test pins
+         * both figures and that no in-cap run outlasts it. Eleven of the
+         * twenty-two over-cap runs do. The margin over the longest real run is
+         * 0.06 s, and that is chosen on the direction it fails in: a genuine
+         * phase longer than this loses its caption for the rest of the run --
+         * a label WITHHELD, never a wrong one -- which is the owner's ruling
+         * for a figure the analysis cannot bound. Nothing measures how often a
+         * real unguided phase runs past six seconds.
+         *
+         * NOT [DspConfig.maxRunDisplacementM] and not a second statement of
+         * it. That is a displacement, and it gates the COUNT; this is a
+         * duration, and it gates a LABEL. #95 records why one constant is not
+         * assumed to serve both, and the cap still does its own jobs untouched.
+         */
+        const val MAX_LABELLED_RUN_S = 6.0
     }
 
     /**
