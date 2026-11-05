@@ -122,13 +122,19 @@ blend of two mountings.
 
 - Repeat step 2 over a closing still window, after the set's `Done` cue and
   before the stream ends: the eleven completed sets of session 32 record
-  4.3-13.7 s past it (recorded on `SetEnd`). A set ended by tap (`Stopped`)
-  has no samples after the tap -- `endSet` cancels the sample collectors
-  before it reads the clock, so its last sample is never later than the tap;
-  session 32's five failed sets record only 0.482-0.832 s past their last cue
-  -- so it never has a closing window and the default below refuses it. Note
-  the `Done` window also holds re-rack handling; it qualifies only where the
-  still threshold holds.
+  4.3-13.7 s past it (recorded on `SetEnd`). Only a set that ends on `Done`
+  has samples past its terminal cue. A set ended by tap has none --
+  `endSet` cancels the sample collectors before it reads the clock, so its
+  last sample is never later than the tap -- and that covers a tap-ended
+  guided set (`Stopped`) and an unguided rep set, which carries no terminal
+  word at all. A timed set (`Time`) has no window worth the name either: on
+  field-41 set 21, the one measured, the last sample is 33 ms before the
+  set's write (recorded on `SetEnd`). Each of those has no closing
+  window, so the default below refuses it. Session 32's five failed sets were
+  recorded before `Stopped` existed and carry no terminal word
+  (`FailedSetBoundaryTest`, set 9); they end 0.482-0.832 s past their last
+  cue, a count cue, not a `Stopped`. Note the `Done` window also holds
+  re-rack handling; it qualifies only where the still threshold holds.
 - Compare each unit's opening and closing gravity directions. **Refuse** the
   set when either unit's two directions differ by more than a declared angle,
   and name which unit moved -- field-35 shows the vectors can say so without
