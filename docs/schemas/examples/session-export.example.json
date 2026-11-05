@@ -346,6 +346,22 @@
           "plannedPrep_s": 12,
           "prep_s": 12,
           "rest_s": 120,
+          "geometry": {
+            "plane": "vertical",
+            "sensorOnStack": false,
+            "sensorInverted": false,
+            "travelRatio": 1,
+            "kind": "hold",
+            "bodyweight": false,
+            "source": {
+              "plane": "default",
+              "kind": "inferred",
+              "travelRatio": "default",
+              "sensorOnStack": "default",
+              "bodyweight": "default",
+              "sensorInverted": "default"
+            }
+          },
           "summary": {}
         }
       ]
