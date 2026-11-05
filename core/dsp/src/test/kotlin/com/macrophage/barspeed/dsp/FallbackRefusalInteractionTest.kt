@@ -179,7 +179,8 @@ class FallbackRefusalInteractionTest {
      * assertion is DELETED rather than re-pointed at 8.47, because re-pointing
      * it would restate the same mistake against a different capture. What this
      * file is about -- the fallback lifting a paired rep of the SAME SET past
-     * the bound -- is asserted by the two lines above it, and
+     * the bound -- is asserted by this test's "its ratio as published" and
+     * "and that is past the bound" checks, and
      * `RepRefusalCorpusTest` owns the corpus maximum by walking every capture.
      * Issue #278's seven pairs do not move that: re-measured at this tree,
      * `RepRefusalCorpusTest` still finds the corpus maximum at

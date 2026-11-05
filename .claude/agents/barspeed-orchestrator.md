@@ -40,7 +40,7 @@ The header is the **opening guess**, not a contract. Escalation below still rais
 | axis | 0 | 1 | 2 | 3 |
 |---|---|---|---|---|
 | **Reversibility** | unlanded branch | source comment or KDoc — editable after landing | published schema, or a commit body landing on protected `main` (immutable: linear history, no rewrites) | `DATABASE_VERSION`, a released artefact, the lifter's stored history |
-| **Verifiability** | an existing test would red | pinnable, test still to be written | **compile- and lint-gated only** (`:app`, `:core:ble` have no test source set) | only a field session can answer it |
+| **Verifiability** | an existing test would red | pinnable, test still to be written | **compile- and lint-gated only** (`:core:ble` has no test source set; nothing in `:app` that draws, connects or reaches Room is test-gated) | only a field session can answer it |
 | **Settledness** | spec'd to the line | design agreed, edge cases obvious | design agreed, edge cases open | needs derivation |
 | **Prose surface** | none | a comment or two | KDoc plus a commit body | a published contract description or schema changelog entry |
 | **Interaction** | isolated file | shared file, no shared seam | shared seam with in-flight work | schema-version collision, or an ordering that measurement forces |

@@ -5,10 +5,10 @@ description: Run device-level verification on the local headless Android emulato
 
 # /bench-test
 
-`:core:ble` has no test source set at all, and `:app` has two files (`PlanQueueTest`, 5 tests over
-one pure function, and `AppendedSlotTest`, 13 over the appended-set rule, measured at
-`eba5aad8df2fcd2f01bf288c94a31a568f8c24e6`) — so almost nothing in
-`:app` has executable JVM coverage for behaviour, but
+`:core:ble` has no test source set at all, and `:app` has a test source set, but nothing in `:app`
+that draws, connects or reaches Room is test-gated (`.claude/facts/live-state.md` §5, which
+deliberately carries no file or test count -- re-measure rather than requote one) — so almost
+nothing in `:app` has executable JVM coverage for behaviour, but
 that is not the end of the story: anything reachable by screenshot-driven navigation can be
 verified here, on a disposable database, before it meets the only real training history that
 exists. This recipe executed `MIGRATION_9_10` under observation for the first time and produced
