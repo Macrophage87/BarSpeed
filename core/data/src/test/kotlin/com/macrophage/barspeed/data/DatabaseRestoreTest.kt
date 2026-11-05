@@ -329,6 +329,92 @@ class DatabaseRestoreTest {
         assertTrue(restore().safeToOpen())
     }
 
+    // ---- round 1 review (A3, B2): a main file at the path is not a whole database ----
+
+    /**
+     * B2's state. The live -wal is set aside, the live main file's move
+     * fails, and the -wal's way back fails too. The main file at the path
+     * is the database in place, but its committed log is in the displaced
+     * directory: opening it shows a pre-checkpoint snapshot and writes a
+     * fresh -wal that blocks the log's return for good.
+     */
+    @Test
+    fun `a main file whose log was set aside is not opened`() {
+        val before = standardSetup()
+        restore().request(item("db-1000"))
+        var calls = 0
+        val failing: (File, File) -> Boolean = { from, to -> if (calls++ >= 1) false else from.renameTo(to) }
+        assertIs<RestoreOutcome.Stuck>(restore(failing).prepare())
+        assertTrue(live.isFile && !File(liveDir, "$DATABASE_NAME-wal").exists(), "not the state under test")
+        assertFalse(restore().safeToOpen(), "Room would open a main file split from its own log")
+        assertEquals(before.values.sorted(), contents().values.sorted(), "a stuck restore lost bytes")
+        assertEquals(RestoreOutcome.Undone, restore().prepare(), "the next launch, with moves working, recovers")
+        assertOriginal(before)
+    }
+
+    /**
+     * A3's state. The swap completed and never opened, so the next launch
+     * undoes it: the restored database goes home, the displaced main file
+     * comes back, and its -wal's return fails.
+     */
+    @Test
+    fun `an undo stuck before the displaced log came back is not opened`() {
+        val before = standardSetup()
+        restore().request(item("db-1000"))
+        assertEquals(RestoreOutcome.Swapped, restore().prepare())
+        val failWalHome: (File, File) -> Boolean = { from, to ->
+            if (from.parentFile.name == "db-5000" && from.name.endsWith("-wal")) false else from.renameTo(to)
+        }
+        assertIs<RestoreOutcome.Stuck>(restore(failWalHome).prepare())
+        assertEquals("live", mainTag(live), "not the state under test")
+        assertFalse(File(liveDir, "$DATABASE_NAME-wal").exists(), "not the state under test")
+        assertFalse(restore().safeToOpen(), "Room would open a main file split from its own log")
+        assertEquals(before.values.sorted(), contents().values.sorted(), "a stuck undo lost bytes")
+        assertEquals(RestoreOutcome.Undone, restore().prepare())
+        assertOriginal(before)
+    }
+
+    /**
+     * Nothing at the path: the live database is set aside, the rescue's
+     * first move in fails, and the live main file's return fails. Room would
+     * create an empty database there, and the next launch would meet it in
+     * the way of the move it has to finish.
+     */
+    @Test
+    fun `nothing at the path after a stuck restore is not opened`() {
+        val before = standardSetup()
+        restore().request(item("db-1000"))
+        var calls = 0
+        val failing: (File, File) -> Boolean = { from, to -> if (calls++ >= 2) false else from.renameTo(to) }
+        assertIs<RestoreOutcome.Stuck>(restore(failing).prepare())
+        assertTrue(liveDir.list().orEmpty().isEmpty(), "not the state under test: ${liveDir.list().orEmpty().toList()}")
+        assertFalse(restore().safeToOpen(), "Room would create an empty database in the way of the undo")
+        assertEquals(RestoreOutcome.Undone, restore().prepare())
+        assertOriginal(before)
+    }
+
+    // ---- round 1 review (A4, B3): an undone restore is refused by this build, not every build ----
+
+    @Test
+    fun `an undone restore is offered again by a build with a newer database version`() {
+        standardSetup()
+        restore().request(item("db-1000"))
+        assertEquals(RestoreOutcome.Swapped, restore().prepare())
+        // No open was recorded, so the next launch undoes it.
+        assertEquals(RestoreOutcome.Undone, restore().prepare())
+        assertEquals(
+            RestoreVerdict.Refused(RestoreRefusal.FAILED_BEFORE, 19),
+            restore().verdict(item("db-1000"), store().rescued()),
+            "the build that saw it fail offered it again",
+        )
+        val newer = DatabaseRestore(live, rescueRoot, 21, edges + (20 to 21), File::renameTo, { 6_000L })
+        assertEquals(
+            RestoreVerdict.Restorable(19),
+            newer.verdict(item("db-1000"), store().rescued()),
+            "a build with a newer database version still refuses a restore an older one undid",
+        )
+    }
+
     /**
      * POSIX rename replaces its destination silently, so a move into a taken
      * name would destroy whatever held it. Nothing in a normal swap puts a
