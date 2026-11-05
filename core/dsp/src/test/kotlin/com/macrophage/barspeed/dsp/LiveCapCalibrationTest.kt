@@ -181,9 +181,16 @@ class LiveCapCalibrationTest {
 
     /**
      * Live movement runs rebuilt from the velocity the tracker publishes; run
-     * state is private. Licensed by [LiveUnderCountAttributionTest], which
-     * asserts the same reconstruction reproduces the tracker's own rep count on
-     * every capture and has been mutation-checked.
+     * state is private.
+     *
+     * Licensed HERE, by `the rebuilt model reproduces the rep count of the
+     * tracker` below, and by nothing else. This KDoc used to say it was
+     * licensed by [LiveUnderCountAttributionTest], which asserts that ITS OWN
+     * reconstruction reproduces the tracker -- a different copy of the model,
+     * with its own drive rule, over its own capture list. A licence on a
+     * sibling's model says nothing about this one: issue #114 records this
+     * file's model going stale while the three siblings' licences failed, and
+     * nothing here failing.
      */
     private fun liveRuns(samples: List<ImuSample>, d: LiftDirection, c: DspConfig): List<LiveRun> {
         val tracker = StreamingSetTracker.forLift(d, c)
@@ -249,6 +256,31 @@ class LiveCapCalibrationTest {
     private fun outOfFamily(r: LiveRun, ref: Double): Boolean {
         if (ref <= 0.0) return false
         return r.displacementM > 2.0 * ref || r.displacementM < ref / 3.0
+    }
+
+    @Test
+    fun `the rebuilt model reproduces the rep count of the tracker`() {
+        // The licence for every other assertion in this file (#114). Each one
+        // scores [countedReps] over [liveRuns], a model rebuilt from the
+        // velocity the tracker publishes, because the tracker's run state is
+        // private. If the model and the tracker disagree about how many reps
+        // a capture holds, the model is not the tracker and no calibration
+        // figure below describes the shipped path.
+        //
+        // Mode 2 is the comparison because it is what ships: an over-cap run
+        // fails `StreamingSetTracker`'s qualification outright, so it neither
+        // counts nor arms (see the last test in this file). Every capture,
+        // not a total, because a total survives a model that gains a rep on
+        // one capture and loses one on another.
+        val c = DspConfig()
+        corpus.forEach { (file, d, _) ->
+            val samples = load(file)
+            val tracker = StreamingSetTracker.forLift(d, c)
+            var last = LiveSetState()
+            samples.forEach { last = tracker.feed(it) }
+            val rebuilt = countedReps(liveRuns(samples, d, c), d, c, mode = 2).size
+            assertEquals(last.repCount, rebuilt, "$file: rebuilt reps against the tracker's own repCount")
+        }
     }
 
     @Test
