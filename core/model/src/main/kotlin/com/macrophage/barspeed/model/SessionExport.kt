@@ -2873,6 +2873,22 @@ data class SessionExport(
          * `SchemaExportKeySetContractTest` pins it as declared;
          * `RepsSourcePublishedTest` in `:core:data` is the export
          * differential.
+         *
+         * 1.26 DOCUMENTATION ENTRY (#284 H1, where a counted set's rest runs
+         * from): ADDS NO KEY, and no key is renamed or retyped, but
+         * `restMeasured_s` moves for a population. On a set no cadence ran
+         * -- one the lifter counted by tapping -- the rest now runs from the
+         * lifter's last `+1 REP` tap where no terminal cue `SetEnd.of` admits
+         * stands, rather than from the rep-count milestone's `Done` or from
+         * the instant the set's write froze. With the cues off the measured
+         * rest is therefore longer by the walk back to the phone; tapped past
+         * the plan it runs from the last tap rather than the planned one. NOT
+         * RETROACTIVE: the rest instant is stored with the set (database
+         * v20), so a set recorded by an earlier build keeps the instant that
+         * build stored. The raw archive's `rest_before_hrm` window reads the
+         * same instant and moves with it. Guided sets, holds, carries and
+         * sensor-counted sets do not move. `RestStartTest` in `:core:dsp` is
+         * the differential.
          */
         const val SCHEMA_VERSION = "1.26"
 
@@ -3276,6 +3292,12 @@ data class SetExport(
      * stopped at 8 of the guide's 10 -- it is the guide's figure the
      * recorded one corrects. Published in the summary document too, where
      * [repMarks] is not.
+     *
+     * [repsSource]'s third collapse reaches this key too: a row with NO
+     * STORED GEOMETRY and a tempo is read as guided, so on an explosive lift
+     * carrying a tempo -- paced by no cadence, its marks the lifter's taps --
+     * this publishes the TAP count as the guide's, and a rest-screen
+     * correction of it reads `corrected` beside it.
      *
      * ABSENT on every set no guide counted, on a timed set, and on a guided
      * set whose marks were never stored (before the stream existed, or a set
@@ -3874,15 +3896,23 @@ data class SetExport(
      * ending in a pause one beat before the cycle ends. The marks are the
      * prescribed grid, spaced at the tempo's sum and kept on the guide's own
      * schedule whether or not the lifter moved with it, so these are NOT
-     * instants anyone observed a rep, and a failed or early-ended set can
-     * carry more marks than [reps]. `RepMarkTrackTest` measures it on the
+     * instants anyone observed a rep. On a `metronome` set that carries
+     * marks there are exactly [reps] of them. A guided set the lifter
+     * recorded at a count other than the guide's reads `corrected` (1.26,
+     * #336): its marks are the guide's cycles, and it can carry more marks
+     * than [reps] -- a set stopped short of the guide's count, field-42 set
+     * 12's shape -- or fewer, on a set carried past it. `RepMarkTrackTest`
+     * measures it on the
      * thirteen committed captures that carry marks, all guided: all 103 marks
      * within 1 ms of a row of the same set's cue track, the guide's next
      * spoken word: a stroke word, a rep call, or `Done`; on eight of the
      * thirteen no mark falls on a rep call. On a
-     * `manual` set they are the lifter's taps, and on a straight-rep set
-     * carrying no tempo the only per-rep instants in the document: [repMetrics]
-     * entries carry no clock and [voiceCues] is what the app SAID.
+     * `manual` set they are the lifter's taps; on a `corrected` set they are
+     * the guide's where a guide counted it, and a set the sensor counted,
+     * corrected or not, writes none. On a straight-rep set carrying no
+     * tempo the lifter's taps are the only per-rep instants in the document:
+     * [repMetrics] entries carry no clock and [voiceCues] is what the app
+     * SAID.
      *
      * NO TRUE REP INSTANT IS STORED on a guided set, which is why the content
      * is kept and described rather than replaced; the name, and the raw

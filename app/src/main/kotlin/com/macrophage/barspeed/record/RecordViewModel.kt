@@ -5632,11 +5632,12 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         val restS = p.slot?.restS ?: DEFAULT_REST_S
         // How much of the rest is left now, against the instant frozen with
         // the write. That instant is a release that decided a hold's seconds
-        // (#259), else the set's own terminal cue -- the stamp SetEnd.calledOver
-        // reads -- and a set nothing called over falls back to the instant the
-        // write froze. #172. Since #141 a guided set the lifter ended early is
-        // not in that group (`endSet` speaks `SetEnd.STOPPED` before freezing
-        // the buffer), since #295 neither is a timed set its clock ended, whose
+        // (#259), else the instant `RestStart.of` reads off the set's record --
+        // a terminal cue `SetEnd.of` admits, or on a set no cadence ran the
+        // lifter's last `+1 REP` tap (#284 H1) -- and a set with none of those
+        // falls back to the instant the write froze. #172. Since #141 a
+        // guided set the lifter ended early is not in that group (`endSet`
+        // speaks `SetEnd.STOPPED` before freezing the buffer), since #295 neither is a timed set its clock ended, whose
         // `Time` is terminal, and since #288 neither is a timed set the lifter
         // ended with the timed voice on, which says `Set ended` at the tap.
         // It is READ here rather than worked out again, because

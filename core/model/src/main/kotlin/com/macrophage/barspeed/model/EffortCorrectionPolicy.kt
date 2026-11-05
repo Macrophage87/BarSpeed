@@ -77,14 +77,6 @@ object EffortCorrectionPolicy {
      * derived shortfall, which is what the line is coloured by. [tappedFailed]
      * is the lifter's own half of it (`RecordState.lastSetTappedFailed`), kept
      * apart for the reason [selection] keeps it apart (#169).
-     *
-     * SEAM ONLY at this commit: the unrated case returns the empty string,
-     * which stands for what the screen does today -- draw no line and, with
-     * it, no way into the correction grid. #168 makes that case reachable on
-     * every timed set, because an auto-ended hold is ended by the clock and
-     * not by a tap on the effort grid, so it arrives at rest with no rating
-     * and nothing on screen to give it one. The differential is in the commit
-     * after this.
      */
     fun lineText(ratedDescription: String?, failed: Boolean, tappedFailed: Boolean): String = when {
         ratedDescription != null && failed -> "$ratedDescription · short of target"

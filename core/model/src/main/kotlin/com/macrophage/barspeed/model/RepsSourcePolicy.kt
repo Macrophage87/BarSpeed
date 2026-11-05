@@ -30,8 +30,8 @@ enum class RepsSource(val wireName: String) {
      * `liveReps` is published beside it holding what the sensor said. On a
      * guided set (#336): the lifter recorded a count other than the one the
      * cadence guide called, and `guideReps` (export 1.26) holds the guide's
-     * count, its marks the calls themselves. Either way the correction and the figure it corrected are both
-     * readable.
+     * count, its marks the calls themselves. Either way the correction and
+     * the figure it corrected are both readable.
      */
     CORRECTED("corrected"),
 
@@ -67,14 +67,18 @@ enum class RepsSource(val wireName: String) {
  *
  * ## The three collapses, stated rather than hidden
  *
- * A corrected MANUAL set reads `manual`: a corrected tally is still the
- * lifter's statement, and nothing on the row records that the rest-screen
- * control was used. A corrected METRONOME set reads `corrected` where the
- * set's archived rep marks say what the guide called and the recorded count
- * differs from it (#336); it still reads `metronome` where no marks are
- * stored, the collapse that remains. A row written before the live count
- * existed reads `analysis` whenever `repsManual` is false, which is what such
- * a row's `actualReps` was: `set.manualReps ?: set.analysis.reps.size`.
+ * The first: a corrected MANUAL set reads `manual`, because a corrected tally
+ * is still the lifter's statement and nothing on the row records that the
+ * rest-screen control was used.
+ *
+ * The second: a corrected METRONOME set reads `corrected` where the set's
+ * archived rep marks say what the guide called and the recorded count
+ * differs from it (#336), but still reads `metronome` where no marks are
+ * stored.
+ *
+ * (Not a collapse: a row written before the live count existed reads
+ * `analysis` whenever `repsManual` is false, which is what such a row's
+ * `actualReps` was: `set.manualReps ?: set.analysis.reps.size`.)
  *
  * The third is [guideCounted]'s: a row with NO STORED GEOMETRY cannot say what
  * kind of exercise it was, so its tempo is read as the guide. That is right for

@@ -570,9 +570,11 @@ data class SetRecordEntity(
      * and the countdown and the next set's rest-HR window already read that
      * one value (#178). Stored so a measured rest can be computed from two
      * stored instants -- this and the next set's [startedAtMs] -- rather than
-     * assumed to be [endedAtMs]: the rule prefers a release that decided a
-     * hold's seconds, then the set's terminal cue, and falls back to the
-     * write instant only when neither exists.
+     * assumed to be [endedAtMs]: the rule, `RestStart.of`'s, prefers a
+     * release that decided a hold's seconds, then a terminal cue `SetEnd.of`
+     * admits (a cadence's `Done`, `Set ended`, `Time`), then on a set no
+     * cadence ran the lifter's last `+1 REP` tap, and falls back to the write
+     * instant only when none of those exists.
      *
      * NULL on every row written before v20. Nothing backfills it; the
      * migration re-derives nothing.
