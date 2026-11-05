@@ -33,23 +33,19 @@ const val TIMED_CLOSE_ENOUGH_FRACTION = TimedSetEndPolicy.CLOSE_ENOUGH_FRACTION
 suspend fun SessionRepository.flattenPlan(planSession: PlanSessionDef): List<PlannedSlot> {
     val slots = mutableListOf<PlannedSlot>()
     for ((exerciseIdx, exerciseDef) in planSession.exercises.withIndex()) {
-        val base = exerciseById(exerciseDef.exercise)
         // Plan-declared direction beats seed defaults and name inference: the
         // same movement pattern starts at the top on one machine and the
         // bottom on another, and no signal processing can tell which. The
-        // precedence itself now lives in SetGeometryPolicy, where a test runs
-        // on it every push. This function is a suspend extension on
-        // SessionRepository, so no test on the CI path calls it.
-        val exercise = SetGeometryPolicy.resolve(base, exerciseDef)
-        // Described from the definition that was resolved, not from the plan,
-        // so what the export publishes is what the DSP was handed.
-        val geometry = SetGeometryPolicy.describe(exercise, exerciseDef)
-        // Whether the stack inversion rule, and no written sensorInverted, set this
-        // exercise's inversion -- carried to the end of the set, where the
-        // analysed unit's own stream decides whether it stands on a stack mount
-        // the plan left to the stack table (#323); a written sensorOnStack true
-        // keeps it whatever the roll (#327).
-        val stackRuleApplied = SetGeometryPolicy.stackRuleApplied(base, exerciseDef)
+        // precedence, the geometry the export publishes and whether the stack
+        // inversion rule set this exercise's inversion are all one call into
+        // :core:model now (#65), where a test runs on them every push. This
+        // function is a suspend extension on SessionRepository, so no test on
+        // the CI path calls it. stackRuleApplied is carried to the end of the
+        // set, where the analysed unit's own stream decides whether it stands
+        // on a stack mount the plan left to the stack table (#323); a written
+        // sensorOnStack true keeps it whatever the roll (#327).
+        val (exercise, geometry, stackRuleApplied) =
+            SetGeometryPolicy.plannedExercise(exerciseById(exerciseDef.exercise), exerciseDef)
         exerciseDef.sets.forEachIndexed { setIdx, set ->
             // Which of the exercise's coaching keys the lifter reads without
             // touching the phone is decided in :core:model, where a test can

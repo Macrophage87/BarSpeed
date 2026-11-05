@@ -332,6 +332,52 @@ object SetLoadPolicy {
         plannedAddedKg?.let { totalKg(bodyweight, bodyWeightKg, it) }
 
     /**
+     * The three load figures a finished set is written with, from the five
+     * facts the set-end path holds (#65).
+     *
+     * `RecordViewModel.endSet` used to compose them inline from [resolve],
+     * [totalKg] and [recordedPlannedLoadKg], and #65 measured what that cost:
+     * putting the typed field back into [resolve]'s answer, or the
+     * body-weight-inclusive total where the ADDED load belongs, left the whole
+     * suite green while the set recorded a wrong number, because no test can
+     * reach a private function in a ViewModel. The composition now runs here,
+     * one call at the one site, and its parts are pinned in
+     * `RecordedLoadTest` against the same three functions it calls.
+     *
+     * [declaredPlannedAddedKg] is the slot's FROZEN plan declaration
+     * (`plannedLoadKg`), never [plannedAddedKg], which is the slot's live
+     * `loadKg` and carries the lifter's standing statement once it has been
+     * baked in. Those two are the same type and the same unit, and that is
+     * the hazard #65's comment names and this does not remove: a caller
+     * passing one where the other belongs compiles. Named arguments at the
+     * call site make a transposition of LINES inert; a swap of VALUES needs
+     * distinct types for the two loads, which would change [resolve]'s
+     * signature and its nineteen call sites in `SetLoadPolicyTest`, and is not
+     * done here.
+     */
+    fun recordedLoad(
+        adHoc: Boolean,
+        plannedAddedKg: Double?,
+        typedAddedKg: Double?,
+        statedAddedKg: Double?,
+        bodyweight: Boolean,
+        bodyWeightKg: Double?,
+        declaredPlannedAddedKg: Double?,
+    ): RecordedLoad {
+        val addedKg = resolve(
+            adHoc = adHoc,
+            plannedAddedKg = plannedAddedKg,
+            typedAddedKg = typedAddedKg,
+            statedAddedKg = statedAddedKg,
+        )
+        return RecordedLoad(
+            addedKg = addedKg,
+            loadKg = totalKg(bodyweight, bodyWeightKg, addedKg),
+            plannedLoadKg = recordedPlannedLoadKg(bodyweight, bodyWeightKg, declaredPlannedAddedKg),
+        )
+    }
+
+    /**
      * Must this set be refused until the lifter states a body weight? (#61)
      *
      * The one question [totalKg] cannot answer for itself. Given
@@ -721,3 +767,13 @@ object SetLoadPolicy {
         return ConvertedLoad(text, kg)
     }
 }
+
+/**
+ * The load figures a finished set is recorded with ([SetLoadPolicy.recordedLoad]).
+ *
+ * [addedKg] is what the lifter ADDED, negative for assistance on body-weight
+ * work; [loadKg] the total that travelled, the lifter's own mass included on
+ * body-weight work; [plannedLoadKg] the plan's declaration on the same scale
+ * as [loadKg], null where the slot declared none.
+ */
+data class RecordedLoad(val addedKg: Double, val loadKg: Double, val plannedLoadKg: Double?)
