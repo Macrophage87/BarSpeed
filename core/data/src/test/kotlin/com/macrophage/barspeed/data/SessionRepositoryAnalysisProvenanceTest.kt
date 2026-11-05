@@ -85,37 +85,36 @@ class SessionRepositoryAnalysisProvenanceTest {
         override suspend fun byId(id: String): CustomExerciseEntity? = null
     }
 
-    private fun completedSet() =
-        CompletedSet(
-            exerciseId = "back_squat",
-            exerciseName = "Back Squat",
-            loadKg = 100.0,
-            plannedLoadKg = 100.0,
-            workingLoadKg = 100.0,
-            plannedReps = 5,
-            manualReps = 5,
-            actualDurationS = null,
-            plannedDurationS = null,
-            tempo = null,
-            targetMeanConVelMps = null,
-            velocityLossStopPct = null,
-            plannedRestS = null,
-            restStartedAtMs = 31_000L,
-            plannedPrepS = null,
-            prepS = null,
-            startedAtMs = 1_000L,
-            endedAtMs = 31_000L,
-            analysis =
-            SetAnalysis(
-                reps = emptyList(),
-                sampleRateHz = 99.4,
-                velocityLossPct = null,
-                tempoCompliance = null,
-                verdicts = emptyList(),
-            ),
-            imuSamples = emptyList(),
-            hrSamples = emptyList(),
-        )
+    private fun completedSet() = CompletedSet(
+        exerciseId = "back_squat",
+        exerciseName = "Back Squat",
+        loadKg = 100.0,
+        plannedLoadKg = 100.0,
+        workingLoadKg = 100.0,
+        plannedReps = 5,
+        manualReps = 5,
+        actualDurationS = null,
+        plannedDurationS = null,
+        tempo = null,
+        targetMeanConVelMps = null,
+        velocityLossStopPct = null,
+        plannedRestS = null,
+        restStartedAtMs = 31_000L,
+        plannedPrepS = null,
+        prepS = null,
+        startedAtMs = 1_000L,
+        endedAtMs = 31_000L,
+        analysis =
+        SetAnalysis(
+            reps = emptyList(),
+            sampleRateHz = 99.4,
+            velocityLossPct = null,
+            tempoCompliance = null,
+            verdicts = emptyList(),
+        ),
+        imuSamples = emptyList(),
+        hrSamples = emptyList(),
+    )
 
     /**
      * The row names the build's own [SessionExport.SCHEMA_VERSION], read at
