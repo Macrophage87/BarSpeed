@@ -29,7 +29,12 @@ data class PlanImportSummary(
 sealed interface PlanImportResult {
     data class Staged(val summary: PlanImportSummary) : PlanImportResult
 
-    data class Invalid(val errors: List<String>) : PlanImportResult
+    /**
+     * A refused document. [warnings] are the non-blocking notes the same
+     * parse produced, carried beside the errors so a document with a real
+     * error AND a near-miss key can show both (#58).
+     */
+    data class Invalid(val errors: List<String>, val warnings: List<String> = emptyList()) : PlanImportResult
 }
 
 /**
@@ -85,6 +90,27 @@ class PlanRepository(
      * to show it now would only hide it.
      */
     fun decode(entity: PlanEntity): PlanFile? = PlanImport.parse(entity.json).plan
+
+    /**
+     * The approval gate's summary for a plan ALREADY stored, with the
+     * warnings recomputed from its text (#58).
+     *
+     * `PlanEntity` stores only the JSON, so the warnings the import dialog
+     * showed exist nowhere once it is dismissed, and a staged plan stays one
+     * "Make active" tap from active. They are recomputed rather than stored
+     * because [PlanImport.parse] is the one decoder both paths use: the same
+     * text gives the same warnings, with no Room column and no migration.
+     * Null when the text no longer decodes.
+     *
+     * The body weight is not re-applied from here: [PlanImportSummary.bodyWeightKg]
+     * is what the import wrote, and the caller decides whether to write it
+     * again.
+     */
+    fun reviewSummary(entity: PlanEntity): PlanImportSummary? {
+        val parsed = PlanImport.parse(entity.json)
+        val plan = parsed.plan ?: return null
+        return summaryOf(entity.id, plan, parsed.warnings)
+    }
 
     fun summaryOf(id: Long, plan: PlanFile, warnings: List<String>): PlanImportSummary = PlanImportSummary(
         planId = id,
