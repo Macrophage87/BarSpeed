@@ -94,11 +94,17 @@ object SessionResumePolicy {
      * captured since its last set ended, or, with no set yet, since the
      * session was picked.
      *
-     * Groundwork: passes [samples] through in every case, which is what the
-     * close did before this function existed.
+     * A continued session that has recorded no set on this visit writes no
+     * window. The close attaches the window to the row's last set, which is
+     * then the earlier visit's, and what this visit captured is the heart
+     * rate on READY, up to [RESUME_WINDOW_MS] later: written there it would
+     * state "the window after the last set" about samples that are not. The
+     * window the earlier visit captured after that set was in its memory and
+     * is gone, so the set keeps no window rather than a wrong one. Once this
+     * visit has written a set, the window is that set's, continued or not.
      */
-    @Suppress("UnusedParameter") // The rule arrives with its red (#48); today the window is written whole.
-    fun closeRestHr(resumedAtOrderIdx: Int?, setsCompleted: Int, samples: List<HrSample>): List<HrSample> = samples
+    fun closeRestHr(resumedAtOrderIdx: Int?, setsCompleted: Int, samples: List<HrSample>): List<HrSample> =
+        if (resumedAtOrderIdx != null && setsCompleted <= resumedAtOrderIdx) emptyList() else samples
 
     /** The prompt's title. */
     const val TITLE = "Continue this session?"
@@ -112,11 +118,18 @@ object SessionResumePolicy {
     /**
      * The prompt's body, for [latest] and its start time as the screen
      * renders it, [startedAt].
+     *
+     * It says what continuing does that the lifter cannot see from the
+     * prompt alone: the sets go into this row whichever session is picked
+     * next, so the row keeps its own plan session's name over sets recorded
+     * under another, and a plan's queue starts again at its first slot,
+     * because where the earlier visit stood in it was never stored.
      */
     fun body(latest: LatestSession, startedAt: String): String {
         val name = latest.planSessionName?.let { " ($it)" } ?: ""
         val sets = if (latest.setCount == 1) "1 set" else "${latest.setCount} sets"
         return "You left a session$name open, started at $startedAt, with $sets saved. Continue it and the " +
-            "sets you record next are added to it. Start a new one and it stays as it is, with no end time."
+            "sets you record next are added to it, whichever session you pick; a plan starts again from its " +
+            "first set. Start a new one and it stays as it is, with no end time."
     }
 }

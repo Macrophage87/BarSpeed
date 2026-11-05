@@ -103,8 +103,12 @@ object RestControlPolicy {
      * the failed close had landed, so nothing written is left behind.
      *
      * Every other state is returned unchanged. From NONE there is nothing to
-     * drop, and IN_FLIGHT and REST_UNSAVED do not draw START NEXT SET, so no
-     * set is started from them.
+     * drop. IN_FLIGHT and REST_UNSAVED start no set through either door: the
+     * rest screen does not draw START NEXT SET in them, and READY, the second
+     * door, asks [readyMayStartSet], which refuses them too. Until review
+     * round 1 of 0.2.0 this paragraph said "do not draw START NEXT SET, so no
+     * set is started from them", which READY's ungated START SET made false;
+     * READY's door now applies this function as the rest screen's does.
      */
     fun closeOnNextSet(close: SessionCloseState): SessionCloseState =
         if (close == SessionCloseState.FAILED) SessionCloseState.NONE else close
@@ -117,13 +121,19 @@ object RestControlPolicy {
      * as the rest screen does, so a close can be asked for there, and it is
      * reached with a session row both by a continued session (#48) and by a
      * body-weight refusal taken from the rest screen. Its START SET was drawn
-     * whatever the close was doing.
+     * whatever the close was doing, so the three hazards the rest screen
+     * guards against were open there: a set started under an in-flight close
+     * has FINISHED written over it; a set started after the session write
+     * landed (REST_UNSAVED) is recorded into a session that has already
+     * ended; and a set started after a failed close left the frozen close to
+     * be replayed over a set list that had grown since (#49).
      *
-     * Groundwork: answers true in every state, which is what READY did before
-     * this function existed.
+     * The answer is the rest screen's own close rule, read from [controls],
+     * so the two doors cannot disagree. It ignores the queue: READY always
+     * has a set to start. A caller that starts one from a FAILED close drops
+     * the frozen copy through [closeOnNextSet], as the rest screen does.
      */
-    @Suppress("UnusedParameter", "FunctionOnlyReturningConstant") // The rule arrives with its red (#49).
-    fun readyMayStartSet(close: SessionCloseState): Boolean = true
+    fun readyMayStartSet(close: SessionCloseState): Boolean = RestControl.START_NEXT_SET in controls(close)
 
     /**
      * The controls to draw while the close is in [close] and the lifter has
