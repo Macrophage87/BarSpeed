@@ -1204,13 +1204,19 @@ data class PlanExerciseDef(
      * Lifted out of `PlanDetailScreen`, where it was the inline expression
      * `exercise.bodyweight ?: false` beside a comment saying it did not see
      * the seed default, so that the decision runs here where a test can reach
-     * it. Lifted as it stood, defect included: it reads the RAW declaration,
-     * so an omitted key on a built-in body-weight id displays as loaded work
-     * on the same screen whose import warning says the set will be recorded
-     * as body weight.
+     * it. It reads the SEEDED answer, through the same
+     * [SetGeometryPolicy.bodyweightMount] `resolve()` and the record path use,
+     * so an omitted key on a built-in body-weight id is drawn as the body-
+     * weight work it will be recorded as. It used to read the raw declaration,
+     * and drew a seeded pull-up at +10 kg as "10 kg" on the screen whose own
+     * import warning said it would record as body weight plus 10 kg.
      */
     val approvalBodyweight: Boolean
-        get() = bodyweight ?: false
+        get() = SetGeometryPolicy.bodyweightMount(
+            exercise,
+            ExerciseDef.seedById(exercise)?.bodyweight ?: false,
+            declared = bodyweight,
+        )
 
     /**
      * Start-phase override, when the plan pins one. Combines the two declared
