@@ -453,6 +453,28 @@ class DatabaseRescueTest {
         assertTrue(file.isFile && File(file.path + "-wal").isFile, "a current database was moved")
     }
 
+    // ---- issue #113: the differential -------------------------------------
+
+    /**
+     * THE MISSED RESCUE. The main file says 10, the log SQLite will read
+     * says 21, and this build knows 20. Room, opening it, would see 21 and
+     * throw on every launch; the rescue, reading only the main file, saw 10
+     * and did nothing.
+     */
+    @Test
+    fun `storedVersion reads the version SQLite would, through an un-checkpointed wal`() {
+        assertEquals(21, DatabaseRescue.storedVersion(staleUnderWal()))
+    }
+
+    @Test
+    fun `a database newer only in its wal is rescued, wal and all`() {
+        val file = staleUnderWal()
+        val rescued = assertIsRescued(DatabaseRescue.rescue(file, rescueRoot(), 20))
+        assertTrue(!file.exists() && !File(file.path + "-wal").exists(), "part of the newer database was left in place")
+        val movedLog = File(rescued, file.name + "-wal").readBytes()
+        assertEquals(realWal.toList(), movedLog.toList(), "the log was not moved intact")
+    }
+
     private fun opens(file: File): Boolean = runCatching { file.inputStream().use { it.read() } }.isSuccess
 
     /**
