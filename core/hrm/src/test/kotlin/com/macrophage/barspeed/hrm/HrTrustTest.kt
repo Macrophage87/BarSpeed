@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.hrm
 
 import com.macrophage.barspeed.model.HrSample
+import com.macrophage.barspeed.model.SensorContact
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -36,6 +37,30 @@ class HrTrustTest {
     @Test
     fun `a sample carrying no R-R interval is trusted on its bpm alone`() {
         assertTrue(HrTrust.isTrusted(sample(46)))
+    }
+
+    /**
+     * Contact is consulted only where the R-R field is silent (#82), so a
+     * sample whose own reported intervals are possible is not overruled by
+     * the contact bit. That is the scope the change was written to, kept
+     * narrow because no capture held here has ever carried the bits.
+     */
+    @Test
+    fun `a sample with possible R-R intervals is trusted whatever the contact bit says`() {
+        assertTrue(HrTrust.isTrusted(sample(72, 830.0).copy(contact = SensorContact.NOT_DETECTED)))
+        assertTrue(HrTrust.isTrusted(sample(72, 830.0).copy(contact = SensorContact.DETECTED)))
+    }
+
+    /**
+     * A strap that says nothing about contact keeps the old behaviour, and so
+     * does every capture written before the column existed: silencing on
+     * missing evidence would withhold heart rate from a compliant strap on
+     * every set, which #82's own ruling refuses.
+     */
+    @Test
+    fun `no R-R and no contact report is still trusted on its bpm`() {
+        assertTrue(HrTrust.isTrusted(sample(72).copy(contact = SensorContact.NOT_RECORDED)))
+        assertTrue(HrTrust.isTrusted(sample(72).copy(contact = SensorContact.DETECTED)))
     }
 
     /**
