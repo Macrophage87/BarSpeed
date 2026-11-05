@@ -64,6 +64,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.macrophage.barspeed.dsp.AccelArtefact
 import com.macrophage.barspeed.dsp.CoachingRules
+import com.macrophage.barspeed.dsp.LivePhaseCaption
 import com.macrophage.barspeed.dsp.PhaseTempoTarget
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.VelocityLoss
@@ -3023,12 +3024,17 @@ private fun TempoRing(state: RecordState, slot: PlannedSlot?) {
 
     ProgressRing(progress = progress, ghostProgress = ghost, color = ringColor) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                phaseLabel(phase).uppercase(),
-                style = MaterialTheme.typography.labelMedium,
-                color = BarColors.Sub,
-                letterSpacing = 2.sp,
-            )
+            // The words are LivePhaseCaption's, in :core:dsp, where they are
+            // pinned against the lift's drive direction and the #95
+            // withdrawal; null draws no caption.
+            LivePhaseCaption.of(phase, state.currentExercise.liftDirection(), state.live.phaseLabelWithdrawn)?.let {
+                Text(
+                    it.uppercase(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = BarColors.Sub,
+                    letterSpacing = 2.sp,
+                )
+            }
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
                     if (moving) {
@@ -3089,14 +3095,6 @@ private fun velocityColor(phase: Phase): Color = when (phase) {
     Phase.CONCENTRIC -> BarColors.Volt
     Phase.ECCENTRIC -> BarColors.Blue
     else -> BarColors.Sub
-}
-
-private fun phaseLabel(phase: Phase): String = when (phase) {
-    Phase.IDLE -> "Ready"
-    Phase.ECCENTRIC -> "Lowering"
-    Phase.BOTTOM_PAUSE -> "Bottom pause"
-    Phase.CONCENTRIC -> "Driving up"
-    Phase.TOP_PAUSE -> "Lockout"
 }
 
 /**

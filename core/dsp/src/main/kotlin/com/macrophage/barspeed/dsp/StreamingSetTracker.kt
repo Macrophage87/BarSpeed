@@ -90,6 +90,18 @@ data class LiveSetState(
      * (#305). NULL on a state no sample produced, for [accMagnitudeG]'s reason.
      */
     val quiet: Boolean? = null,
+    /**
+     * True while the movement run in progress has outlasted
+     * [StreamingSetTracker.MAX_LABELLED_RUN_S] and [phase] has been withdrawn
+     * to [Phase.IDLE] for it (#95).
+     *
+     * [Phase.IDLE] alone cannot say this: it is also the state before an
+     * eccentric-first lift's first stroke, which the ring captions "Ready".
+     * A withdrawn label mid-set is not that state, so it is published as a
+     * fact of its own rather than read off the phase. Read by
+     * [LivePhaseCaption]; nothing counts a rep from it.
+     */
+    val phaseLabelWithdrawn: Boolean = false,
 )
 
 /**
@@ -258,6 +270,7 @@ class StreamingSetTracker(
                 accelMps2 = accel,
                 accMagnitudeG = FrameTransform.accMagnitudeG(sample),
                 quiet = quietSample,
+                phaseLabelWithdrawn = labelWithdrawn,
             )
         return state
     }
@@ -444,8 +457,12 @@ class StreamingSetTracker(
 
         /**
          * The longest a movement run in progress may be NAMED a movement
-         * phase, s (#95). Past it [LiveSetState.phase] withdraws the label --
-         * [Phase.IDLE], the state that names no phase -- until the run ends.
+         * phase, s (#95). Past it [LiveSetState.phase] withdraws the label to
+         * [Phase.IDLE] until the run ends, with
+         * [LiveSetState.phaseLabelWithdrawn] set so a reader can tell it from
+         * the IDLE before an eccentric-first lift's first stroke. What the
+         * ring draws for it is [LivePhaseCaption]'s. This used to call IDLE
+         * "the state that names no phase"; the ring captioned it "Ready".
          *
          * Without it a drift run holds `Lowering` or `Driving up` for as long
          * as the drift lasts: 24.3 s on `field-bench-rotating-6rep`, 51.1 s on
