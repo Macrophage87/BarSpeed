@@ -755,14 +755,17 @@ abstract class AppDatabase : RoomDatabase() {
          * silently dropping every table. Loud beats quiet when the alternative
          * is a corpus that cannot be rebuilt.
          *
-         * If the rescue cannot complete there is nothing further to do and
-         * nothing further is done: Room meets the newer main file and throws.
-         * What "nothing further is done" means for what is still where it was
-         * is [RescueOutcome.Failed]'s own KDoc to state, not repeated here --
-         * an earlier version of this exact sentence claimed the original was
-         * untouched, a gate found that false for a mid-move failure, and it
-         * was deleted there rather than reworded. A crash with the data
-         * recoverable beats a clean start with it gone.
+         * If the rescue cannot complete, this throws rather than opening. It
+         * used to leave that to Room ("Room meets the newer main file and
+         * throws"), which stopped being true at issue #113's fix: when the
+         * newer version was only in the `-wal` and the `-wal` has already
+         * moved, the main file left at the path reads older, and Room would
+         * open it -- a pre-checkpoint snapshot, with the committed sets in a
+         * rescue directory. Round 1's review found it. What is still where it
+         * was is [RescueOutcome.Failed]'s own KDoc to state, not repeated
+         * here. The next launch finishes the rescue into the same directory
+         * (see [DatabaseRescue.rescue]). A crash with the data recoverable
+         * beats a clean start with it gone, and beats an open of half of it.
          *
          * A ROLLBACK IS WHAT REACHES ANY OF THIS. [DATABASE_VERSION] is 20
          * here, so once a phone has opened this build, installing any build
@@ -791,11 +794,14 @@ abstract class AppDatabase : RoomDatabase() {
             check(restored !is RestoreOutcome.Stuck || restore.safeToOpen()) {
                 "a restore could go neither forward nor back and left a sidecar with no database beside it: $restored"
             }
-            DatabaseRescue.rescue(
+            val rescued = DatabaseRescue.rescue(
                 databaseFile = databaseFile,
                 rescueRoot = rescueRoot,
                 compiledVersion = DATABASE_VERSION,
             )
+            check(rescued !is RescueOutcome.Failed) {
+                "a newer database could not be moved aside, or a rescue could not be finished: $rescued"
+            }
             return Room.databaseBuilder(context, AppDatabase::class.java, DATABASE_NAME)
                 // One at a time rather than a spread: detekt's `SpreadOperator`
                 // is on, and a copy of the array per open is a cost with no
