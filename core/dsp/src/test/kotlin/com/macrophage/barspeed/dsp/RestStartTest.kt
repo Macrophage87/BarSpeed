@@ -60,4 +60,30 @@ class RestStartTest {
         val marks = taps(6)
         assertEquals(marks.last(), RestStart.of(milestones(marks), cadenceGuided = false, marks, null, endedAtMs))
     }
+
+    /**
+     * #284 H1: a lifter who taps past the planned count did those reps, and
+     * the rest begins when they stopped -- at their LAST tap, not at the
+     * milestone the sixth tap spoke. Eight taps on a six-rep slot: the
+     * milestone is 4 s before the lifter stopped.
+     */
+    @Test
+    fun `a manual set tapped past the plan rests from the last tap, not from the milestone`() {
+        val marks = taps(8)
+        assertEquals(marks.last(), RestStart.of(milestones(marks), cadenceGuided = false, marks, null, endedAtMs))
+    }
+
+    /**
+     * #284 H1, the one-flag-several-jobs half: the audio-cue toggle decides
+     * whether the milestone is written at all, so it must not decide when a
+     * set's rest began. The same eight taps with the cues off and on.
+     */
+    @Test
+    fun `the cue toggle does not move a manual set's rest`() {
+        val marks = taps(8)
+        val cuesOff = RestStart.of(emptyList(), cadenceGuided = false, marks, null, endedAtMs)
+        val cuesOn = RestStart.of(milestones(marks), cadenceGuided = false, marks, null, endedAtMs)
+        assertEquals(cuesOn, cuesOff)
+        assertEquals(marks.last(), cuesOff)
+    }
 }
