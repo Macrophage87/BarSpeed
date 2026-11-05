@@ -178,9 +178,9 @@ object BlePermissionPolicy {
      * could still be legal with `BLUETOOTH_CONNECT` alone denied.
      *
      * Keying on `BLUETOOTH_CONNECT` is therefore a deliberate over-degrade,
-     * and it is fail-safe under either reading: `MainActivity.kt:41-44`
-     * requests SCAN and CONNECT in one `RequestMultiplePermissions` call so
-     * they move together, and the only available error is claiming
+     * and it is fail-safe under either reading: `MainActivity.ensureAskedAgain`
+     * requests every name in [runtimePermissions], SCAN and CONNECT among
+     * them, in one `RequestMultiplePermissions` call so they move together, and the only available error is claiming
      * `SPECIAL_USE` where `CONNECTED_DEVICE` would also have been allowed,
      * which costs a Play-policy label rather than a recording.
      */
