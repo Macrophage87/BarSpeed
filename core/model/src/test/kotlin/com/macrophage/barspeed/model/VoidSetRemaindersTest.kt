@@ -2,6 +2,7 @@ package com.macrophage.barspeed.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -46,5 +47,25 @@ class VoidSetRemaindersTest {
         assertTrue("\"app re-armed the slot\"" in text, text)
         assertTrue("deleted" in text, text)
         assertTrue("cannot be brought back" in text, text)
+    }
+
+    /**
+     * THE DEFECT (#232, item 3). Un-void clears the stored reason with the
+     * mark, on one tap with no question, so a mistap deletes the lifter's own
+     * words with no way back. Where a reason is stored, it asks first.
+     */
+    @Test
+    fun `taking the mark off a set with a reason asks first`() {
+        assertTrue(VoidSetPolicy.unvoidAsks("app re-armed the slot"))
+    }
+
+    /**
+     * The other side: with no reason stored there is nothing to lose, and the
+     * tap stays one tap. `SessionRepository.setVoided` stores a blank reason
+     * as null (`VoidSetPolicy.reason`), so null is the only "no reason".
+     */
+    @Test
+    fun `taking the mark off a set with no reason does not ask`() {
+        assertFalse(VoidSetPolicy.unvoidAsks(null))
     }
 }
