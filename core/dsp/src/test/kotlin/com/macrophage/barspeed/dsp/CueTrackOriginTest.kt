@@ -210,7 +210,7 @@ class CueTrackOriginTest {
                 // A call takes the word of the beat it rides, on every rep it is
                 // spoken on: every rep but the first when it rides beat 0, and
                 // every rep including the first when it rides a later beat.
-                val keepsBoth = replaced == null || (rep == 1 && !p.announcesAtConcentricEnd)
+                val keepsBoth = replaced == null || (rep == 1 && !p.namesRepOne)
                 val expected = if (keepsBoth) words else words - replaced
                 assertEquals(
                     expected,

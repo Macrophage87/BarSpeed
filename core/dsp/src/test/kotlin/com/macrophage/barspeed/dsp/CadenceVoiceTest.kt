@@ -289,7 +289,7 @@ class CadenceVoiceTest {
         // digit 2's pause sits INSIDE the rep and the drive closes it.
         corpus.forEach { (tempo, direction, reps) ->
             val p = plan(tempo, direction)
-            val firstNamed = if (p.announcesAtConcentricEnd) 1 else 2
+            val firstNamed = if (p.namesRepOne) 1 else 2
             val decided = (firstNamed..reps).mapNotNull { p.announcementFor(it, reps) }
             val recorded = CadenceVoice.script(p, reps)
                 .flatMap { it.recorded }

@@ -188,7 +188,7 @@ object CadenceVoice {
         // so those plans open with nothing pending and rep 2 is the first named.
         // A call at the end of the drive replaces a LATER beat's word, which rep
         // 1 has as much as any other rep, so rep 1 is named there (#266).
-        var pending: String? = if (plan.announcesAtConcentricEnd) plan.announcementFor(rep, plannedReps) else null
+        var pending: String? = if (plan.namesRepOne) plan.announcementFor(rep, plannedReps) else null
         var lastRep = false
         while (true) {
             for ((index, beat) in plan.beats.withIndex()) {

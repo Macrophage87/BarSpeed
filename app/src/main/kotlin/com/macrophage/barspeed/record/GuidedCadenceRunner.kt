@@ -124,7 +124,7 @@ class GuidedCadenceRunner(
                 // CadenceVoice.script, which models this loop; LockoutRepCallTest
                 // scores that model against two recorded 1010 sets.
                 var pending: String? =
-                    if (plan.announcesAtConcentricEnd) plan.announcementFor(rep, plannedReps) else null
+                    if (plan.namesRepOne) plan.announcementFor(rep, plannedReps) else null
                 var lastRep = false
                 while (true) {
                     for ((index, beat) in plan.beats.withIndex()) {

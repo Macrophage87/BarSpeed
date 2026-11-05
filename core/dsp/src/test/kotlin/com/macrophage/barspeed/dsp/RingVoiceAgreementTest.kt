@@ -137,7 +137,7 @@ class RingVoiceAgreementTest {
             }
             // Rep 1 is named only where the call rides a beat the rep has
             // already begun: its first beat's word is the start cue (#241).
-            val expectedCalls = if (plan.announcesAtConcentricEnd) planned else planned - 1
+            val expectedCalls = if (plan.namesRepOne) planned else planned - 1
             assertEquals(expectedCalls, calls.size, "$tempo: one call per named rep")
             // Seconds from the start of a rep to its call, which is 0 on a plan
             // that opens the rep with it.

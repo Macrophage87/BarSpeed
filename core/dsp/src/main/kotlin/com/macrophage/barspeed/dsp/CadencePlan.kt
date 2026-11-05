@@ -407,6 +407,25 @@ data class CadencePlan(
      * none, and a flag with one value is a fact nothing can check.
      */
     val announceOnBeat: Int?,
+    /**
+     * True when the rep number lands at the END OF THE DRIVE rather than at the
+     * start of the rep -- the placement #266 gives the plans #293 leaves silent.
+     *
+     * Read as a Boolean by exactly one caller, the prep countdown, through
+     * `RepCallNotePolicy` in `:core:model`: a set announcing at the drive's end
+     * draws one line saying so and no other set does.
+     *
+     * A STORED FIELD, set by [of] beside the placement it describes. It was
+     * written as "[announceOnBeat] is past the rep's first beat", on the ground
+     * that [of] placed a call on beat 0 or on the beat that opens as the
+     * concentric ends and nothing else; that getter's own KDoc said a third
+     * placement should make it a field rather than widen the arithmetic, and
+     * this is that change, made before the third placement arrives so the
+     * move is behaviour-preserving on its own. "Is rep 1 named" is a
+     * different question with a different answer, and is [namesRepOne].
+     * `CadencePlanTest` pins the partition by geometry.
+     */
+    val announcesAtConcentricEnd: Boolean,
 ) {
     /** Seconds the metronome will actually play per rep. */
     val deliveredCycleS: Int get() = beats.sumOf { it.seconds }
@@ -444,22 +463,19 @@ data class CadencePlan(
         get() = if (announceOnBeat == null) 0 else repCompleteAfterBeat - announceOnBeat + 1
 
     /**
-     * True when the rep number lands at the END OF THE DRIVE rather than at the
-     * start of the rep -- the placement #266 gives the plans #293 leaves silent.
+     * True when rep 1 is named: the call replaces a LATER beat's word than
+     * beat 0, which rep 1 has like any other rep. On a plan whose call rides
+     * beat 0 rep 1 is not named, because beat 0's word on rep 1 is the start
+     * cue under #241's contract.
      *
-     * Read as a Boolean by exactly one caller, the prep countdown, through
-     * `RepCallNotePolicy` in `:core:model`: a set announcing at the drive's end
-     * draws one line saying so and no other set does.
-     *
-     * Written as "[announceOnBeat] is past the rep's first beat" and not as a
-     * stored field, because [of] places a call on beat 0 or on the beat that
-     * opens as the concentric ends and on nothing else, so the two placements
-     * partition the speaking plans. A THIRD placement would make this sentence
-     * false, and a reader adding one should make it a field rather than widen
-     * the arithmetic: `CadencePlanTest` pins the partition by geometry, so the
-     * pin reds rather than the claim quietly drifting.
+     * `CadenceVoice.script` and `GuidedCadenceRunner` read this to decide
+     * whether the set opens with a call pending. They read
+     * [announcesAtConcentricEnd] until it was split from this: the two had the
+     * same answer on every plan [of] built, because the only call past beat 0
+     * was #266's at the drive's end, and a flag doing two jobs is the class
+     * that makes a third placement land wrong in one of them.
      */
-    val announcesAtConcentricEnd: Boolean get() = announceOnBeat != null && announceOnBeat > 0
+    val namesRepOne: Boolean get() = announceOnBeat != null && announceOnBeat > 0
 
     /**
      * What the guide says about rep [repNowDue] of [plannedReps], or null when
@@ -594,7 +610,7 @@ data class CadencePlan(
                 // stroke's spoken word on every rep after the first, so the
                 // lifter hears the rep begin. `CadenceVoice` does the replacing
                 // and renumbers that stroke's counts from the number.
-                return CadencePlan(beats, secondStroke, announceOnBeat = 0)
+                return CadencePlan(beats, secondStroke, announceOnBeat = 0, announcesAtConcentricEnd = false)
             }
             // Two one-second strokes and no closing pause, so no second at the
             // START of the rep is free. The owner ruled these count at the
@@ -603,7 +619,12 @@ data class CadencePlan(
             // rep opens with, and no beat of this cycle at all when it is the
             // stroke the rep ends on. See "Where the rep announcement goes".
             val driveEnd = if (schedule.first.isConcentric) 1 else null
-            return CadencePlan(beats, secondStroke, announceOnBeat = driveEnd)
+            return CadencePlan(
+                beats,
+                secondStroke,
+                announceOnBeat = driveEnd,
+                announcesAtConcentricEnd = driveEnd != null,
+            )
         }
 
         private fun stroke(label: String, seconds: Int) = CadenceBeat(
