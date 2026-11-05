@@ -144,6 +144,37 @@ class SchemaVelocityLossRegimeContractTest {
         )
     }
 
+    /**
+     * 1.26 (#258, lane L5's follow-up): THE RULE did not change, but plan
+     * schema 1.15 made one of its answers reachable. Before it no plan could
+     * write `X` in digit 1, so a vertical concentric-down set with a tempo was
+     * always `controlled`; from it `X010` on a lat pulldown is `maxIntent`. A
+     * reader comparing a 1.25 export with a 1.26 one sees a word it could not
+     * see before, so the log files it, once, beside the decision it describes.
+     */
+    @Test
+    fun `the 1_26 log files the explosive digit 1 that plan 1_15 made reachable`() {
+        val log = versionLog()
+        val marker = "1.26 (#258, `velocityLossRegime` on an explosive digit 1)"
+        assertEquals(1, log.split(marker).size - 1, "the 1.26 #258 entry is not filed exactly once")
+        val entry = log.substringAfter(marker).substringBefore(" 1.26 (")
+        val facts =
+            listOf(
+                "`X010`",
+                "lat pulldown",
+                "bench press",
+                "plan schema 1.15",
+                "DATABASE_VERSION does NOT move",
+            )
+        for (fact in facts) {
+            assertTrue(fact in entry, "the 1.26 #258 entry does not state: $fact")
+        }
+        val pulldown = VelocityLossRegime.of("X010", concentricUp = false, horizontal = false, ExerciseKind.DYNAMIC)
+        val bench = VelocityLossRegime.of("X010", concentricUp = true, horizontal = false, ExerciseKind.DYNAMIC)
+        assertEquals(VelocityLossRegime.MAX_INTENT, pulldown, "the entry describes a pulldown the decision does not")
+        assertEquals(VelocityLossRegime.CONTROLLED, bench, "the entry describes a bench press the decision does not")
+    }
+
     // ---- 3. the reading rule on the key and on velocityLoss_pct ----
 
     @Test
