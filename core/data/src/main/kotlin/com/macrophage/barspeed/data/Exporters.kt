@@ -968,9 +968,8 @@ fun SetRecordEntity.repsSourceOf(kind: ExerciseKind?, guideCalls: Int?): RepsSou
  * counts. `runCatching` for the reason the session document's own rep-mark
  * decode gives: a mark is the least of what either document carries.
  */
-fun List<RawStreamEntity>.guideCalls(): Int? =
-    firstOrNull { it.kind == RawStreamEntity.KIND_REPS }
-        ?.let { stream -> runCatching { RepMarkCsv.decode(Gzip.decompress(stream.csvGzip)).size }.getOrNull() }
+fun List<RawStreamEntity>.guideCalls(): Int? = firstOrNull { it.kind == RawStreamEntity.KIND_REPS }
+    ?.let { stream -> runCatching { RepMarkCsv.decode(Gzip.decompress(stream.csvGzip)).size }.getOrNull() }
 
 /** [repsSourceOf] as the word both export writers publish. */
 private fun SetRecordEntity.publishedRepsSource(kind: ExerciseKind?, guideCalls: Int?): String? =
