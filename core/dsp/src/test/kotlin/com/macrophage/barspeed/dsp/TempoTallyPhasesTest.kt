@@ -18,8 +18,9 @@ import kotlin.test.assertTrue
  * older builds wrote flags the 1.26 `byPhase` contract cannot carry: before
  * v0.1.31 there is no `scored` key, so a pause decodes as scored; v0.1.31 to
  * v0.1.35 mark a prescribed movement phase scored with `repsEvaluated` 0
- * when no rep resolved it. Each case below is one of those shapes, built the
- * way the stored JSON reads, and decoded by the current serializer.
+ * when no rep resolved it. The pre-v0.1.31 case is decoded by the current
+ * serializer from JSON with every `scored` key deleted; the others are
+ * constructed directly in the shape each build stored.
  *
  * Nothing here executes Room, SQLite or Android.
  */
