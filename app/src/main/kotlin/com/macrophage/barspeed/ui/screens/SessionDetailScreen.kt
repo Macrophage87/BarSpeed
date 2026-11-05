@@ -24,10 +24,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -263,7 +263,11 @@ private fun SetCard(
     // What the cadence guide called, read off the set's archived rep marks
     // the way the export reads it (#336), so the count chip and `repsSource`
     // name one counter. Null until read, which draws the row's own columns.
-    val guideCalls by produceState<Int?>(null, record.id) { value = viewModel.guideCallsOf(record) }
+    // A remembered state filled by an effect rather than `produceState`:
+    // Android lint's ProduceStateDoesNotAssignValue reported the
+    // single-expression producer as never assigning, and failed the build.
+    var guideCalls by remember(record.id) { mutableStateOf<Int?>(null) }
+    LaunchedEffect(record.id) { guideCalls = viewModel.guideCallsOf(record) }
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             SetCardHeader(record, unit, target)
