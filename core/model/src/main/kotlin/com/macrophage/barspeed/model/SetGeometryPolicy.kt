@@ -102,6 +102,22 @@ data class GeometrySources(
      * [SetGeometryPolicy.bodyweightSource].
      */
     @EncodeDefault(EncodeDefault.Mode.ALWAYS) val bodyweight: GeometrySource = GeometrySource.DEFAULT,
+    /**
+     * Where `sensorInverted` came from (1.26, #289): the one geometry value
+     * that decides which measured phase is called the concentric, and the
+     * last of the eight to be given a provenance.
+     *
+     * NULLABLE, NOT DEFAULTED TO [GeometrySource.DEFAULT], and that is the
+     * departure from the two fields above. Every row written by a build up to
+     * and including v0.1.59 holds a `sources` object without this key, and
+     * those builds resolved the value through [SetGeometryPolicy.stackInversion]'s
+     * rule 3 on some sets and through a declaration on others. Decoding such a
+     * row to `DEFAULT` would publish "nothing supplied it" beside a `true` the
+     * rule supplied, which is a claim about a set that was never recorded.
+     * Null decodes those rows to "not recorded", and the export omits the key
+     * for them; a set this build records always carries one.
+     */
+    val sensorInverted: GeometrySource? = null,
 )
 
 /**
