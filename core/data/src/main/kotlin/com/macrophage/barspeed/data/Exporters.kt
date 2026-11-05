@@ -833,29 +833,35 @@ class SessionExporter(
      * [ResolvedGeometry] speaks in the app's terms because it records what the
      * app used; this is the one place the two vocabularies meet.
      */
-    private fun geometryExport(g: ResolvedGeometry) = GeometryExport(
-        startsWith = g.startsWith.name.lowercase(),
-        concentric = if (g.concentricUp) "up" else "down",
-        plane = if (g.horizontal) "horizontal" else "vertical",
-        sensorOnStack = g.sensorOnStack,
-        sensorInverted = g.sensorInverted,
-        travelRatio = g.travelRatio,
-        kind = g.kind.name.lowercase(),
-        bodyweight = g.bodyweight,
-        source =
-        GeometrySourceExport(
-            startsWith = g.sources.startsWith.name.lowercase(),
-            concentric = g.sources.concentric.name.lowercase(),
-            plane = g.sources.plane.name.lowercase(),
-            kind = g.sources.kind.name.lowercase(),
-            travelRatio = g.sources.travelRatio.name.lowercase(),
-            sensorOnStack = g.sources.sensorOnStack.name.lowercase(),
-            bodyweight = g.sources.bodyweight.name.lowercase(),
-            // Null on a row stored before 1.26 (#289), which never recorded
-            // it, and so omitted: no answer is invented for such a set.
-            sensorInverted = g.sources.sensorInverted?.name?.lowercase(),
-        ),
-    )
+    // A hold or a carry has no stroke, so it publishes neither stroke word nor
+    // a source for either (#297, export 1.26): the stored values are an
+    // absence the resolver had to fill, never something measured or declared.
+    private fun geometryExport(g: ResolvedGeometry): GeometryExport {
+        val stroke = GeometryExport.publishesStroke(g.kind)
+        return GeometryExport(
+            startsWith = g.startsWith.name.lowercase().takeIf { stroke },
+            concentric = (if (g.concentricUp) "up" else "down").takeIf { stroke },
+            plane = if (g.horizontal) "horizontal" else "vertical",
+            sensorOnStack = g.sensorOnStack,
+            sensorInverted = g.sensorInverted,
+            travelRatio = g.travelRatio,
+            kind = g.kind.name.lowercase(),
+            bodyweight = g.bodyweight,
+            source =
+            GeometrySourceExport(
+                startsWith = g.sources.startsWith.name.lowercase().takeIf { stroke },
+                concentric = g.sources.concentric.name.lowercase().takeIf { stroke },
+                plane = g.sources.plane.name.lowercase(),
+                kind = g.sources.kind.name.lowercase(),
+                travelRatio = g.sources.travelRatio.name.lowercase(),
+                sensorOnStack = g.sources.sensorOnStack.name.lowercase(),
+                bodyweight = g.sources.bodyweight.name.lowercase(),
+                // Null on a row stored before 1.26 (#289), which never recorded
+                // it, and so omitted: no answer is invented for such a set.
+                sensorInverted = g.sources.sensorInverted?.name?.lowercase(),
+            ),
+        )
+    }
 
     private fun List<Double>.averageOrNull(): Double? = if (isEmpty()) null else average()
 
@@ -1460,10 +1466,15 @@ class RawExporter(
         // from four the plan meant.
         // Flat here and nested there, which is what these two documents
         // already do with geometry.
+        //
+        // A hold or a carry writes none of the three stroke keys (#297), the
+        // split session.json takes through the same GeometryExport.publishesStroke.
         geometry?.let { g ->
-            str("startsWith", g.startsWith.name.lowercase())
-            str("concentric", if (g.concentricUp) "up" else "down")
-            str("concentricSource", g.sources.concentric.name.lowercase())
+            if (GeometryExport.publishesStroke(g.kind)) {
+                str("startsWith", g.startsWith.name.lowercase())
+                str("concentric", if (g.concentricUp) "up" else "down")
+                str("concentricSource", g.sources.concentric.name.lowercase())
+            }
             str("plane", if (g.horizontal) "horizontal" else "vertical")
             bool("sensorOnStack", g.sensorOnStack)
             bool("sensorInverted", g.sensorInverted)
