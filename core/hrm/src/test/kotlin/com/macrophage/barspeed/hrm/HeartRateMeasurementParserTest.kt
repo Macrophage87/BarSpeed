@@ -1,5 +1,6 @@
 package com.macrophage.barspeed.hrm
 
+import com.macrophage.barspeed.model.SensorContact
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -36,6 +37,18 @@ class HeartRateMeasurementParserTest {
         assertEquals(65, sample.bpm)
         assertEquals(1, sample.rrIntervalsMs.size)
         assertTrue(abs(sample.rrIntervalsMs[0] - 500.0) < 0.01)
+    }
+
+    /**
+     * Sensor Contact Status (flags bit 1) means nothing unless Sensor Contact
+     * Support (bit 2) is set, so a notification with Support clear says
+     * nothing about contact whatever bit 1 holds (#82). Status set and
+     * Support clear is the case a reader of bit 1 alone would get wrong.
+     */
+    @Test
+    fun `a notification without contact support says nothing about contact`() {
+        assertEquals(SensorContact.NOT_RECORDED, HeartRateMeasurementParser.parse(byteArrayOf(0x00, 72), 10L)!!.contact)
+        assertEquals(SensorContact.NOT_RECORDED, HeartRateMeasurementParser.parse(byteArrayOf(0x02, 72), 10L)!!.contact)
     }
 
     @Test
