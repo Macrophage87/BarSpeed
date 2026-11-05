@@ -128,6 +128,27 @@ data class RepAnalysis(
      * loses a figure it has always published.
      */
     val romBounded: Boolean? = null,
+    /**
+     * The ARRIVAL stamp of the sample this rep's drive began on, on the same
+     * epoch-ms clock as the set's cue track and rep marks (#246).
+     *
+     * The sample's own stamp and not a time off the reconstructed clock the
+     * velocity series runs on, for the reason `SetAnalyzer.analyze` reads its
+     * set-end bound off the same sample: the series is index-parallel to the
+     * sample list, so this is exact and owes nothing to the clock skew a
+     * dropout introduces.
+     *
+     * It is the one fact that ties a stored rep to a moment of the set. Every
+     * other field here is a duration, a speed or a distance, so until this
+     * existed a stored rep list could be compared with the set's counted reps
+     * only by length -- which is what `repMetricsComplete` was, and why errors
+     * that cancel published true.
+     *
+     * Null on every rep analysed before this field existed, and a stored
+     * analysis cannot recover it from anything else it holds: absence, read as
+     * "no instant was stored", never as an instant of zero.
+     */
+    val driveStartedAtMs: Long? = null,
 )
 
 @Serializable
@@ -601,9 +622,12 @@ object SetAnalyzer {
         // indices address them exactly -- the same property `driveStartMs`
         // above relies on. Issues #290 and #255.
         val artefacts = AccelArtefact.indices(samples)
+        // Each rep carries the arrival stamp its drive began on (#246), read
+        // off the sample for the reason `driveStartMs` above is.
         val detected =
             within.mapIndexed { idx, span ->
                 repMetrics(idx, span, series, direction, loadKg, config, artefacts, spans)
+                    .copy(driveStartedAtMs = samples[span.conStartIdx].timestampMs)
             }
         // Refused HERE, for the reason the cue bound is applied where it is:
         // everything below reads one list, so a rule applied at any consumer
