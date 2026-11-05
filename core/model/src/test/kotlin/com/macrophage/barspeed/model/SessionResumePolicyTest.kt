@@ -82,6 +82,17 @@ class SessionResumePolicyTest {
     }
 
     /**
+     * A row that counts no set is not offered even where it carries a last
+     * set time. `latestSession` cannot build that row today; the rule is the
+     * KDoc's "holds at least one set", stated on its own rather than left to
+     * follow from the other field.
+     */
+    @Test
+    fun `a row that counts no set is not offered whatever its last set time`() {
+        assertNull(SessionResumePolicy.offer(open.copy(setCount = 0), soon, writeOutstanding = false))
+    }
+
+    /**
      * A continued session's close may not compute an HRV from this visit's
      * beats alone (#48). Its earlier sets' beats were in the earlier visit's
      * memory and are gone, so an RMSSD over what is left describes part of

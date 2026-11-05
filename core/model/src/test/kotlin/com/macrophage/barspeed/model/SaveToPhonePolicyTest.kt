@@ -85,4 +85,14 @@ class SaveToPhonePolicyTest {
             assertEquals(SaveOutcome.NOTHING, SaveToPhonePolicy.onPickedFor(false, heldKind = kind, pickedKind = kind))
         }
     }
+
+    /**
+     * Nothing held and no kind for the picker: the empty file is refused, as
+     * [SaveToPhonePolicy.onPicked] refuses it. Two nulls are not a match, so
+     * this is never answered by writing bytes that do not exist.
+     */
+    @Test
+    fun `nothing held for a picker of no kind is refused`() {
+        assertEquals(SaveOutcome.REFUSE, SaveToPhonePolicy.onPickedFor(true, heldKind = null, pickedKind = null))
+    }
 }
