@@ -2822,6 +2822,30 @@ data class SessionExport(
          * `SchemaExportKeySetContractTest` pins the entry object's keys to
          * [PhaseTallyExport]; `SessionExportTempoByPhaseTest` in `:core:data`
          * is the export differential.
+         *
+         * 1.26 FURTHER ENTRY (#246, repMetricsComplete judged against the
+         * guide's marks): A VALUE MAY MOVE FROM TRUE TO FALSE, and never the
+         * other way. On a `metronome` set whose stored reps carry
+         * `RepAnalysis.driveStartedAtMs`, [SetExport.repMetricsComplete] is
+         * false where the counts agree but the detections do not each sit in
+         * their own cycle of the guide's marks -- [RepMarkAlignment] is the
+         * rule: paired in order, no drive half a cycle or more from the
+         * residuals' median. Count equality published true over a missed rep
+         * and an invented one; `field-legcurl-1030-12rep` and `-12rep-b` are
+         * that shape on committed streams, 12 detections against 12 cycles,
+         * and read false. Everywhere else the key is 1.23's count equality: a
+         * set the sensor, the lifter's taps or the segmenter counted, a set
+         * analysed before this version, and a guided set whose mark count
+         * differs from its detection count. Under 1.26 and not a mint: 1.26
+         * is unreleased. NOT RETROACTIVE: the drive instant is stored with the
+         * analysis from this version. `DATABASE_VERSION` does NOT move -- the
+         * instant rides in `analysisJson` -- and the plan schema is untouched.
+         *
+         * PINNED. `SchemaCountAgreementContractTest` asserts this entry's
+         * marker and the key's description; `RepMarkAlignmentTest` pins the
+         * rule, `RepMarkAlignmentFieldTest` in `:core:dsp` the corpus it is
+         * argued from, and `SessionExportRepMarksTest` in `:core:data` is the
+         * export differential.
          */
         const val SCHEMA_VERSION = "1.26"
 
@@ -3873,6 +3897,11 @@ data class SetExport(
      * is DELETED rather than reworded. It was true while every such row carried
      * the segmenter's own figure, and stopped being true when a sensor-counted
      * set began recording the live count with [repsManual] false.
+     *
+     * FROM 1.26 (#246), ON A `metronome` SET whose stored reps carry their
+     * drive instants, equal counts publish false unless each detection sits
+     * in its own cycle of the guide's marks; [RepMarkAlignment] is the rule
+     * and says what it cannot catch. Everywhere else this is count equality.
      *
      * Null is a third state, not a synonym for false: the segmenter resolved no
      * reps at all, so there is no figure left to qualify.

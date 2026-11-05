@@ -33,6 +33,11 @@ import kotlin.test.assertTrue
  *
  * RED WHEN WRITTEN: the description says what false means and never says what
  * true does not.
+ *
+ * 1.26 (#246, the remaining half): the stronger test the paragraph above calls
+ * possible is made on a `metronome` set, from a drive instant now stored with
+ * each rep -- `RepMarkAlignment` in this module. The 1.23 entry is kept as the
+ * record of what 1.23 said; the description and the prompt move.
  */
 class SchemaCountAgreementContractTest {
     private fun document(name: String): JsonObject = Json.parseToJsonElement(
@@ -68,18 +73,33 @@ class SchemaCountAgreementContractTest {
     }
 
     /**
-     * It says why nothing stronger is published: none is computed, because
-     * matching a detection to a rep in time needs the segmenter re-run over
-     * the stored raw stream. Review round 1 deleted "none can be computed
-     * from what a set stores" -- #246 built its alignment from that stream.
+     * It says where a stronger test is made from 1.26 (#246) and why it is made
+     * nowhere else. Replaces the 1.23 wording, which said none was computed:
+     * true when written, and false from the commit that stores each rep's
+     * drive instant.
      */
     @Test
-    fun `repMetricsComplete says why no stronger test is computed`() {
+    fun `repMetricsComplete says where the stronger test is made and where it is not`() {
         val d = description("repMetricsComplete")
-        assertTrue("carry durations and no clock" in d, "the per-rep rows' missing clock is not stated")
-        assertTrue("one integer" in d, "the live count's shape is not stated")
-        assertTrue("segmenter re-run over the stored raw stream" in d, "the raw stream's role is not stated")
+        assertTrue("FROM 1.26 (#246) ONE STRONGER TEST IS MADE" in d, "the 1.26 alignment test is not stated")
+        assertTrue("its own cycle of the guide's marks" in d, "what the alignment asks is not stated")
+        assertTrue("shifted by one WHOLE cycle" in d, "the shape it cannot catch is not stated")
+        assertTrue("stored as one integer" in d, "why a sensor set is not judged is not stated")
+        assertTrue("durations and no clock" in d, "why an older set is not judged is not stated")
+        assertFalse("No stronger test is published" in d, "the 1.23 wording still says none is made")
         assertFalse("none can be computed from what a set stores" in d, "the false impossibility is still stated")
+    }
+
+    /** The 1.26 entry is filed once, says which way a value can move, and that nothing is stored in a column. */
+    @Test
+    fun `the 1_26 log files the alignment once`() {
+        val log = versionLog()
+        val marker126 = "1.26 (#246, repMetricsComplete judged against the guide's marks)"
+        assertEquals(1, log.split(marker126).size - 1, "the 1.26 #246 entry is not filed exactly once")
+        val entry = log.substringAfter(marker126).substringBefore(" 1.26 (")
+        for (fact in listOf("FROM TRUE TO FALSE", "NOT RETROACTIVE", "DATABASE_VERSION does NOT move", "-12rep-b")) {
+            assertTrue(fact in entry, "the 1.26 #246 entry does not state: $fact")
+        }
     }
 
     /** The log files the change once, and says nothing but a description moved. */

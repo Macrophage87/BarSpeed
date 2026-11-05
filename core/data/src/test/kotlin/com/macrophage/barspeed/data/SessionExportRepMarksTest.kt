@@ -2,6 +2,7 @@ package com.macrophage.barspeed.data
 
 import com.macrophage.barspeed.dsp.RepAnalysis
 import com.macrophage.barspeed.dsp.SetAnalysis
+import com.macrophage.barspeed.model.SetExport
 import com.macrophage.barspeed.model.VoiceCue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -354,18 +355,16 @@ class SessionExportRepMarksTest {
     }
 
     /**
-     * GUARD for #246's decision, green before and after it: a guided set whose
-     * segmenter resolved as many reps as the guide counted publishes
-     * `repMetricsComplete` true, however its detections fell against the
-     * cycle marks beside them.
+     * GUARD, green before and after #246's fix: a guided set whose segmenter
+     * resolved as many reps as the guide counted, from reps stored WITHOUT a
+     * drive instant -- every set analysed before export 1.26 -- publishes
+     * `repMetricsComplete` true, however its detections fell.
      *
-     * #246's two field-38 sets published true at 12 of 12 and 14 of 14 while
-     * some cycles held no detection and others two. That misalignment cannot
-     * be written into this fixture: the stored reps carry durations and an
+     * Such a row cannot be judged in time: its reps carry durations and an
      * ordinal and no clock, and the exporter does not re-run the segmenter
-     * over the stored raw stream, which is where #246 took its alignment
-     * from. So count equality is all the exporter compares. The value is
-     * kept; the published description says what it does not certify.
+     * over the stored raw stream. So count equality is all that is compared
+     * for it, and the published description says so. The three tests below
+     * are the rows that DO carry the instant.
      */
     @Test
     fun `a guided set whose counts agree publishes true however its detections fell`() = runTest {
@@ -404,6 +403,91 @@ class SessionExportRepMarksTest {
         val set = exporter.buildExport(1L, includeRepDetail = true)!!.exercises.single().sets.single()
         assertEquals("metronome", set.repsSource, "the fixture is not a guided set")
         assertEquals(true, set.repMetricsComplete, "equal counts no longer publish true")
+    }
+
+    /** Twelve reps, rep k's drive starting at [drives] k. */
+    private fun stampedAnalysis(drives: List<Long>): SetAnalysis =
+        noReps.copy(
+            sampleRateHz = 99.4,
+            reps =
+            drives.mapIndexed { i, at ->
+                RepAnalysis(
+                    index = i,
+                    eccS = 1.0,
+                    bottomPauseS = null,
+                    conS = 1.0,
+                    topPauseS = null,
+                    meanConVelMps = 0.3,
+                    peakConVelMps = 0.5,
+                    meanEccVelMps = -0.2,
+                    peakEccVelMps = -0.3,
+                    romM = 0.2,
+                    peakPowerW = null,
+                    driveStartedAtMs = at,
+                )
+            },
+        )
+
+    /** The guide's twelve marks, one per 4004 ms cycle, as a 1120 set leaves them. */
+    private val grid = (1..12).map { 5_000L + it * 4_004L }
+
+    /** Rep k's drive, 3 s into the cycle that ends at mark k. */
+    private val inStep = grid.map { it - 1_004L }
+
+    /** #246's shape: cycle 4 resolves nothing, cycle 9 resolves two. Still twelve. */
+    private val cancelling = inStep.filterIndexed { i, _ -> i != 3 } + (inStep[8] + 1_200L)
+
+    private suspend fun exportedSet(row: SetRecordEntity, marks: List<Long>): SetExport {
+        val dao =
+            FakeSessionDao(
+                session = SessionEntity(id = 1L, startedAtMs = 1_000L, endedAtMs = 61_000L),
+                rows = listOf(row),
+                streams = mapOf(5L to listOf(repStream(marks))),
+            )
+        val exporter =
+            SessionExporter(SessionRepository(dao, FakeExerciseDao()), dispatcher = Dispatchers.Default)
+        return exporter.buildExport(1L, includeRepDetail = false)!!.exercises.single().sets.single()
+    }
+
+    private fun guidedRow(drives: List<Long>) = row().copy(
+        actualReps = 12,
+        plannedReps = 12,
+        tempo = "1120",
+        analysisJson = json.encodeToString(SetAnalysis.serializer(), stampedAnalysis(drives)),
+    )
+
+    /**
+     * RED before #246's fix: twelve detections against twelve guided cycles,
+     * one cycle empty and another doubled, published true because the counts
+     * agree. The summary export, because the flag qualifies the summary and is
+     * published there too -- the marks themselves are detail-only.
+     */
+    @Test
+    fun `a guided set whose detections cancel against the guide's marks publishes false`() = runTest {
+        val set = exportedSet(guidedRow(cancelling), grid)
+        assertEquals("metronome", set.repsSource, "the fixture is not a guided set")
+        assertEquals(12, set.reps, "the counts no longer agree, so this is not #246's shape")
+        assertEquals(false, set.repMetricsComplete, "a missed rep and an invented one publish true")
+    }
+
+    /** Green before and after: the same twelve marks with a drive in every cycle. */
+    @Test
+    fun `a guided set whose detections follow the guide's marks publishes true`() = runTest {
+        val set = exportedSet(guidedRow(inStep), grid)
+        assertEquals(true, set.repMetricsComplete, "an aligned guided set lost its true")
+    }
+
+    /**
+     * Green before and after: a TAPPED set is judged on its counts alone. A
+     * tap follows its rep by a lag nothing bounds, so its marks are not a grid
+     * and the same cancelling instants say nothing about it.
+     */
+    @Test
+    fun `a tapped set is judged on its counts alone`() = runTest {
+        val tapped = guidedRow(cancelling).copy(tempo = null)
+        val set = exportedSet(tapped, grid)
+        assertEquals("manual", set.repsSource, "the fixture is not a tapped set")
+        assertEquals(true, set.repMetricsComplete, "a tapped set was judged against its taps")
     }
 
     /**
