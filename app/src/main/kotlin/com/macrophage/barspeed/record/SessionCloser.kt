@@ -124,6 +124,18 @@ class SessionCloser(
     private var pending: PendingSessionClose? = null
 
     /**
+     * Whether the pending close's `endSession` has landed on any run of it.
+     *
+     * Kept across retries rather than recomputed per run. A REST_UNSAVED retry
+     * calls `endSession` again, whose guard reads the row before refusing the
+     * second write; if that read threw, a per-run flag reported FAILED for a
+     * row that already had its end time, FAILED drew START NEXT SET, and the
+     * sets that followed landed in a session that had already ended. Once
+     * landed, a retry skips `endSession` and writes only what is missing.
+     */
+    private var rowLanded = false
+
+    /**
      * Give up a close that came back failed, so the next finish freezes a new
      * one (#49). Called only once `RestControlPolicy.closeOnNextSet` has said
      * the frozen close does not survive the set the lifter is starting; never
@@ -132,6 +144,7 @@ class SessionCloser(
     fun discard() {
         asked = false
         pending = null
+        rowLanded = false
     }
 
     /**
@@ -156,6 +169,7 @@ class SessionCloser(
     ): Boolean {
         if (asked) return false
         asked = true
+        rowLanded = false
         pending =
             PendingSessionClose(
                 sessionId,
@@ -175,11 +189,6 @@ class SessionCloser(
     private fun run(onState: (SessionCloseState, UnwrittenClose?) -> Unit, onClosed: () -> Unit) {
         val p = pending ?: return
         onState(SessionCloseState.IN_FLIGHT, null)
-        // Whether endSession returned before a failure, which is what decides
-        // whether the row is still open (#333). False again on every run: a
-        // retry's endSession refuses a second write and returns, so it reads
-        // true by the time the rest window is reached.
-        var sessionRowLanded = false
         // Taken before the launch and given up in the finally below, so the
         // process keeps foreground-service priority for as long as the close is
         // outstanding. The prompt this window raises offers the lifter a labelled
@@ -189,8 +198,11 @@ class SessionCloser(
         scope.launch(Dispatchers.Main.immediate) {
             try {
                 p.sessionId?.let {
-                    repository.endSession(it, p.endedAtMs, p.hrvRmssdMs, p.sessionRpe, p.skippedSets)
-                    sessionRowLanded = true
+                    // Whether endSession has landed decides whether the row is
+                    // still open (#333), and it is kept across runs: see
+                    // rowLanded.
+                    if (!rowLanded) repository.endSession(it, p.endedAtMs, p.hrvRmssdMs, p.sessionRpe, p.skippedSets)
+                    rowLanded = true
                     // AFTER the close and never before it, and the ordering is
                     // the whole of the reasoning (#109). This is a second,
                     // non-atomic write onto a row that is already durable --
@@ -231,7 +243,7 @@ class SessionCloser(
                 // with the frozen close still behind it.
                 val unwritten =
                     UnwrittenClose.of(
-                        sessionRowLanded = sessionRowLanded,
+                        sessionRowLanded = rowLanded,
                         rated = p.sessionRpe != null,
                         skipped = p.skippedSets.isNotEmpty(),
                         restCaptured = p.restHrSamples.isNotEmpty(),

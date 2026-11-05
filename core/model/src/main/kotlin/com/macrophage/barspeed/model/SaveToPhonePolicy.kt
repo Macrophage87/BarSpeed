@@ -69,11 +69,16 @@ object SaveToPhonePolicy {
      * first picker draws opens a second one over it, and each build replaces
      * the one set of held bytes (#37).
      *
-     * Groundwork: counts any held bytes as this picker's, which is what the
-     * one-kind flow did before this function existed.
+     * Held bytes are this picker's only where they were built as its kind.
+     * Bytes built for another export are not written into this document; it
+     * is built again from [pickedKind], as it is when the bytes were lost
+     * behind the picker.
      */
-    fun onPickedFor(documentCreated: Boolean, heldKind: SaveKind?, pickedKind: SaveKind?): SaveOutcome =
-        onPicked(documentCreated = documentCreated, bytesHeld = heldKind != null, kind = pickedKind)
+    fun onPickedFor(documentCreated: Boolean, heldKind: SaveKind?, pickedKind: SaveKind?): SaveOutcome = onPicked(
+        documentCreated = documentCreated,
+        bytesHeld = heldKind != null && heldKind == pickedKind,
+        kind = pickedKind,
+    )
 
     /** What the lifter is told when an export could not be written at all. */
     const val REFUSED_MESSAGE = "Nothing was saved. Tap Save to phone again."

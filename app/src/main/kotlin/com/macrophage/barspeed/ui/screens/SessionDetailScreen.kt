@@ -1,7 +1,6 @@
 package com.macrophage.barspeed.ui.screens
 
 import android.app.Application
-import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -29,7 +28,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -153,19 +151,19 @@ fun SessionDetailScreen(navController: NavController, sessionId: Long) {
                 Text(parts.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
                 Spacer(Modifier.height(10.dp))
             }
-            // Which export the open picker is for, kept in saved instance
-            // state so it outlives the Activity being destroyed behind the
-            // picker -- the bytes do not (#37). A name, not the enum, because
-            // a String needs no Saver.
-            var pendingKind by rememberSaveable { mutableStateOf<String?>(null) }
-            val onPicked: (Uri?) -> Unit = { uri ->
-                viewModel.savePendingTo(uri, pendingKind?.let { SaveKind.valueOf(it) })
-                pendingKind = null
-            }
-            val saveJsonLauncher =
-                rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json"), onPicked)
-            val saveZipLauncher =
-                rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip"), onPicked)
+            // One picker launcher per export, each answering with its own
+            // kind (#37). Which export a returning picker was opened for is a
+            // fact about which launcher it returns to, so two pickers stacked
+            // by a quick second tap each answer for themselves, where one
+            // saved kind could name only the last tap. It is also what
+            // survives the Activity being destroyed behind the picker: the
+            // bytes do not, and the launcher's registration is keyed in saved
+            // instance state by rememberLauncherForActivityResult. That the
+            // result reaches the re-registered launcher on a device is
+            // [Field], not observed here.
+            val saveSummaryLauncher = saveLauncher("application/json", SaveKind.SUMMARY_JSON, viewModel)
+            val saveDetailedLauncher = saveLauncher("application/json", SaveKind.DETAILED_JSON, viewModel)
+            val saveZipLauncher = saveLauncher("application/zip", SaveKind.RAW_ZIP, viewModel)
 
             SectionCaption("Share")
             Spacer(Modifier.height(4.dp))
@@ -197,32 +195,17 @@ fun SessionDetailScreen(navController: NavController, sessionId: Long) {
             Spacer(Modifier.height(4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(
-                    onClick = {
-                        viewModel.prepareJsonSave(false) {
-                            pendingKind = SaveKind.SUMMARY_JSON.name
-                            saveJsonLauncher.launch(it)
-                        }
-                    },
+                    onClick = { viewModel.prepareJsonSave(false) { saveSummaryLauncher.launch(it) } },
                     enabled = !exporting,
                     modifier = Modifier.weight(1f),
                 ) { Text("JSON") }
                 OutlinedButton(
-                    onClick = {
-                        viewModel.prepareJsonSave(true) {
-                            pendingKind = SaveKind.DETAILED_JSON.name
-                            saveJsonLauncher.launch(it)
-                        }
-                    },
+                    onClick = { viewModel.prepareJsonSave(true) { saveDetailedLauncher.launch(it) } },
                     enabled = !exporting,
                     modifier = Modifier.weight(1f),
                 ) { Text("Detailed") }
                 OutlinedButton(
-                    onClick = {
-                        viewModel.prepareRawZipSave {
-                            pendingKind = SaveKind.RAW_ZIP.name
-                            saveZipLauncher.launch(it)
-                        }
-                    },
+                    onClick = { viewModel.prepareRawZipSave { saveZipLauncher.launch(it) } },
                     enabled = !exporting,
                     modifier = Modifier.weight(1f),
                 ) { Text("Raw CSV") }
@@ -248,6 +231,13 @@ fun SessionDetailScreen(navController: NavController, sessionId: Long) {
         }
     }
 }
+
+/** The "Save to phone" picker for [kind], answering [SessionDetailViewModel.savePendingTo] with it (#37). */
+@Composable
+private fun saveLauncher(mimeType: String, kind: SaveKind, viewModel: SessionDetailViewModel) =
+    rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(mimeType)) { uri ->
+        viewModel.savePendingTo(uri, kind)
+    }
 
 @Composable
 private fun SetCard(

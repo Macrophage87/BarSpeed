@@ -18,11 +18,15 @@ object SessionFinishedCopy {
     const val SAVED = "Session saved."
 
     /**
-     * The headline over a session that wrote no row: nothing was recorded, so
+     * The headline over a session that wrote no row: no set was saved, so
      * there is nothing saved to speak of, and the View session button beneath
      * it is hidden for the same reason.
+     *
+     * "No set was saved" rather than "Nothing was recorded": a set that was
+     * recorded and whose write failed and was discarded reaches here too, and
+     * it was recorded.
      */
-    const val NOT_SAVED = "Nothing was recorded, so no session was saved."
+    const val NOT_SAVED = "No set was saved, so no session was saved."
 
     /** The headline, by whether a row was written. */
     fun headline(sessionWritten: Boolean): String = if (sessionWritten) SAVED else NOT_SAVED

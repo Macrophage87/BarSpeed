@@ -2913,7 +2913,8 @@ private fun CoroutineScope.offerResume(
  * `planSessionName` stays the earlier one (each set row carries the name of
  * the session it was recorded under). And a plan's queue starts again at its
  * first slot, so a lifter who picks the same session faces slots the earlier
- * visit already recorded. Which pick to allow is the owner's call.
+ * visit already recorded. The prompt says both
+ * ([SessionResumePolicy.body]); which pick to allow is the owner's call.
  */
 private fun resumedState(s: RecordState): RecordState {
     val offer = s.resumeOffer ?: return s
@@ -2942,7 +2943,10 @@ private fun closeRestHrOf(s: RecordState, samples: List<HrSample>): List<HrSampl
  */
 internal fun readyStartState(s: RecordState): RecordState? {
     if (!RestControlPolicy.readyMayStartSet(s.sessionClose)) return null
-    return s
+    // What a failed close becomes once the lifter lifts on (#49), decided by
+    // RestControlPolicy.closeOnNextSet as on the rest screen's door.
+    val close = RestControlPolicy.closeOnNextSet(s.sessionClose)
+    return s.copy(sessionClose = close, closeUnwritten = s.closeUnwritten.takeIf { close != SessionCloseState.NONE })
 }
 
 /**
@@ -3408,9 +3412,10 @@ data class RecordState(
      *
      * Written by [SessionCloser] through `onSessionCloseState` -- IN_FLIGHT
      * when a close starts, FAILED or REST_UNSAVED when it comes back failed --
-     * and put back to NONE by `onSessionClosed` when it lands, and by
+     * and put back to NONE by `onSessionClosed` when it lands, by
      * [startedNextSetState] when the lifter starts another set from the rest
-     * screen over a FAILED close (#49, `RestControlPolicy.closeOnNextSet`).
+     * screen over a FAILED close (#49, `RestControlPolicy.closeOnNextSet`), and
+     * by [readyStartState] when they start one from READY over the same.
      * The list is of every writer; an earlier copy of this paragraph named
      * only the first two, and the third was added without it (#69's class,
      * named in review). So every branch

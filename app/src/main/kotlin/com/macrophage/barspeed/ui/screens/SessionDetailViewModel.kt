@@ -195,7 +195,13 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
 
     // --- Save-to-phone flow: build the bytes, then write to the SAF uri the user picks. ---
 
-    private var pendingSave: ByteArray? = null
+    /**
+     * The export built for the open picker, with the kind it was built as
+     * (#37). One field for every picker, so a second build replaces the
+     * first's bytes; the kind is what lets the picker that returns tell its
+     * own bytes from another's.
+     */
+    private var pendingSave: Pair<SaveKind, ByteArray>? = null
 
     fun prepareJsonSave(includeDetail: Boolean, onReady: (suggestedName: String) -> Unit) {
         viewModelScope.launch {
@@ -203,7 +209,8 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
             try {
                 val json = container.sessionExporter.exportJson(sessionId, includeDetail) ?: return@launch
                 val name = jsonName(includeDetail) ?: return@launch
-                pendingSave = json.toByteArray(Charsets.UTF_8)
+                val kind = if (includeDetail) SaveKind.DETAILED_JSON else SaveKind.SUMMARY_JSON
+                pendingSave = kind to json.toByteArray(Charsets.UTF_8)
                 onReady(name)
             } finally {
                 _exporting.value = false
@@ -217,7 +224,7 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
             try {
                 val zip = container.rawExporter.buildZip(sessionId) ?: return@launch
                 val name = exportName("raw.zip") ?: return@launch
-                pendingSave = zip
+                pendingSave = SaveKind.RAW_ZIP to zip
                 onReady(name)
             } finally {
                 _exporting.value = false
@@ -229,22 +236,24 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
      * Write the pending export to the picked document. Null uri = picker
      * cancelled.
      *
-     * [kind] is the export the lifter asked for, as the screen kept it in its
-     * saved instance state, so it survives the Activity being destroyed behind
-     * the picker where [pendingSave] does not (#37). What happens is
-     * [SaveToPhonePolicy.onPicked]'s decision; this carries it out.
+     * [kind] is the export the returning picker was opened for, which the
+     * screen knows from the launcher it returned to, so it survives the
+     * Activity being destroyed behind the picker where [pendingSave] does not,
+     * and it is this picker's own where two are stacked (#37). What happens is
+     * [SaveToPhonePolicy.onPickedFor]'s decision; this carries it out.
      */
-    fun savePendingTo(uri: Uri?, kind: SaveKind?) {
+    fun savePendingTo(uri: Uri?, kind: SaveKind) {
         val held = pendingSave
         pendingSave = null
-        val outcome = SaveToPhonePolicy.onPicked(documentCreated = uri != null, bytesHeld = held != null, kind = kind)
+        val outcome =
+            SaveToPhonePolicy.onPickedFor(documentCreated = uri != null, heldKind = held?.first, pickedKind = kind)
         if (uri == null || outcome == SaveOutcome.NOTHING) return
         viewModelScope.launch {
             val app = getApplication<Application>()
             val bytes =
                 when (outcome) {
-                    SaveOutcome.WRITE_HELD -> held
-                    SaveOutcome.REGENERATE -> kind?.let { exportBytes(it) }
+                    SaveOutcome.WRITE_HELD -> held?.second
+                    SaveOutcome.REGENERATE -> exportBytes(kind)
                     SaveOutcome.NOTHING, SaveOutcome.REFUSE -> null
                 }
             val ok =
@@ -255,10 +264,11 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
                         }.getOrDefault(false)
                     }
             // The picker created the document before it returned, so where
-            // there is nothing to write the file already exists, empty. It is
-            // removed rather than left under the name the lifter chose; if the
-            // provider refuses, the message below still says nothing was saved.
-            if (bytes == null) {
+            // nothing was written the file already exists, empty or cut short.
+            // It is removed rather than left under the name the lifter chose,
+            // whether there was nothing to write or the write failed; if the
+            // provider refuses, the message below still says the save failed.
+            if (!ok) {
                 withContext(Dispatchers.IO) {
                     runCatching { DocumentsContract.deleteDocument(app.contentResolver, uri) }
                 }
