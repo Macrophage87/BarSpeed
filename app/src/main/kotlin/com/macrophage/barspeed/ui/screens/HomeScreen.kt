@@ -49,6 +49,7 @@ import com.macrophage.barspeed.data.RescuedDatabase
 import com.macrophage.barspeed.model.ArmedDelivery
 import com.macrophage.barspeed.model.ByteSize
 import com.macrophage.barspeed.model.ConnectionState
+import com.macrophage.barspeed.model.RecordingHold
 import com.macrophage.barspeed.model.RestoreVerdict
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.ui.BarColors
@@ -78,6 +79,7 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
     val rescued by viewModel.rescued.collectAsState()
     val busyRescues by viewModel.busyRescues.collectAsState()
     val restoreVerdicts by viewModel.restoreVerdicts.collectAsState()
+    val recordingHolds by viewModel.recordingHolds.collectAsState()
     val busyInterrupted by viewModel.busyInterrupted.collectAsState()
     val busyCrashReports by viewModel.busyCrashReports.collectAsState()
     val crashReports by viewModel.crashReports.collectAsState()
@@ -137,6 +139,7 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
                 rescued,
                 busyRescues,
                 restoreVerdicts,
+                recordingHolds,
                 viewModel::shareRescued,
                 viewModel::discardRescued,
                 viewModel::restoreRescued,
@@ -573,6 +576,7 @@ private fun RescuedDatabaseNotice(
     rescued: List<RescuedDatabase>,
     busy: Set<File>,
     restoreVerdicts: Map<File, RestoreVerdict>,
+    held: Set<RecordingHold>,
     onShare: (RescuedDatabase) -> Unit,
     onDiscard: (RescuedDatabase) -> Unit,
     onRestore: (RescuedDatabase) -> Unit,
@@ -637,7 +641,7 @@ private fun RescuedDatabaseNotice(
     Column(modifier = Modifier.fillMaxWidth()) {
         for (item in rescued) {
             val restore = restoreVerdicts[item.directory]
-            val buttons = rescuedCardButtons(item, busy, restore)
+            val buttons = rescuedCardButtons(item, busy, restore, held)
             Card(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                 Column(Modifier.padding(14.dp)) {
                     Text(

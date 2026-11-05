@@ -4,6 +4,7 @@ import com.macrophage.barspeed.data.RescueCompleteness
 import com.macrophage.barspeed.data.RescuedDatabase
 import com.macrophage.barspeed.model.ByteSize
 import com.macrophage.barspeed.model.RecordingHold
+import com.macrophage.barspeed.model.RecordingServicePolicy
 import com.macrophage.barspeed.model.RestoreRefusal
 import com.macrophage.barspeed.model.RestoreVerdict
 import java.io.File
@@ -62,17 +63,17 @@ internal data class RescuedCardButtons(
      * through [rescuedRestoreNote], says why.
      */
     val showRestore: Boolean,
-    /** RESTORE is tappable. False while busy, and whenever it is not drawn. */
+    /** RESTORE is tappable. False while busy, while a recording hold is held, and whenever it is not drawn. */
     val restoreEnabled: Boolean,
 )
 
 /**
  * [restore] is `DatabaseRestore.verdict` for [item], or null when none was
- * computed. [held] is what the recording holds hold now (round 1 review of
- * #112, A2/B4); NOT READ YET -- this commit adds the parameter and nothing
- * consults it, so RESTORE stays live while a set-end write is in flight.
+ * computed. [held] is what the recording holds hold now: RESTORE ends the
+ * process, so it is dead while [RecordingServicePolicy.mayEndProcess] says
+ * no -- a set-end write or a session close would be cut short (round 1
+ * review of #112, A2/B4). SEND and DISCARD end nothing and ignore it.
  */
-@Suppress("UNUSED_PARAMETER")
 internal fun rescuedCardButtons(
     item: RescuedDatabase,
     busy: Set<File>,
@@ -85,7 +86,7 @@ internal fun rescuedCardButtons(
         sendEnabled = allowed,
         discardEnabled = allowed,
         showRestore = restore is RestoreVerdict.Restorable,
-        restoreEnabled = restore is RestoreVerdict.Restorable && allowed,
+        restoreEnabled = restore is RestoreVerdict.Restorable && allowed && RecordingServicePolicy.mayEndProcess(held),
     )
 }
 
