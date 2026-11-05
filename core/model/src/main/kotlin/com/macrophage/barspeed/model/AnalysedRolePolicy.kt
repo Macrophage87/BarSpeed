@@ -88,7 +88,10 @@ enum class AnalysedRoleBasis(val published: String) {
      * a preference: a buffer below [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES]
      * is one `VelocityEstimator.estimate` refuses outright, so a unit whose
      * roll says "stack" cannot be analysed if it sent nothing. This is
-     * [AnalysedStream.fellBack] and the same population it always named.
+     * [AnalysedStream.fellBack] and the same population it always named,
+     * widened since #242 and #287 to an armed unit that stopped early beside
+     * its partner or never moved while its partner did; see
+     * [SensorCapturePolicy.analysable].
      */
     FALLBACK("fallback"),
 }
@@ -135,7 +138,11 @@ data class AnalysedRoleChoice(
  * 3. BOTH UNITS MUST HAVE DELIVERED. With one stream there is no choice to
  *    make, and with a partner below [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES]
  *    the alternative is a buffer the analysis would refuse: basis
- *    [AnalysedRoleBasis.DECLARED].
+ *    [AnalysedRoleBasis.DECLARED]. "Delivered" is
+ *    [SensorCapturePolicy.analysable]'s answer, so since #287 a partner that
+ *    never moved beside a unit that did is not a candidate either: a still
+ *    unit's roll does not move, so its signature reads [StackMountSignal.ON_STACK]
+ *    whatever it is lying on.
  * 4. EVERY ANALYSABLE UNIT MUST HAVE BEEN READ. A role whose signal is
  *    [StackMountSignal.UNMEASURED], or which has no entry at all, is one
  *    nothing measured -- absence, not a failed candidate -- so there is no
@@ -186,6 +193,10 @@ object AnalysedRolePolicy {
      *   set, never a guess from the exercise's name.
      * @param signalByRole what each role's own stream says about riding the
      *   load; a missing key is [StackMountSignal.UNMEASURED].
+     * @param spanMsByRole each role's time on the link, [UnitMotion.spanMs];
+     *   read by [SensorCapturePolicy.analysable], a missing key unjudged.
+     * @param stillByRole whether each role's stream moved, [UnitMotion.still];
+     *   read by [SensorCapturePolicy.analysable], a missing key unjudged.
      */
     fun choose(
         armed: SensorRole?,
@@ -193,14 +204,16 @@ object AnalysedRolePolicy {
         framesByRole: Map<SensorRole, Int>,
         declaresStackMount: Boolean = false,
         signalByRole: Map<SensorRole, StackMountSignal> = emptyMap(),
+        spanMsByRole: Map<SensorRole, Long> = emptyMap(),
+        stillByRole: Map<SensorRole, Boolean> = emptyMap(),
     ): AnalysedRoleChoice {
-        val frames = SensorCapturePolicy.analysedFrom(armed, expected, framesByRole)
+        val frames = SensorCapturePolicy.analysedFrom(armed, expected, framesByRole, spanMsByRole, stillByRole)
         if (frames.fellBack) {
             return AnalysedRoleChoice(frames.role, fellBack = true, basis = AnalysedRoleBasis.FALLBACK)
         }
         val declared = AnalysedRoleChoice(frames.role, fellBack = false, basis = AnalysedRoleBasis.DECLARED)
         if (!declaresStackMount || armed == null) return declared
-        val analysable = SensorCapturePolicy.analysable(expected, framesByRole)
+        val analysable = SensorCapturePolicy.analysable(expected, framesByRole, spanMsByRole, stillByRole)
         if (analysable.size < 2) return declared
         val read = analysable.map { signalByRole[it] ?: StackMountSignal.UNMEASURED }
         if (read.any { it == StackMountSignal.UNMEASURED }) return declared
