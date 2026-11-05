@@ -172,6 +172,7 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
     val rssi by viewModel.sightedRssi.collectAsState()
     val scanning by viewModel.scanning.collectAsState()
     val scanError by viewModel.scanError.collectAsState()
+    val actionError by viewModel.actionError.collectAsState()
     val imuState by viewModel.imuState.collectAsState()
     val imuStateB by viewModel.imuStateB.collectAsState()
     val hrmState by viewModel.hrmState.collectAsState()
@@ -316,6 +317,11 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
                 Text(if (scanning) "Stop scanning" else "Scan for sensors")
             }
             scanError?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
+            // A pair, forget, label or switch that did not take (#50): before
+            // it was caught, the same failure killed the process.
+            actionError?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
             Spacer(Modifier.height(8.dp))

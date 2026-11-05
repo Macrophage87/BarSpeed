@@ -14,6 +14,7 @@ import com.macrophage.barspeed.model.DualSetupStep
 import com.macrophage.barspeed.model.ScanRow
 import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.model.Sighting
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -196,7 +197,56 @@ class DevicesViewModel(app: Application) : AndroidViewModel(app) {
         )
 
     fun setSensorRole(address: String, role: SensorRole?) {
-        viewModelScope.launch { container.settings.setSensorRole(address, role) }
+        guarded("Could not save the sensor's label") { container.settings.setSensorRole(address, role) }
+    }
+
+    /**
+     * Why the last tap on this screen did not take, or null (#50).
+     *
+     * Drawn by `DevicesScreen` under the scan error. A separate flow from
+     * [scanError] because the two are cleared by different things: a new scan
+     * clears that one, and the next tap that reaches its write clears this.
+     */
+    val actionError = MutableStateFlow<String?>(null)
+
+    /**
+     * Run one tap's DataStore write and link change, reporting a throw instead
+     * of letting it reach the process (#50).
+     *
+     * Every action on this screen ends in a `DeviceRegistry` or `SettingsStore`
+     * DataStore write launched on [viewModelScope], which has no
+     * `CoroutineExceptionHandler`, so an exception escaping one -- an
+     * `IOException` from a full disk, which `DeviceRegistry`'s own try/catch
+     * does not cover because it wraps only the JSON decode INSIDE the edit
+     * block -- went to the thread's default handler and killed the process.
+     * That handler kills a set in progress with it: the Devices screen is
+     * reachable mid-session, and the in-memory buffers go with the process.
+     * `AutoConnectManager.maintain` already makes the same argument for the
+     * reconnect loop.
+     *
+     * `Exception`, not `IOException`, for `maintain`'s reason: `forgetAndDrop`
+     * also reads the registry before writing it, and a read failure is not an
+     * `IOException` either. Cancellation is rethrown, so leaving the screen
+     * still cancels the write's coroutine rather than reporting it as a
+     * failure. The write is not retried and nothing it half-did is undone;
+     * what DataStore leaves on disk after a failed `edit` is its own
+     * transactional guarantee and is not re-checked here.
+     *
+     * NO TEST REACHES THIS. Nothing in this repository executes a ViewModel or
+     * a DataStore; this is compile- and lint-gated only, not test-gated, and
+     * a full disk has not been watched happening on a device.
+     */
+    private fun guarded(failure: String, write: suspend () -> Unit) {
+        viewModelScope.launch {
+            try {
+                write()
+                actionError.value = null
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                actionError.value = "$failure: ${e.message ?: e.javaClass.simpleName}"
+            }
+        }
     }
 
     /**
@@ -240,7 +290,7 @@ class DevicesViewModel(app: Application) : AndroidViewModel(app) {
      * reachable from this screen.
      */
     fun setPreferred(device: KnownDevice) {
-        viewModelScope.launch { container.autoConnect.setPreferredAndConnect(device) }
+        guarded("Could not switch to this device") { container.autoConnect.setPreferredAndConnect(device) }
     }
 
     val discovered = MutableStateFlow<List<DiscoveredDevice>>(emptyList())
@@ -330,13 +380,13 @@ class DevicesViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun pair(device: DiscoveredDevice, role: DeviceRole) {
-        viewModelScope.launch {
+        guarded("Could not pair ${device.name}") {
             container.autoConnect.pairAndConnect(KnownDevice(device.address, device.name, role))
         }
     }
 
     fun forget(device: KnownDevice) {
-        viewModelScope.launch { container.autoConnect.forgetAndDrop(device) }
+        guarded("Could not forget ${device.name}") { container.autoConnect.forgetAndDrop(device) }
     }
 
     override fun onCleared() {
