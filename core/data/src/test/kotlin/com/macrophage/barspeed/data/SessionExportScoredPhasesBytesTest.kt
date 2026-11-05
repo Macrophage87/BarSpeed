@@ -168,7 +168,16 @@ class SessionExportScoredPhasesBytesTest {
         val text = exporter.exportJson(1L, includeRepDetail = false)!!
         val lines = text.lines().map { it.trim() }
         val start = lines.indexOf("\"tempoCompliance\": {")
-        return lines.subList(start, lines.subList(start, lines.size).indexOfFirst { it.startsWith("}") } + start + 1)
+        // To the brace that closes the block, counting the nesting the
+        // block's own arrays and objects open.
+        var depth = 0
+        val end = (start until lines.size).first { i ->
+            val line = lines[i]
+            if (line.startsWith("}") || line.startsWith("]")) depth--
+            if (line.endsWith("{") || line.endsWith("[")) depth++
+            depth == 0
+        }
+        return lines.subList(start, end + 1)
     }
 
     @Test
@@ -199,6 +208,13 @@ class SessionExportScoredPhasesBytesTest {
                 "\"of\": 8,",
                 "\"scoredPhases\": [",
                 "\"concentric\"",
+                "],",
+                "\"byPhase\": [",
+                "{",
+                "\"phase\": \"concentric\",",
+                "\"withinTolerance\": 8,",
+                "\"of\": 8",
+                "}",
                 "],",
                 "\"prescribedEccConRatio\": 3.0",
                 "},",
