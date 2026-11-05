@@ -88,6 +88,37 @@ class ShortOrStillUnitTest {
         assertEquals(false, c.sensors?.analysedFellBack)
     }
 
+    /**
+     * The one-second floor under the tenth, on a set short enough for the two
+     * to differ. FOUND BY MUTATION TESTING: setting
+     * [SensorCapturePolicy.SPAN_MARGIN_MS] to 0 left every other test here
+     * green, because on a minute of capture the tenth is six seconds and the
+     * floor never decides anything. On a five-second set the tenth is half a
+     * second, and a unit that stopped 0.8 s early is still inside a second.
+     */
+    @Test
+    fun `on a short set a unit that stopped inside a second keeps the analysis, and one beyond it does not`() {
+        val shortPartner = buffer(500, moving = true)
+        val inside = capture(buffer(420, moving = true), shortPartner)
+        assertEquals(SensorRole.A, inside.sensors?.analysed, "0.8 s short of a 5 s partner lost the analysis")
+        val beyond = capture(buffer(390, moving = true), shortPartner)
+        assertEquals(SensorRole.B, beyond.sensors?.analysed, "1.1 s short of a 5 s partner kept the analysis")
+    }
+
+    /**
+     * The tenth, on a minute of capture, where it rather than the floor
+     * decides: six seconds. Added beside the floor's pin for the same reason
+     * -- `stopped half way` is thirty seconds short and would pass under any
+     * share up to a half.
+     */
+    @Test
+    fun `on a minute a unit that stopped inside a tenth keeps the analysis, and one beyond it does not`() {
+        val inside = capture(buffer(5_500, moving = true), partner)
+        assertEquals(SensorRole.A, inside.sensors?.analysed, "5 s short of a minute lost the analysis")
+        val beyond = capture(buffer(5_300, moving = true), partner)
+        assertEquals(SensorRole.B, beyond.sensors?.analysed, "7 s short of a minute kept the analysis")
+    }
+
     /** Green before and after: field-42's shape, a 44 Hz unit over the same minute as a 100 Hz partner. */
     @Test
     fun `a slower unit over the same seconds keeps the analysis`() {
