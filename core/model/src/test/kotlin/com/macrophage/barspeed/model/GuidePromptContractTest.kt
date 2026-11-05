@@ -518,6 +518,27 @@ class GuidePromptContractTest {
         }
     }
 
+    /**
+     * The prompt states the 1.15 tempo contract (#258): an "X" may sit on
+     * digit 1 as well as digit 3, and the plan is told which stroke it means
+     * by role -- the drive -- rather than by position. A prompt still saying
+     * "digit 3 only" makes every pulldown and pushdown plan written from it
+     * spell its explosive drive on the eccentric, which the app then draws as
+     * an X it will not let the lifter step back into.
+     */
+    @Test
+    fun `the plan prompt lets X sit on the drive in digit 1 or digit 3`() {
+        assertTrue("accepted in digit 3 only" !in prompt, "the plan prompt still confines X to digit 3")
+        assertTrue(
+            "\"X\" is accepted in digit 1 or digit 3" in prompt,
+            "the plan prompt never says digit 1 takes an X",
+        )
+        assertTrue(
+            "on the CONCENTRIC digit" in prompt,
+            "the plan prompt never says which of the two strokes an X belongs on",
+        )
+    }
+
     private companion object {
         /**
          * The source spelling of the interpolation both version sites use. The
@@ -529,4 +550,5 @@ class GuidePromptContractTest {
         val SKELETON_VERSION = Regex("\"schemaVersion\": *\"([^\"]*)\"")
         val PROSE_VERSION = Regex("""full (\d+\.\d+) contract""")
     }
+
 }

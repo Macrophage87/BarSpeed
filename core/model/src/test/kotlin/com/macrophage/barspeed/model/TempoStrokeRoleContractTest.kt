@@ -30,17 +30,12 @@ import kotlin.test.assertTrue
  *   between-sets wheel already honoured that floor; the plan import gate did
  *   not, and neither did the published pattern.
  *
- * WHAT THIS FILE DOES NOT CLAIM. A vertical concentric-DOWN lift's drive is
- * digit 1, and it still cannot be stepped to X -- not because the role rule
- * says so, but because [Tempo] has no way to hold one: `downS` is a
- * non-nullable Double and [Tempo.parse] refuses a non-numeric digit 1. So on a
- * pulldown NEITHER stroke offers X, and the owner's ask -- step the down
- * stroke on a pulldown to X -- is not discharged here. Widening the notation
- * is #258, which changes [Tempo]'s shape, the plan schema, the voice guide and
- * the tempo scorer together. The role rule is written so that #258 turns the
- * offer on by itself: the concentric digit is offered X exactly where
- * [TempoAdjustPolicy.spellable] says X can be spelled, and #258 moves that one
- * statement.
+ * A vertical concentric-DOWN lift's drive is digit 1, and since #258 (plan
+ * schema 1.15) it can be stepped to X: [Tempo] holds a null `downS` and
+ * [Tempo.parse] reads an X there. The role rule needed no change for it --
+ * the concentric digit is offered X exactly where
+ * [TempoAdjustPolicy.spellable] says X can be spelled, and #258 moved that one
+ * statement. The eccentric is still never offered X on any lift shape.
  */
 class TempoStrokeRoleContractTest {
     private fun benchPress() = TempoAdjustPolicy.digits(concentricUp = true, horizontal = false)
@@ -73,7 +68,7 @@ class TempoStrokeRoleContractTest {
         }
         val pulldown = pulldown()
         assertEquals(oneToNine, at(pulldown, TempoAdjustPolicy.UP_STROKE).choices, "the return is never explosive")
-        assertEquals(oneToNine, at(pulldown, TempoAdjustPolicy.DOWN_STROKE).choices, "the drive cannot spell one")
+        assertEquals(listOf("X") + oneToNine, at(pulldown, TempoAdjustPolicy.DOWN_STROKE).choices, "the drive")
         assertEquals(zeroToNine, at(pulldown, TempoAdjustPolicy.BOTTOM_PAUSE).choices)
         assertEquals(zeroToNine, at(pulldown, TempoAdjustPolicy.TOP_PAUSE).choices)
     }
@@ -143,22 +138,43 @@ class TempoStrokeRoleContractTest {
     }
 
     /**
-     * A vertical concentric-DOWN lift's drive is digit 1 and cannot be stepped
-     * to X, because the notation cannot hold one. #258, not this change.
+     * INVERTS `a pulldown's drive cannot reach X because the notation cannot
+     * spell one` (#258).
      *
-     * Green at its own parent and green here: it pins the BOUNDARY of what
-     * landed rather than a behaviour that moved, and it is written down so that
-     * the gap between the owner's ask and what shipped is a failing assertion
-     * the day #258 lands rather than a sentence in a commit body.
+     * That pin was written to fail the day the notation widened, and this is
+     * it failing on purpose: digit 1 now spells X, so a pulldown's drive steps
+     * below one into X and stops there, exactly as a bench press's does on
+     * digit 3, and the written tempo says X in the position the lift drives.
      */
     @Test
-    fun `a pulldown's drive cannot reach X because the notation cannot spell one`() {
-        assertNull(Tempo.parseOrNull("X010"), "digit 1 takes no X")
-        assertFalse(TempoAdjustPolicy.EXPLOSIVE in TempoAdjustPolicy.spellable(TempoAdjustPolicy.DOWN_STROKE))
+    fun `a pulldown's drive steps below one into X and stops there`() {
+        assertEquals(Tempo(null, 0.0, 1.0, 0.0), Tempo.parseOrNull("X010"), "digit 1 takes an X")
+        assertTrue(TempoAdjustPolicy.EXPLOSIVE in TempoAdjustPolicy.spellable(TempoAdjustPolicy.DOWN_STROKE))
         val drive = at(pulldown(), TempoAdjustPolicy.DOWN_STROKE)
         assertEquals("concentric", drive.caption)
-        assertEquals("1", TempoAdjustPolicy.steppedValue("1010", drive, -1))
-        assertFalse(TempoAdjustPolicy.canStep("1010", drive, -1))
+        assertEquals("X", TempoAdjustPolicy.steppedValue("1010", drive, -1))
+        assertTrue(TempoAdjustPolicy.canStep("1010", drive, -1))
+        assertEquals("X010", TempoAdjustPolicy.withDigit("1010", drive, "X"))
+        assertFalse(TempoAdjustPolicy.canStep("X010", drive, -1), "nothing faster than X")
+        assertEquals("1", TempoAdjustPolicy.steppedValue("X010", drive, 1))
+        assertEquals(listOf("X", "0", "1", "0"), TempoAdjustPolicy.wheelValues("X010"))
+    }
+
+    /**
+     * The other half of the same rule: on a lift whose digit 1 is the
+     * ECCENTRIC -- a bench press, a seated row -- digit 1 still never offers X,
+     * though the notation can now spell one there. A plan may declare `X0X0`
+     * on a bench press; the control draws it and steps out of it, as it does a
+     * plan-authored explosive return on a pulldown.
+     */
+    @Test
+    fun `a bench press's lowering is never offered X, and a plan-authored one steps out`() {
+        val lowering = at(benchPress(), TempoAdjustPolicy.DOWN_STROKE)
+        assertEquals("eccentric", lowering.caption)
+        assertNull(TempoAdjustPolicy.withDigit("3010", lowering, "X"))
+        assertEquals("1", TempoAdjustPolicy.steppedValue("X0X0", lowering, -1))
+        assertEquals("1", TempoAdjustPolicy.steppedValue("X0X0", lowering, 1))
+        assertEquals("10X0", TempoAdjustPolicy.withDigit("X0X0", lowering, "1"))
     }
 
     /**
@@ -211,7 +227,7 @@ class TempoStrokeRoleContractTest {
     /** A pause of 0 is a real pause -- the one where the lifter does not stop -- and stays valid. */
     @Test
     fun `a zero pause is still a tempo the plan gate accepts`() {
-        listOf("1010", "3010", "1-0-1-0", "30X0", "3-0-X-0").forEach { text ->
+        listOf("1010", "3010", "1-0-1-0", "30X0", "3-0-X-0", "X010", "X-0-X-0").forEach { text ->
             assertEquals(
                 emptyList(),
                 PlanSetDef(reps = 5, tempo = text).validate("sessions[0].exercises[0].sets[0]"),
@@ -237,6 +253,35 @@ class TempoStrokeRoleContractTest {
         listOf("1010", "3010", "30X0", "30x0", "4-0-1-0", "4-0-X-0", "0.5-0-1-0", "10-0-1-0").forEach {
             assertTrue(pattern.matches(it), "the published pattern no longer accepts '$it'")
         }
+    }
+
+    /**
+     * INVERTS the published pattern's `X in digit 3 only` (#258, plan schema
+     * 1.15): digit 1 takes an X in both the compact and the dash form, the two
+     * pauses still take none, and the schema says so among its versions.
+     *
+     * The pattern and [Tempo.parse] move in one change because the import gate
+     * is the parser: a pattern that refused `X010` while the app took it, or
+     * took it while the app refused it, is a plan that validates in an ajv run
+     * and is then treated differently on the phone.
+     */
+    @Test
+    fun `the published plan schema takes an X on either stroke and on no pause`() {
+        val pattern = Regex(tempoPattern())
+        listOf("X010", "x010", "X0X0", "X-0-1-0", "x-2-X-1").forEach {
+            assertTrue(pattern.matches(it), "the published pattern refuses '$it'")
+            assertTrue(Tempo.parseOrNull(it) != null, "the app refuses '$it'")
+        }
+        listOf("3X10", "301X", "3-X-1-0", "3-0-1-X", "XX10").forEach {
+            assertFalse(pattern.matches(it), "the published pattern accepts '$it'")
+            assertNull(Tempo.parseOrNull(it), "the app accepts '$it'")
+        }
+        val versions = planSchema()["properties"]!!.jsonObject["schemaVersion"]!!.jsonObject
+        assertTrue(
+            versions["description"]!!.jsonPrimitive.content.contains("1.15: "),
+            "plan schema 1.15 does not record the widened digit 1 among its changes",
+        )
+        assertTrue(tempoNode()["description"]!!.jsonPrimitive.content.contains("digit 1 or digit 3"))
     }
 
     /**

@@ -114,7 +114,9 @@ class StartCueVoiceContractTest {
                 def("row", StartPhase.CONCENTRIC, horizontal = true),
             )
         for (lift in lifts) {
-            for (tempo in listOf("1010", "1120", "2020", "3110", "20X0")) {
+            // X010 and X0X0 since #258: digit 1 can be explosive, and on the
+            // pulldown it is the drive, so the first word has a new branch.
+            for (tempo in listOf("1010", "1120", "2020", "3110", "20X0", "X010", "X0X0")) {
                 assertAgrees(lift, tempo)
             }
         }
