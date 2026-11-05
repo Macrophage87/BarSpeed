@@ -60,12 +60,53 @@ data class ImuSample(
     val yawDeg: Double,
 )
 
-/** One decoded heart-rate measurement. RR intervals are in milliseconds. */
+/**
+ * One decoded heart-rate measurement. RR intervals are in milliseconds.
+ *
+ * [contact] is what the notification said about skin contact (#82), and
+ * [SensorContact.NOT_RECORDED] by default, which is what every sample decoded
+ * from a file written before the field existed must say.
+ */
 data class HrSample(
     val timestampMs: Long,
     val bpm: Int,
     val rrIntervalsMs: List<Double> = emptyList(),
+    val contact: SensorContact = SensorContact.NOT_RECORDED,
 )
+
+/**
+ * The Heart Rate Measurement characteristic's Sensor Contact bits, as one
+ * notification reported them (#82).
+ *
+ * Bit 2 of the flags byte is Sensor Contact Support and bit 1 is Sensor
+ * Contact Status. A strap that sets Support says, per notification, whether it
+ * detected skin contact; one that clears it says nothing either way, and a
+ * stream decoded from a file written before this was carried says nothing
+ * either.
+ *
+ * THREE STATES, NOT TWO, and the third is the point. A boolean would have to
+ * call every historical capture and every strap that does not report contact
+ * either "worn" or "not worn", and both are claims nobody measured: absence
+ * rendered as a value, one level below the trust check it feeds.
+ * [NOT_RECORDED] covers both "the strap did not report it" and "this file
+ * predates the column", which are the same fact for every reader here:
+ * nothing is known about contact. A reader needing to tell them apart has the
+ * file's header -- three columns or four -- and the export's app version.
+ *
+ * DETECTED is what the strap claimed, not what was true. Whether the strap in
+ * use sets either bit at all has never been observed: the flags byte was
+ * discarded before anything was stored.
+ */
+enum class SensorContact {
+    /** Support set, Status set: the strap reported skin contact. */
+    DETECTED,
+
+    /** Support set, Status clear: the strap reported no skin contact. */
+    NOT_DETECTED,
+
+    /** Support clear, or a stream written before contact was recorded. */
+    NOT_RECORDED,
+}
 
 /** Rep phases, in the order they occur for an eccentric-first lift. */
 enum class Phase { IDLE, ECCENTRIC, BOTTOM_PAUSE, CONCENTRIC, TOP_PAUSE }
