@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Macrophage87/AccelerometerLifting/docs/schemas/raw-meta.schema.json",
   "title": "Raw Archive Manifest",
-  "description": "The meta.json manifest inside a BarSpeed raw-data zip: one descriptor per set, naming the CSV files the zip holds for it and the facts a reader who opens only the CSVs needs to interpret them -- which way the lift moved, how the sensor was mounted, which sensor was analysed, where the prep window was. The analysis itself is in the zip's session.json (session-export.schema.json); where a key here and a key there state one fact they use the same words, and the flat keys here correspond to nested objects there. Every unknown is expressed by omitting the key: this document writes no null literals. VERSION LOG. meta.json carries no version key of its own -- adding one would change the bytes of every manifest -- so this log is tied to the app build that wrote the file, which meta.json states as `appVersion`. 1.0 (appVersion 0.2.0, issue #326): first publication, describing meta.json exactly as RawExporter writes it on the 0.2.0 release branch. Builds of that branch made before its version bump, and v0.1.59 itself, write the same shape stamped 0.1.59. Manifests written by earlier builds are not guaranteed to validate against it: v0.1.44 to v0.1.46 wrote a sensorsPlanned key this schema does not declare; v0.1.31 to v0.1.50 wrote rollExcursion_deg without rollExcursionBasis, as the range over the whole capture; builds up to v0.1.30 could write \"sampleRate_hz\": null, and builds before v0.1.38 could write it as 0.0. Read a manifest's appVersion before applying this schema to it. Every later change to what RawExporter writes into meta.json adds an entry here and moves this schema, its example and RawExporterTest's manifest pin in the same change; a key this schema does not declare fails validation, because every object here is closed.",
+  "description": "The meta.json manifest inside a BarSpeed raw-data zip: one descriptor per set, naming the CSV files the zip holds for it and the facts a reader who opens only the CSVs needs to interpret them -- which way the lift moved, how the sensor was mounted, which sensor was analysed, where the prep window was. The analysis itself is in the zip's session.json (session-export.schema.json); where a key here and a key there state one fact they use the same words, and the flat keys here correspond to nested objects there. Every unknown is expressed by omitting the key: this document writes no null literals. VERSION LOG. meta.json carries no version key of its own -- adding one would change the bytes of every manifest -- so this log is tied to the app build that wrote the file, which meta.json states as `appVersion`. 1.0 (appVersion 0.2.0, issue #326): first publication, describing meta.json exactly as RawExporter writes it on the 0.2.0 release branch. Builds of that branch made before its version bump, and v0.1.59 itself, write the same shape stamped 0.1.59. Within 1.0 (#297, export 1.26, lane L1 of that branch): a set of kind hold or carry writes no startsWith, concentric or concentricSource; a build of the branch made before that change, and v0.1.59, wrote all three for it. Manifests written by earlier builds are not guaranteed to validate against it: v0.1.44 to v0.1.46 wrote a sensorsPlanned key this schema does not declare; v0.1.31 to v0.1.50 wrote rollExcursion_deg without rollExcursionBasis, as the range over the whole capture; builds up to v0.1.30 could write \"sampleRate_hz\": null, and builds before v0.1.38 could write it as 0.0. Read a manifest's appVersion before applying this schema to it. Every later change to what RawExporter writes into meta.json adds an entry here and moves this schema, its example and RawExporterTest's manifest pin in the same change; a key this schema does not declare fails validation, because every object here is closed.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -124,9 +124,6 @@
           "bodyweight"
         ],
         "plane": [
-          "startsWith",
-          "concentric",
-          "concentricSource",
           "sensorOnStack",
           "sensorInverted",
           "travelRatio",
@@ -134,9 +131,6 @@
           "bodyweight"
         ],
         "sensorOnStack": [
-          "startsWith",
-          "concentric",
-          "concentricSource",
           "plane",
           "sensorInverted",
           "travelRatio",
@@ -144,9 +138,6 @@
           "bodyweight"
         ],
         "sensorInverted": [
-          "startsWith",
-          "concentric",
-          "concentricSource",
           "plane",
           "sensorOnStack",
           "travelRatio",
@@ -154,9 +145,6 @@
           "bodyweight"
         ],
         "travelRatio": [
-          "startsWith",
-          "concentric",
-          "concentricSource",
           "plane",
           "sensorOnStack",
           "sensorInverted",
@@ -164,9 +152,6 @@
           "bodyweight"
         ],
         "kind": [
-          "startsWith",
-          "concentric",
-          "concentricSource",
           "plane",
           "sensorOnStack",
           "sensorInverted",
@@ -174,9 +159,6 @@
           "bodyweight"
         ],
         "bodyweight": [
-          "startsWith",
-          "concentric",
-          "concentricSource",
           "plane",
           "sensorOnStack",
           "sensorInverted",
@@ -428,7 +410,7 @@
             "eccentric",
             "concentric"
           ],
-          "description": "Which phase the set starts with. This and the next eight keys are written together, from the set's stored geometry, or not at all: absent on every set recorded before geometry was stored."
+          "description": "Which phase the set starts with. This and the next eight keys come from the set's stored geometry and are absent together on every set recorded before geometry was stored. This key, concentric and concentricSource -- the stroke words -- are written together or not at all, and only with the other six. The other six (plane, sensorOnStack, sensorInverted, travelRatio, kind, bodyweight) are written together, and without the stroke words on a set of kind hold or carry (#297, export 1.26): such a set has no stroke, so its stroke words would be an absence the resolver filled. session.json omits the same three words for it (geometry.publishesStroke)."
         },
         "concentric": {
           "enum": [
