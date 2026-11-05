@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.ui.screens
 
 import android.app.Application
+import android.content.Intent
 import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -10,6 +11,7 @@ import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.data.OrphanedSet
 import com.macrophage.barspeed.data.RescuedDatabase
 import com.macrophage.barspeed.data.SessionEntity
+import com.macrophage.barspeed.model.RestoreVerdict
 import com.macrophage.barspeed.model.SessionHeartRate
 import com.macrophage.barspeed.model.VoidSetPolicy
 import com.macrophage.barspeed.model.VolumeSet
@@ -137,6 +139,15 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     val rescued: StateFlow<List<RescuedDatabase>> = rescuedFlow
 
     /**
+     * Issue #112: whether each rescue in [rescued] can be put back, keyed by
+     * its directory. Computed with the list, on IO, because it reads each
+     * rescue's header and `-wal` -- the same read the launch-time rescue
+     * makes, and never an open.
+     */
+    private val restoreVerdictsFlow = MutableStateFlow<Map<File, RestoreVerdict>>(emptyMap())
+    val restoreVerdicts: StateFlow<Map<File, RestoreVerdict>> = restoreVerdictsFlow
+
+    /**
      * Rescued directories with a share or a discard currently in flight,
      * keyed by [RescuedDatabase.directory] so one busy item does not disable
      * every card.
@@ -258,7 +269,57 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      * branch and is not issue #111's to change.
      */
     fun refreshRescued(): Job = viewModelScope.launch {
-        rescuedFlow.value = withContext(Dispatchers.IO) { container.rescuedDatabases.rescued() }
+        val (list, verdicts) = withContext(Dispatchers.IO) {
+            val list = container.rescuedDatabases.rescued()
+            val verdicts = runCatching {
+                list.associate { it.directory to container.databaseRestore.verdict(it, list) }
+            }.onFailure { AppLog.w(TAG, "restore verdicts failed; offering none", it) }.getOrDefault(emptyMap())
+            list to verdicts
+        }
+        restoreVerdictsFlow.value = verdicts
+        rescuedFlow.value = list
+    }
+
+    /**
+     * Put a rescued database back. Issue #112. By the time this runs the
+     * lifter has confirmed, in the card's own dialog.
+     *
+     * TWO STEPS, AND THIS IS ONLY THE FIRST. It writes a request naming the
+     * rescue and restarts the app; the swap itself happens at the next
+     * launch, in `AppDatabase.build`, before Room opens anything -- the one
+     * place nothing holds the file. The verdict is checked again there, so a
+     * request this build can honour and the next cannot is dropped.
+     *
+     * THE RESTART is a relaunch intent followed by ending the process. That
+     * the system then starts the activity in a fresh process is the
+     * documented shape of the call and has not been watched on a device; a
+     * phone that does not come back simply shows the launcher, and the next
+     * start does the restore. If no launch intent exists the lifter is told
+     * to reopen the app themselves.
+     */
+    fun restoreRescued(item: RescuedDatabase) {
+        if (!rescuedActionAllowed(item, busyRescuesFlow.value)) return
+        viewModelScope.launch {
+            busyRescuesFlow.update { it + item.directory }
+            val requested = withContext(Dispatchers.IO) { container.databaseRestore.request(item) }
+            if (!requested) {
+                busyRescuesFlow.update { it - item.directory }
+                Toast.makeText(getApplication(), "Couldn't schedule the restore -- try again", Toast.LENGTH_SHORT)
+                    .show()
+                return@launch
+            }
+            val app = getApplication<Application>()
+            val relaunch = app.packageManager.getLaunchIntentForPackage(app.packageName)
+                ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            if (relaunch == null) {
+                refreshRescued().join()
+                busyRescuesFlow.update { it - item.directory }
+                Toast.makeText(app, "Close BarSpeed and open it again to finish restoring", Toast.LENGTH_LONG).show()
+                return@launch
+            }
+            app.startActivity(relaunch)
+            Runtime.getRuntime().exit(0)
+        }
     }
 
     /**

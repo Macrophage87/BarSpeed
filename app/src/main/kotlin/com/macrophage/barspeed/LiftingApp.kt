@@ -5,6 +5,7 @@ import com.macrophage.barspeed.ble.AutoConnectManager
 import com.macrophage.barspeed.ble.BleScanner
 import com.macrophage.barspeed.ble.DeviceRegistry
 import com.macrophage.barspeed.data.AppDatabase
+import com.macrophage.barspeed.data.DATABASE_NAME
 import com.macrophage.barspeed.data.DatabaseRescue
 import com.macrophage.barspeed.data.PlanRepository
 import com.macrophage.barspeed.data.RawExporter
@@ -96,6 +97,15 @@ class AppContainer(app: Application) {
      * it reads the filesystem [DatabaseRescue] already left in place.
      */
     val rescuedDatabases = RescuedDatabaseStore(File(app.filesDir, DatabaseRescue.RESCUE_DIR))
+
+    /**
+     * Issue #112: what the rescued card asks before it offers RESTORE, and
+     * where it leaves the request. The same construction [AppDatabase.build]
+     * acts on at the next launch, so the card and the launch cannot judge a
+     * rescue differently.
+     */
+    val databaseRestore =
+        AppDatabase.restoreFor(app.getDatabasePath(DATABASE_NAME), File(app.filesDir, DatabaseRescue.RESCUE_DIR))
 
     /**
      * The crash reports [CrashHandler] has written, for Home's card to list
