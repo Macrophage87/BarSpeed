@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Macrophage87/AccelerometerLifting/docs/schemas/raw-meta.schema.json",
   "title": "Raw Archive Manifest",
-  "description": "The meta.json manifest inside a BarSpeed raw-data zip: one descriptor per set, naming the CSV files the zip holds for it and the facts a reader who opens only the CSVs needs to interpret them -- which way the lift moved, how the sensor was mounted, which sensor was analysed, where the prep window was. The analysis itself is in the zip's session.json (session-export.schema.json); where a key here and a key there state one fact they use the same words, and the flat keys here correspond to nested objects there. Every unknown is expressed by omitting the key: this document writes no null literals. VERSION LOG. meta.json carries no version key of its own -- adding one would change the bytes of every manifest -- so this log is tied to the app build that wrote the file, which meta.json states as `appVersion`. 1.0 (appVersion 0.2.0, issue #326): first publication, describing meta.json exactly as RawExporter writes it on the 0.2.0 release branch. Builds of that branch made before its version bump, and v0.1.59 itself, write the same shape stamped 0.1.59. Within 1.0 (#297, export 1.26, lane L1 of that branch): a set of kind hold or carry writes no startsWith, concentric or concentricSource; a build of the branch made before that change, and v0.1.59, wrote all three for it. Manifests written by earlier builds are not guaranteed to validate against it: v0.1.44 to v0.1.46 wrote a sensorsPlanned key this schema does not declare; v0.1.31 to v0.1.50 wrote rollExcursion_deg without rollExcursionBasis, as the range over the whole capture; builds up to v0.1.30 could write \"sampleRate_hz\": null, and builds before v0.1.38 could write it as 0.0. Read a manifest's appVersion before applying this schema to it. Every later change to what RawExporter writes into meta.json adds an entry here and moves this schema, its example and RawExporterTest's manifest pin in the same change; a key this schema does not declare fails validation, because every object here is closed.",
+  "description": "The meta.json manifest inside a BarSpeed raw-data zip: one descriptor per set, naming the CSV files the zip holds for it and the facts a reader who opens only the CSVs needs to interpret them -- which way the lift moved, how the sensor was mounted, which sensor was analysed, where the prep window was. The analysis itself is in the zip's session.json (session-export.schema.json); where a key here and a key there state one fact they use the same words, and the flat keys here correspond to nested objects there. Every unknown is expressed by omitting the key: this document writes no null literals. VERSION LOG. meta.json carries no version key of its own -- adding one would change the bytes of every manifest -- so this log is tied to the app build that wrote the file, which meta.json states as `appVersion`. 1.0 (appVersion 0.2.0, issue #326): first publication, describing meta.json exactly as RawExporter writes it on the 0.2.0 release branch. Builds of that branch made before its version bump, and v0.1.59 itself, write the same shape stamped 0.1.59. Within 1.0 (#297, export 1.26, lane L1 of that branch): a set of kind hold or carry writes no startsWith, concentric or concentricSource; a build of the branch made before that change, and v0.1.59, wrote all three for it. Within 1.0 (#337, lane L8 of that branch): a set that ran no prep and whose work began writes workStartedAt_ms equal to its startedAt_ms, alone, with no prepStartedAt_ms, so workStartedAt_ms no longer requires prepStartedAt_ms, and the rollExcursionBasis rules key on prepStartedAt_ms (a stored prep window) rather than on workStartedAt_ms; a build of the branch made before that change, and v0.1.59, wrote no work start on such a set. Manifests written by earlier builds are not guaranteed to validate against it: v0.1.44 to v0.1.46 wrote a sensorsPlanned key this schema does not declare; v0.1.31 to v0.1.50 wrote rollExcursion_deg without rollExcursionBasis, as the range over the whole capture; builds up to v0.1.30 could write \"sampleRate_hz\": null, and builds before v0.1.38 could write it as 0.0. Read a manifest's appVersion before applying this schema to it. Every later change to what RawExporter writes into meta.json adds an entry here and moves this schema, its example and RawExporterTest's manifest pin in the same change; a key this schema does not declare fails validation, because every object here is closed.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -191,9 +191,6 @@
         ],
         "prepStartedAt_ms": [
           "workStartedAt_ms"
-        ],
-        "workStartedAt_ms": [
-          "prepStartedAt_ms"
         ],
         "rollExcursion_deg": [
           "rollExcursionBasis"
@@ -547,11 +544,11 @@
         },
         "prepStartedAt_ms": {
           "type": "integer",
-          "description": "The prep window's start, epoch milliseconds, on the clock the IMU timestamp_ms column is stamped with. Written with workStartedAt_ms or not at all."
+          "description": "The prep window's start, epoch milliseconds, on the clock the IMU timestamp_ms column is stamped with. Written only where the set stored a prep window, and then always with workStartedAt_ms; a set that ran no prep has none."
         },
         "workStartedAt_ms": {
           "type": "integer",
-          "description": "The prep window's end, where the work began, epoch milliseconds."
+          "description": "Where the set's work began, epoch milliseconds. On a set that stored a prep window it is that window's end, and prepStartedAt_ms is written beside it. On a set that ran NO prep it is the START SET tap -- equal to startedAt_ms -- and is written alone (#337): the app states the work began at the tap. Absent where the instant is not known: a set that set out to run a prep and stored no window, a row written before v0.1.50 that cannot say whether its work began, or a set whose work never began."
         },
         "sampleRate_hz": {
           "type": "number",
@@ -570,7 +567,7 @@
             "toTerminalCue",
             "wholeCapture"
           ],
-          "description": "Which interval rollExcursion_deg covers. workingWindow and fromWorkStart are written exactly when the set carries workStartedAt_ms, because the work start is the window's opening bound; toTerminalCue and wholeCapture exactly when it does not."
+          "description": "Which interval rollExcursion_deg covers. workingWindow and fromWorkStart are written exactly when the set carries prepStartedAt_ms -- a stored prep window, whose end is the window's opening bound; toTerminalCue and wholeCapture exactly when it does not. A no-prep set's workStartedAt_ms is its capture's own start, so its roll is still reported over the capture and named so."
         },
         "sensors": {
           "type": "array",
@@ -594,7 +591,7 @@
           "if": {
             "required": [
               "rollExcursionBasis",
-              "workStartedAt_ms"
+              "prepStartedAt_ms"
             ]
           },
           "then": {
@@ -615,7 +612,7 @@
             ],
             "not": {
               "required": [
-                "workStartedAt_ms"
+                "prepStartedAt_ms"
               ]
             }
           },
@@ -633,7 +630,7 @@
         {
           "if": {
             "required": [
-              "workStartedAt_ms"
+              "prepStartedAt_ms"
             ]
           },
           "then": {
@@ -659,7 +656,7 @@
           "if": {
             "not": {
               "required": [
-                "workStartedAt_ms"
+                "prepStartedAt_ms"
               ]
             }
           },
@@ -733,7 +730,7 @@
             "toTerminalCue",
             "wholeCapture"
           ],
-          "description": "Which interval this entry's rollExcursion_deg covers. The set-level rule holds here too, and the set descriptor enforces it: workingWindow or fromWorkStart exactly when the set carries workStartedAt_ms, toTerminalCue or wholeCapture exactly when it does not, because every entry is windowed by the set's own work start and terminal cue."
+          "description": "Which interval this entry's rollExcursion_deg covers. The set-level rule holds here too, and the set descriptor enforces it: workingWindow or fromWorkStart exactly when the set carries prepStartedAt_ms, toTerminalCue or wholeCapture exactly when it does not, because every entry is windowed by the set's own stored prep window and terminal cue."
         }
       }
     }
