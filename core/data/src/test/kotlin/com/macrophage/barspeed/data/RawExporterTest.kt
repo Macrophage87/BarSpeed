@@ -1386,4 +1386,66 @@ class RawExporterTest {
             "the check reported nothing for a whole-capture basis on a set that carries a work start",
         )
     }
+
+    /**
+     * RED at the commit that writes it (L1 review round 2, lens B F2; #297,
+     * #326). A hold and a carry write the six geometry keys that are not
+     * stroke words and none of the three that are (#297), and the published
+     * raw-meta schema, as #326 wrote it, makes each of the nine geometry keys
+     * require the other eight -- so a manifest this writer produces for a
+     * hold or a carry breaks the schema's `dependentRequired`, and the
+     * schema check above reaches no such set. The dynamic set beside them
+     * still writes all nine, and the schema is held to all three.
+     *
+     * The controls are the rules the fix must keep: the dynamic set with
+     * `startsWith` struck off must still be reported (the three stroke keys
+     * still go together), and the hold with `plane` struck off must still be
+     * reported (the six still go together on a stroke-less set).
+     */
+    @Test
+    fun `the manifests of a hold and a carry meet the published schema`() = runTest {
+        val manifest =
+            meta(
+                listOf(
+                    row(id = 5L, geometry = legCurl.copy(kind = ExerciseKind.HOLD)),
+                    row(
+                        id = 6L,
+                        exerciseId = "carry",
+                        orderIdx = 1,
+                        geometry = legCurl.copy(kind = ExerciseKind.CARRY),
+                    ),
+                    row(
+                        id = 7L,
+                        exerciseId = "leg_curl",
+                        orderIdx = 2,
+                        actualReps = 5,
+                        durationS = null,
+                        analysis = analysedAt(100.0),
+                        geometry = legCurl,
+                    ),
+                ),
+                emptyMap(),
+            )
+        val sets = manifest.getValue("sets").jsonArray.map { it.jsonObject }
+        assertEquals(listOf("hold", "carry", "dynamic"), sets.map { it.text("kind") })
+        assertTrue(
+            sets.take(2).all { "startsWith" !in it && "plane" in it } && "startsWith" in sets[2],
+            "the fixture did not reach a stroke-less set beside a stroked one: $sets",
+        )
+        sets.forEachIndexed { i, set ->
+            assertEquals(emptyList(), RawMetaSchema.undeclaredInSet(set, "sets[$i]."), "keys or words the schema omits")
+            assertEquals(emptyList(), RawMetaSchema.unmetInSet(set, "sets[$i]."), "dependent keys the schema demands")
+        }
+
+        val unstroked = RawMetaSchema.unmetInSet(JsonObject(sets[2] - "startsWith"), "sets[2].")
+        assertTrue(
+            "sets[2].concentric needs startsWith" in unstroked,
+            "the check reported nothing for a dynamic set's stroke word struck off: $unstroked",
+        )
+        val unplaned = RawMetaSchema.unmetInSet(JsonObject(sets[0] - "plane"), "sets[0].")
+        assertTrue(
+            "sets[0].kind needs plane" in unplaned,
+            "the check reported nothing for a hold's plane struck off: $unplaned",
+        )
+    }
 }
