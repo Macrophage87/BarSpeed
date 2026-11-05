@@ -136,30 +136,28 @@ class SessionExportScoredPhasesBytesTest {
         ),
     )
 
-    private fun phase(name: String, prescribedS: Double, within: Int, of: Int, scored: Boolean) =
-        PhaseComplianceResult(
-            phase = name,
-            prescribedS = prescribedS,
-            actualMeanS = if (of == 0) null else prescribedS,
-            worstDeviationS = 0.0,
-            repsWithinTolerance = within,
-            repsEvaluated = of,
-            scored = scored,
-        )
+    private fun phase(name: String, prescribedS: Double, within: Int, of: Int, scored: Boolean) = PhaseComplianceResult(
+        phase = name,
+        prescribedS = prescribedS,
+        actualMeanS = if (of == 0) null else prescribedS,
+        worstDeviationS = 0.0,
+        repsWithinTolerance = within,
+        repsEvaluated = of,
+        scored = scored,
+    )
 
-    private fun compliance(eccentricOf: Int, concentricOf: Int) =
-        TempoComplianceResult(
-            prescribed = Tempo.parse("3010"),
-            toleranceS = 0.5,
-            phases =
-            listOf(
-                phase("eccentric", 3.0, eccentricOf, eccentricOf, scored = eccentricOf > 0),
-                phase("concentric", 1.0, concentricOf, concentricOf, scored = concentricOf > 0),
-            ),
-            repsFullyCompliant = maxOf(eccentricOf, concentricOf),
-            repsEvaluated = maxOf(eccentricOf, concentricOf),
-            prescribedEccConRatio = 3.0,
-        )
+    private fun compliance(eccentricOf: Int, concentricOf: Int) = TempoComplianceResult(
+        prescribed = Tempo.parse("3010"),
+        toleranceS = 0.5,
+        phases =
+        listOf(
+            phase("eccentric", 3.0, eccentricOf, eccentricOf, scored = eccentricOf > 0),
+            phase("concentric", 1.0, concentricOf, concentricOf, scored = concentricOf > 0),
+        ),
+        repsFullyCompliant = maxOf(eccentricOf, concentricOf),
+        repsEvaluated = maxOf(eccentricOf, concentricOf),
+        prescribedEccConRatio = 3.0,
+    )
 
     /** The exporter's text for the one set's `tempoCompliance`, one trimmed line per element. */
     private suspend fun tempoLines(compliance: TempoComplianceResult): List<String> {
