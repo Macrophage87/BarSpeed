@@ -120,16 +120,21 @@ set. A unit that rotated on its mount during the set has no single transform,
 and the honest output is a refusal (#185's body), not a transform fitted to a
 blend of two mountings.
 
-- Repeat step 2 over a closing still window, after the set's `Done` cue and
-  before the stream ends: the eleven completed sets of session 32 record
-  4.3-13.7 s past it (recorded on `SetEnd`). Only a set that ends on `Done`
-  has samples past its terminal cue. A set ended by tap has none --
-  `endSet` cancels the sample collectors before it reads the clock, so its
-  last sample is never later than the tap -- and that covers a tap-ended
-  guided set (`Stopped`) and an unguided rep set, which carries no terminal
-  word at all. A timed set (`Time`) has no window worth the name either: on
-  field-41 set 21, the one measured, the last sample is 33 ms before the
-  set's write (recorded on `SetEnd`). Each of those has no closing
+- Repeat step 2 over a closing still window, after the set's cadence `Done`
+  -- the boundary `SetEnd.of(cues, cadenceGuided = true)` returns, not
+  `calledOver` -- and before the stream ends: the eleven completed sets of
+  session 32 record 4.3-13.7 s past it (recorded on `SetEnd`). Only a set
+  that ends on a cadence `Done` has samples past its terminal cue. A set
+  ended by tap has none -- `endSet` cancels the sample collectors before it
+  reads the clock, so its last sample is never later than the tap -- and
+  that covers a tap-ended guided set (`Stopped`). An unguided rep set either
+  carries no word (voice off or no planned count) or carries `Done` as the
+  rep-count milestone (#285), which is not a call to stop lifting and opens
+  no closing window. A clock-ended timed set (`Time`) has none either: the
+  tick that speaks `Time` calls `endSet`, which cancels the collectors
+  first -- read from source; no clock-ended set has been measured.
+  Field-41 set 21, a hang ended by tap at 5 s of 30, is the tap case: its
+  last sample is 33 ms before its write. Each of those has no closing
   window, so the default below refuses it. Session 32's five failed sets were
   recorded before `Stopped` existed and carry no terminal word
   (`FailedSetBoundaryTest`, set 9); they end 0.482-0.832 s past their last
