@@ -68,8 +68,9 @@ package com.macrophage.barspeed.dsp
  * TWO CLOCKS MEET HERE, and only one of them is the motion's. The instant is
  * the app's own; a drive's end is read off sample ARRIVAL stamps, which carry
  * whatever delay the sensor, the link and the phone's stack added. On one
- * session of five a link ran 600 ms behind (#292), which would let handling
- * that ended up to that long before work began read as inside the window.
+ * session of five a link ran 600 ms behind the other unit (#292), a floor on
+ * its own delay, which would let handling that ended within that delay -- at
+ * least 600 ms -- before work began read as inside the window.
  * `ImuSample`'s KDoc is the one statement of what was measured and why no
  * offset is applied.
  *

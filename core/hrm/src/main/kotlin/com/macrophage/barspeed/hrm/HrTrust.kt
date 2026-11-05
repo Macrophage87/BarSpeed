@@ -357,8 +357,8 @@ object HrTrust {
      * A stream that cannot produce a budget is NOT silenced. Issue #82 -- a
      * strap streaming bpm with no R-R at all -- is deliberately not covered
      * here; since 1.26 [isTrusted] answers it per sample, and only where the
-     * strap reports no skin contact:
-     * "no budget" is equally true of a genuinely short set and of a strap that
+     * strap reports no skin contact. This rule declines it because "no
+     * budget" is equally true of a genuinely short set and of a strap that
      * connected a second before the set ended, and silencing on missing
      * evidence rests on zero observed instances against this rule's one.
      */
