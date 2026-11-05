@@ -347,6 +347,26 @@ private fun SetCard(record: SetRecordEntity, viewModel: SessionDetailViewModel, 
 private fun VoidRow(record: SetRecordEntity, viewModel: SessionDetailViewModel) {
     var asking by remember { mutableStateOf(false) }
     var reason by remember { mutableStateOf("") }
+    // The question before the mark comes off a set carrying the lifter's own
+    // words (#232). Whether to ask is VoidSetPolicy.unvoidAsks's decision.
+    var unvoiding by remember { mutableStateOf(false) }
+    val stored = record.voidReason
+    if (unvoiding && stored != null) {
+        AlertDialog(
+            onDismissRequest = { unvoiding = false },
+            title = { Text("Performed after all?") },
+            text = { Text(VoidSetPolicy.unvoidConfirmation(stored)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        unvoiding = false
+                        viewModel.setVoided(record.id, voided = false, reason = null)
+                    },
+                ) { Text("Mark performed") }
+            },
+            dismissButton = { TextButton(onClick = { unvoiding = false }) { Text("Keep the mark") } },
+        )
+    }
 
     if (asking) {
         AlertDialog(
@@ -404,10 +424,10 @@ private fun VoidRow(record: SetRecordEntity, viewModel: SessionDetailViewModel) 
     // label carries the state.
     TextButton(
         onClick = {
-            if (record.voided) {
-                viewModel.setVoided(record.id, voided = false, reason = null)
-            } else {
-                asking = true
+            when {
+                !record.voided -> asking = true
+                VoidSetPolicy.unvoidAsks(record.voidReason) -> unvoiding = true
+                else -> viewModel.setVoided(record.id, voided = false, reason = null)
             }
         },
     ) { Text(VoidSetPolicy.label(record.voided), color = BarColors.Sub) }
