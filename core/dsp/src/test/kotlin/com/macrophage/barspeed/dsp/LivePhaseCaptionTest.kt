@@ -33,13 +33,20 @@ class LivePhaseCaptionTest {
         plane = MovementPlane.HORIZONTAL,
     )
 
+    private fun caption(
+        phase: Phase,
+        d: LiftDirection,
+        labelWithdrawn: Boolean = false,
+        countWithheld: Boolean = false,
+    ) = LivePhaseCaption.of(phase, d, labelWithdrawn = labelWithdrawn, countWithheld = countWithheld)
+
     private fun load(n: String) = ImuCsv.decode(
         javaClass.getResourceAsStream("/$n")!!.readBytes().decodeToString(),
     )
 
     @Test
     fun `a lift that drives up reads its strokes and pauses by their positions`() {
-        val words = Phase.entries.associateWith { LivePhaseCaption.of(it, squat, labelWithdrawn = false) }
+        val words = Phase.entries.associateWith { caption(it, squat) }
         assertEquals(
             mapOf(
                 Phase.IDLE to "Ready",
@@ -59,7 +66,7 @@ class LivePhaseCaptionTest {
         // captioned CONCENTRIC "Driving up" and the pause at the top "Lockout"
         // whatever the lift, so a pushdown's drive read "Driving up" and its
         // stretch at the top read "Lockout".
-        val words = Phase.entries.associateWith { LivePhaseCaption.of(it, pushdown, labelWithdrawn = false) }
+        val words = Phase.entries.associateWith { caption(it, pushdown) }
         assertEquals(
             mapOf(
                 Phase.IDLE to "Ready",
@@ -74,12 +81,38 @@ class LivePhaseCaptionTest {
     }
 
     @Test
+    fun `a drive-down lift the stack rule inverts reads in the lifter's frame`() {
+        // A pushdown a plan declared `concentric: down`, on the stack table:
+        // SetGeometryPolicy.stackInversion's rule 3 inverts it, so the tracker
+        // measures the HANDLE's travel and its drive is the lifter's downward
+        // drive. The up and down words are true there and stay.
+        val inverted = LiftDirection(
+            startsWith = StartPhase.CONCENTRIC,
+            concentricUp = false,
+            sensorInverted = true,
+            sensorOnStack = true,
+        )
+        val words = Phase.entries.associateWith { caption(it, inverted) }
+        assertEquals(
+            mapOf(
+                Phase.IDLE to "Ready",
+                Phase.ECCENTRIC to "Raising",
+                Phase.BOTTOM_PAUSE to "Bottom pause",
+                Phase.CONCENTRIC to "Driving down",
+                Phase.TOP_PAUSE to "Top pause",
+            ),
+            words,
+            "declared drive-down pushdown on the stack, inverted",
+        )
+    }
+
+    @Test
     fun `a horizontal lift names no up or down`() {
         // The tracker orients a horizontal lift so the drive is positive, so
         // TOP_PAUSE there is the end the drive reaches and BOTTOM_PAUSE the end
         // it starts from. Neither is a top or a bottom, and neither stroke
         // goes up or down.
-        val words = Phase.entries.associateWith { LivePhaseCaption.of(it, chestPress, labelWithdrawn = false) }
+        val words = Phase.entries.associateWith { caption(it, chestPress) }
         assertEquals(
             mapOf(
                 Phase.IDLE to "Ready",
@@ -99,10 +132,10 @@ class LivePhaseCaptionTest {
         // reads IDLE. The ring captioned IDLE "Ready", a word that says the
         // set has not started, mid-set. Withdrawn means no word at all.
         listOf(squat, pushdown, chestPress).forEach { d ->
-            assertEquals(null, LivePhaseCaption.of(Phase.IDLE, d, labelWithdrawn = true), "$d, withdrawn")
+            assertEquals(null, caption(Phase.IDLE, d, labelWithdrawn = true), "$d, withdrawn")
             assertEquals(
                 "Ready",
-                LivePhaseCaption.of(Phase.IDLE, d, labelWithdrawn = false),
+                caption(Phase.IDLE, d),
                 "$d, before the first stroke",
             )
         }

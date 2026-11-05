@@ -36,9 +36,14 @@ import com.macrophage.barspeed.model.Phase
 object LivePhaseCaption {
     /**
      * The caption for [phase] on a lift moving as [direction], with
-     * [labelWithdrawn] the tracker's [LiveSetState.phaseLabelWithdrawn].
+     * [labelWithdrawn] the tracker's [LiveSetState.phaseLabelWithdrawn] and
+     * [countWithheld] the screen's `liveCountWithheld`: true once #280's
+     * fallback has given up the live count for the rest of the set, which
+     * drops the tracker and leaves [phase] at the [Phase.IDLE] of an empty
+     * [LiveSetState]. Not read yet.
      */
-    fun of(phase: Phase, direction: LiftDirection, labelWithdrawn: Boolean): String? {
+    @Suppress("UNUSED_PARAMETER")
+    fun of(phase: Phase, direction: LiftDirection, labelWithdrawn: Boolean, countWithheld: Boolean): String? {
         if (labelWithdrawn) return null
         val horizontal = direction.plane == MovementPlane.HORIZONTAL
         val up = direction.concentricUp

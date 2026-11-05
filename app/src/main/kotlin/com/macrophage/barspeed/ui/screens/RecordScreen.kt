@@ -3025,9 +3025,14 @@ private fun TempoRing(state: RecordState, slot: PlannedSlot?) {
     ProgressRing(progress = progress, ghostProgress = ghost, color = ringColor) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             // The words are LivePhaseCaption's, in :core:dsp, where they are
-            // pinned against the lift's drive direction and the #95
-            // withdrawal; null draws no caption.
-            LivePhaseCaption.of(phase, state.currentExercise.liftDirection(), state.live.phaseLabelWithdrawn)?.let {
+            // pinned against the lift's drive direction, the #95
+            // withdrawal and the #280 withheld count; null draws no caption.
+            LivePhaseCaption.of(
+                phase,
+                state.currentExercise.liftDirection(),
+                labelWithdrawn = state.live.phaseLabelWithdrawn,
+                countWithheld = state.liveCountWithheld,
+            )?.let {
                 Text(
                     it.uppercase(),
                     style = MaterialTheme.typography.labelMedium,
