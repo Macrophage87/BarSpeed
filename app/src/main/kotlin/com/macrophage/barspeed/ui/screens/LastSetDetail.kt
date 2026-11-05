@@ -175,6 +175,7 @@ private fun LastSetCard(state: RecordState, feedback: SetFeedback) {
             ratedDescription = rated,
             rpe = state.lastSetRpe,
             failed = state.lastSetFailed,
+            tappedFailed = state.lastSetTappedFailed,
             limiter = state.lastSetLimiter,
             limiterNote = state.lastSetLimiterNote,
             timed = feedback.actualDurationS != null,
