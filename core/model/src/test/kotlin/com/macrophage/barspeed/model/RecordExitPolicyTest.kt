@@ -284,7 +284,7 @@ class RecordExitPolicyTest {
      * prompt.
      *
      * That prompt's body tells the lifter that leaving without finishing leaves
-     * the session open and that nothing can finish it later. Once the close
+     * the session open, to be continued from Record (#48). Once the close
      * outlives the screen both halves are false, in the direction that reads as
      * a bug: the lifter is told the session will stay open, taps the button that
      * says so, and finds it closed.
