@@ -291,6 +291,27 @@ enum class NoRepsReason(val wireName: String) {
      */
     @SerialName("mountNotDeclared")
     MOUNT_NOT_DECLARED("mountNotDeclared"),
+
+    /**
+     * A carry prescribed in reps, whose stream was recorded and deliberately
+     * NOT segmented (export 1.26, lane L5's follow-up to #63).
+     * `RepAnalysisPolicy.segmentsReps` keeps every carry off the segmenter:
+     * on a walker's gait nothing captured says what a movement run is, so the
+     * figures are withheld rather than published unbounded and the count is
+     * the lifter's.
+     *
+     * Like [MOUNT_NOT_DECLARED], the segmenter never ran and [of] can never
+     * return it. `SetAnalyzer.withheldCarry` sets it, and ONLY when the stream
+     * held at least `SensorCapturePolicy.MIN_ANALYSABLE_FRAMES` samples: a
+     * shorter one would have been segmented by nothing whatever the kind, and
+     * it records what a sensorless set records -- no reason -- because the
+     * carry gate is not what emptied it.
+     *
+     * NOT RETROACTIVE. Every carry recorded before this keeps the empty
+     * summary it had.
+     */
+    @SerialName("carryNotSegmented")
+    CARRY_NOT_SEGMENTED("carryNotSegmented"),
     ;
 
     companion object {

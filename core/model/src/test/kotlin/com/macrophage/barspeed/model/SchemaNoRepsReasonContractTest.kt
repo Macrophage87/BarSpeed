@@ -126,12 +126,21 @@ class SchemaNoRepsReasonContractTest {
         // set with no sensor at all publishes `summary: {}` and NO reason,
         // because nothing analysed it; a set whose segmentation emptied
         // publishes a reason. Before 1.18 those two were the same document.
+        //
+        // "Exactly one set stating a reason" stood here until export 1.26 added
+        // a carry counted in reps, whose `carryNotSegmented` is the second
+        // (SchemaCarryNotSegmentedContractTest). What this test needs is one
+        // set the segmenter emptied beside one nobody analysed, so it asks for
+        // a segmentation reason by name rather than counting reasons.
         val sets = exampleSets()
         val reasons = sets.mapNotNull { it["summary"]?.jsonObject?.get("noRepsReason")?.jsonPrimitive?.content }
-        assertEquals(1, reasons.size, "the example does not carry exactly one set stating a reason")
-        assertTrue(
-            reasons.single() in SessionExport.VALID_NO_REPS_REASONS,
-            "the example states a reason the schema rejects: ${reasons.single()}",
+        reasons.forEach {
+            assertTrue(it in SessionExport.VALID_NO_REPS_REASONS, "the example states a reason the schema rejects: $it")
+        }
+        assertEquals(
+            listOf("runsExceedDisplacementCap"),
+            reasons.filterNot { it == "carryNotSegmented" },
+            "the example does not carry exactly one set the segmenter emptied",
         )
         assertTrue(
             sets.any { it["summary"]?.jsonObject?.isEmpty() == true },
