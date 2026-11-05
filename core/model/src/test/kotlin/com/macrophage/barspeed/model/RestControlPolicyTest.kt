@@ -398,4 +398,31 @@ class RestControlPolicyTest {
             }
         }
     }
+
+    // ---- a failed close and the next set, issues #49 and #333 --------------
+
+    /**
+     * THE DEFECT (#49). START NEXT SET is drawn after a failed close, so a
+     * lifter can keep lifting, but the close frozen at the first tap -- its
+     * end time, the HRV over the beats received so far, the rating -- survived
+     * the next set, and FINISH SESSION AGAIN replayed that copy over a set list
+     * that had grown since. The session was stamped as ending before its last
+     * sets. Starting a set from a failed close must drop the frozen copy, so
+     * the next finish computes from the session as it then is.
+     */
+    @Test
+    fun `starting a set after a failed close drops the frozen close`() {
+        assertEquals(SessionCloseState.NONE, RestControlPolicy.closeOnNextSet(SessionCloseState.FAILED))
+    }
+
+    /**
+     * Once `endSession` has landed the row has its end time, and only the
+     * final rest window is missing (#333). A set started from there would be
+     * recorded after the session's own end, so the retry is the only control:
+     * the session is finished.
+     */
+    @Test
+    fun `a finished session whose last rest did not save offers only the retry`() {
+        assertEquals(setOf(RestControl.RETRY_FINISH), RestControlPolicy.controls(SessionCloseState.REST_UNSAVED))
+    }
 }
