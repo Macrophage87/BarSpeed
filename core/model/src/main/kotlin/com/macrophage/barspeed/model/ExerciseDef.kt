@@ -195,15 +195,21 @@ data class ExerciseDef(
          *
          * `copy` rather than a fresh constructor call, deliberately: the seed
          * entry for `dead_hang` carries a display name and a HOLD kind, and
-         * rebuilding it from `ExerciseDef(id, id)` would set one flag and
-         * discard both.
+         * rebuilding it from scratch would set one flag and discard both.
          *
-         * Only `bodyweight` is seeded here. `sensorOnStack` has the same gap
-         * on the same path and is not tracked anywhere; for the owner to
-         * decide whether it is.
+         * An id with no seed entry falls back to [inferred], the definition
+         * `SessionRepository.exerciseById` builds for the same id on the plan
+         * path (#69 item 4). It used to fall back to the bare
+         * `ExerciseDef(id, id)`, which skipped the start phase, kind and stack
+         * inferences, so one id meant two exercises depending on which path
+         * asked. The stack default comes with it, which is #229 item 3's
+         * `sensorOnStack` half: an ad-hoc set against a [STACK_MOUNTED_IDS]
+         * id rides the stack as a plan slot does. Neither is reachable from
+         * the picker today -- it offers [SEED] alone, and no seed id is
+         * stack-mounted -- so this closes a landmine rather than a live bug.
          */
         fun resolvedById(id: String): ExerciseDef {
-            val base = seedById(id) ?: ExerciseDef(id, id)
+            val base = seedById(id) ?: inferred(id)
             return base.copy(
                 bodyweight = SetGeometryPolicy.bodyweightMount(base.id, base.bodyweight, declared = null),
             )
