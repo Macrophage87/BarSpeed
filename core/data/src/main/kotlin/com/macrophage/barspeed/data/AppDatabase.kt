@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.data
 
 import android.content.Context
+import android.util.Log
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -121,6 +122,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun exerciseDao(): ExerciseDao
 
     companion object {
+        private const val TAG = "AppDatabase"
+
         /** v2: timed-set (hold/carry) duration columns on set_records. */
         private val MIGRATION_1_2 =
             object : Migration(1, 2) {
@@ -792,7 +795,7 @@ abstract class AppDatabase : RoomDatabase() {
             val restore = restoreFor(databaseFile, rescueRoot)
             val restored = restore.prepare()
             check(restored !is RestoreOutcome.Stuck || restore.safeToOpen()) {
-                "a restore could go neither forward nor back and left a sidecar with no database beside it: $restored"
+                "a restore could go neither forward nor back and left no whole database at its path: $restored"
             }
             val rescued = DatabaseRescue.rescue(
                 databaseFile = databaseFile,
@@ -812,7 +815,11 @@ abstract class AppDatabase : RoomDatabase() {
                         // After migrations and Room's own validation: the one
                         // point that proves a restored database opens. A
                         // restore never verified here is undone next launch.
-                        override fun onOpen(db: SupportSQLiteDatabase) = restore.markOpened()
+                        override fun onOpen(db: SupportSQLiteDatabase) {
+                            if (!restore.markOpened()) {
+                                Log.w(TAG, "a restored database opened but its journal stayed; next launch undoes it")
+                            }
+                        }
                     },
                 )
                 .build()
