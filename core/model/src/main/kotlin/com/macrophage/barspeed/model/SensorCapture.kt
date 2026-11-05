@@ -627,12 +627,18 @@ object SensorCapturePolicy {
      * Removing the second unit's label, or forgetting it, nulls the live
      * roster's `secondaryAddress`, and `AutoConnectManager.setSecondaryImuAddress`
      * then disconnects the second link with no in-set guard, so that unit's
-     * stream can stop mid-set. A swap of the two labels keeps both addresses
-     * and drops nothing; a set armed for one opens no second collector, so a
-     * unit labelled mid-set adds no stream. A bar drawn from the live roster
-     * would drop or rename the dot of a unit the set is still declared to
-     * capture; the frozen roster keeps that dot, and its link state then
-     * shows the stream going quiet.
+     * stream can stop mid-set. Swapping the two labels drops it too, though it
+     * ends with both addresses where they were: [SensorRole] is A or B only and
+     * the Devices screen writes one label per tap, so a swap passes through a
+     * collision or an unlabelled unit, whose roster has no `secondaryAddress`.
+     * Link B is disconnected at the first tap and re-pointed at the same
+     * address after the second, so B's stream has a gap rather than an end --
+     * read from source; whether the set's still-open collector picks up the
+     * reconnected link's samples has not been watched on a device. A set armed
+     * for one opens no second collector, so a unit labelled mid-set adds no
+     * stream. A bar drawn from the live roster would drop or rename the dot of
+     * a unit the set is still declared to capture; the frozen roster keeps
+     * that dot, and its link state then shows the stream going quiet.
      *
      * So in a set the frozen roster wins, and only there. A set with nothing
      * frozen -- which no set reaching `inSetState` can be, and is answered
