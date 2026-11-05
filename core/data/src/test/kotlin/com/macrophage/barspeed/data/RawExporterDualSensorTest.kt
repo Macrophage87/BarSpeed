@@ -578,10 +578,12 @@ class RawExporterDualSensorTest {
      * units the app could not tell apart, an armed unit that went silent, and
      * a single armed unit that delivered nothing -- because each writes keys
      * the others do not. Each is held to the schema's keys and words and to
-     * its `required` and `dependentRequired` rules. The last two assertions
-     * are the controls: a check that cannot report an undeclared key, or a
-     * role list written without the armed count it depends on, would pass
-     * the first ones too.
+     * its `required`, `dependentRequired` and `allOf` rules; none has a prep
+     * window, so only the no-work-start basis rules apply here, and
+     * `RawExporterRollWindowTest`'s dual case reaches the work-start ones. The last
+     * two assertions are the controls: a check that cannot report an
+     * undeclared key, or a role list written without the armed count it
+     * depends on, would pass the first ones too.
      */
     @Test
     fun `every sensor key the manifest writes is declared by the published schema`() = runTest {

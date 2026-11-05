@@ -9,7 +9,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -412,6 +414,22 @@ class RawExporterRollWindowTest {
         assertEquals(12.0, set.sensor("b").num("rollExcursion_deg"))
         assertEquals("fromWorkStart", set.sensor("a").text("rollExcursionBasis"))
         assertEquals("fromWorkStart", set.sensor("b").text("rollExcursionBasis"))
+
+        // The published schema's entry-level basis rule (allOf[2]: a set with
+        // a work start gives each `sensors` entry a working-window word) is
+        // reached on writer output here and nowhere else (#326): this is the
+        // only fixture that writes a `sensors` array beside a prep window.
+        assertTrue("workStartedAt_ms" in set, "the prep fixture did not reach the descriptor: $set")
+        assertEquals(emptyList(), RawMetaSchema.unmetInSet(set), "the schema refuses what the writer wrote")
+        val entries = set.getValue("sensors").jsonArray
+        val a = entries.indexOfFirst { it.jsonObject.text("role") == "a" }
+        val wholeCapture = "rollExcursionBasis" to JsonPrimitive("wholeCapture")
+        val rebased = entries.mapIndexed { j, e -> if (j != a) e else JsonObject(e.jsonObject + wholeCapture) }
+        assertEquals(
+            listOf("sensors[$a].rollExcursionBasis=\"wholeCapture\" breaks allOf[2]"),
+            RawMetaSchema.unmetInSet(JsonObject(set + ("sensors" to JsonArray(rebased)))),
+            "the check reported nothing for a whole-capture sensor entry on a set that carries a work start",
+        )
     }
 
     // ---- what must not change ----------------------------------------------

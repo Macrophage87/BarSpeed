@@ -1347,6 +1347,10 @@ class RawExporterTest {
             sets.take(2).all { "rollExcursionBasis" in it.jsonObject },
             "the basis rules were never reached: ${sets.take(2)}",
         )
+        assertTrue(
+            "workStartedAt_ms" !in sets[1].jsonObject,
+            "the second set gained a work start, so allOf[1] is no longer reached: ${sets[1]}",
+        )
         val unopened =
             JsonObject(manifest + ("sets" to JsonArray(listOf(JsonObject(first - "files")) + sets.drop(1))))
         assertEquals(
