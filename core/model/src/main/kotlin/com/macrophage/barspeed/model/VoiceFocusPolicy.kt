@@ -70,7 +70,12 @@ enum class VoiceFocusChange { GAIN, LOSS, LOSS_TRANSIENT, LOSS_TRANSIENT_CAN_DUC
  *   can-duck form, or a gain -- says the request is still on the platform's
  *   stack, so it is still owed an abandon whatever was believed before.
  *   Only a permanent loss drops it. The voice keeps speaking through a
- *   transient loss; whether a call lets it be heard is the platform's.
+ *   transient loss; whether a call lets it be heard is the platform's. This
+ *   is a stated rule, not a fix: see [heldAfter] for why it changes nothing
+ *   the platform's documented sequence can reach. What DID change is the
+ *   caller's: `VoiceCounter` moves to what is wanted after every change, so
+ *   after a permanent loss mid-set it asks for focus again at once, where it
+ *   used to wait for the set's next word.
  * - **A voice going away** starts again from `VoiceFocusState()`: no set,
  *   nothing playing, so whatever is held is abandoned. `VoiceCounter.shutdown`
  *   does that; it is reached from `RecordViewModel.onCleared`, which is also
@@ -139,10 +144,18 @@ object VoiceFocusPolicy {
      *
      * A permanent [VoiceFocusChange.LOSS] drops it. Every other change is the
      * platform addressing a request it still holds, so the answer is true
-     * whatever [held] was: a request believed released and then sent a gain
-     * would otherwise never be abandoned, and the music would stay ducked
-     * under it. [held] is taken so the rule reads as a transition, and the
-     * answer does not depend on it.
+     * whatever [held] was. [held] is taken so the rule reads as a transition,
+     * and the answer does not depend on it.
+     *
+     * Defensive: the listener as it stood could not be shown to reach a
+     * request believed released while still stacked. On the platform's
+     * documented sequence no gain or transient change reaches a request after
+     * a permanent loss, an abandon or a refused request, and nothing here asks
+     * for delayed focus, so this changes no observable behaviour; the rule
+     * says what every change means so a later path cannot. During a call
+     * (a transient loss, then a gain) the voice keeps its request and keeps
+     * speaking, exactly as before; pausing or withholding speech during a
+     * transient loss is not built.
      */
     @Suppress("UNUSED_PARAMETER", "UnusedParameter")
     fun heldAfter(held: Boolean, change: VoiceFocusChange): Boolean = change != VoiceFocusChange.LOSS

@@ -52,8 +52,10 @@ class VoiceCounter(context: Context) {
     // VoiceFocusPolicy.heldAfter's (#340); this maps the integers and then
     // moves to what is wanted, so a change that leaves the request standing
     // while nothing wants it is abandoned rather than left holding the music
-    // down. Any other integer is not one this request can be sent, and is
-    // ignored.
+    // down. Moving after every change also means a permanent loss mid-set
+    // is answered by asking again at once, where the listener before #340
+    // waited for the set's next word. Any other integer is not one this
+    // request can be sent, and is ignored.
     private val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
         .setAudioAttributes(attributes)
         .setOnAudioFocusChangeListener { change -> focusChanged(change) }
