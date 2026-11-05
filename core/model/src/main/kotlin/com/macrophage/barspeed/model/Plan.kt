@@ -461,7 +461,7 @@ data class PlanFile(
         val where = "sessions[$si].exercises[$ei]: "
         val either = " - the set is measured $measured either way."
         val named = kind.name.lowercase()
-        return when {
+        val line = when {
             exercise.kindOverride != null ->
                 "${where}this plan declares \"kind\": \"${exercise.kind}\" but prescribes $prescribed$either " +
                     "Kind sets the movement type, not the timing."
@@ -472,6 +472,12 @@ data class PlanFile(
                 "${where}no \"kind\" is declared and the app guessed $named for ${exercise.exercise} from the " +
                     "id, but the plan prescribes $prescribed$either Declare \"kind\" if the guess is wrong."
         }
+        // A carry in reps is the one mismatch whose figures are withheld (#63):
+        // the set is counted on reps, by the lifter, and RepAnalysisPolicy keeps
+        // its stream off the segmenter. "Measured on reps" alone reads as the
+        // sensor measuring it.
+        val withheld = !mismatched.isTimed && !RepAnalysisPolicy.segmentsReps(isTimed = false, kind = kind)
+        return if (withheld) "$line $CARRY_IN_REPS" else line
     }
 
     /**
@@ -1343,3 +1349,11 @@ data class PlanSetDef(
         return errors
     }
 }
+
+/**
+ * What the import gate adds to its kind-versus-shape line on a carry
+ * prescribed in reps (#63): that set is counted by the lifter and
+ * [RepAnalysisPolicy] withholds every figure the segmenter would publish.
+ */
+private const val CARRY_IN_REPS =
+    "A carry prescribed in reps is counted by the lifter, and no velocity, range or power is published for it."
