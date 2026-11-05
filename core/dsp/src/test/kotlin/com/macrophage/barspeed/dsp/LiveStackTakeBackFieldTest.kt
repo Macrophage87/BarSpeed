@@ -35,16 +35,18 @@ import kotlin.test.assertTrue
  * window grows. So a prefix of the stream that reads
  * [StackMountSignal.NOT_ON_STACK] proves the set-end verdict early; the live
  * readout could act on it without making a second judgement. On field-41 set
- * 16's rope stream it would fire at sample 104, about a second into the
- * capture and before the first rep. The stack stream never fires.
+ * 16's rope stream it would fire once 105 leading samples are in (the sample
+ * at index 104), about a second into the capture and before the first rep.
+ * The stack stream never fires.
  *
  * ## Why it is not wired
  *
  * Replayed through the live counter a sensor-counted set runs
  * ([RepCounter.SENSOR], so `LiveCounterPolicy`'s full-cycle detector), the
  * rope stream calls 13 of the 14 reps performed under the rule's inversion
- * and 5 with the inversion taken back. The take-back would cost the lifter
- * eight reps on the only rope capture the corpus holds. The stack stream
+ * and 5 with the inversion taken back. On this one guided set replayed as
+ * straight reps, the take-back would cost eight called reps; nothing here
+ * says what a lifter would hear on a real straight set. The stack stream
  * calls 0 under either reading, so the live count on that exercise is not
  * an inversion problem at all, and nothing about the take-back can repair
  * it. (The figures #323 quoted -- 1 inverted, 2 uninverted -- were taken
@@ -54,6 +56,22 @@ import kotlin.test.assertTrue
  * The set-end path is not this. `SetAnalyzer` reads the same rope stream 16
  * inverted and 15 uninverted (`PushdownInversionFieldTest`), so its take-back
  * stands.
+ *
+ * ## The near neighbour this exposes, and does not fix
+ *
+ * The geometry the take-back produces is the CORRECT one for this unit: the
+ * set-end path reads the rope under it. It is also exactly what `beginSet`
+ * builds for a rope pushdown whose plan writes `sensorOnStack: false`, since
+ * the stack rule then never applies (`SetGeometryPolicy.stackInversion`),
+ * except that the take-back leaves `sensorOnStack` true, which on a vertical
+ * lift measures the same plane; `a plan that keeps the unit off the stack
+ * gets the taken-back geometry` pins both. So on that set, today, with no take-back anywhere, the live
+ * counter calls 5 of 14 on this stream. The better live count, 13, comes
+ * from the WRONG geometry. Why the full-cycle detector under-counts on the
+ * correct one is not measured here and is not fixed by anything in this
+ * file; it is recorded as a remainder of #334. Keeping the inversion is
+ * also a departure from #334's brief, which asked that the live count not
+ * apply the stack rule, and is the owner's to confirm or overrule.
  *
  * ## What is not claimed
  *
@@ -138,6 +156,21 @@ class LiveStackTakeBackFieldTest {
     fun `the rule inverts this set and its roll decides`() {
         assertEquals(true, used.sensorInverted, "the stack rule's inversion")
         assertEquals(false, takenBack.sensorInverted, "taken back off the stack")
+    }
+
+    @Test
+    fun `a plan that keeps the unit off the stack gets the taken-back geometry`() {
+        val offStack = SetGeometryPolicy.resolve(base, declared.copy(sensorOnStack = false))
+        // The two differ in one field, sensorOnStack, which the take-back
+        // leaves as the stack table set it. On a vertical lift both measure
+        // the same plane, and the live count below is the same five.
+        assertEquals(
+            takenBack.liftDirection().copy(sensorOnStack = false),
+            offStack.liftDirection(),
+            "declared off the stack against taken back, sensorOnStack aside",
+        )
+        assertEquals(takenBack.liftDirection().measuredPlane, offStack.liftDirection().measuredPlane, "measured plane")
+        assertEquals(5, liveCalls(offStack, load(rope)), "rope, live, under the geometry its plan declared")
     }
 
     @Test
