@@ -136,9 +136,14 @@ data class VoidedSetEffects(
  * the count right and every figure under it wrong.
  *
  * IT IS REVERSIBLE, and that is a data-safety property rather than a
- * convenience. Voiding the wrong set must cost a tap to undo, or the control
+ * convenience. Voiding the wrong set must be cheap to undo, or the control
  * becomes one more irreversible action on a screen whose only other
- * irreversible action already destroys a session.
+ * irreversible action already destroys a session. The MARK is what is
+ * reversible: a set voided with no reason comes back in one tap, and a set
+ * voided with one comes back through a confirmed question that deletes the
+ * reason with the mark ([unvoidAsks], #232). The lifter's words are not
+ * reversible, and the question says so. This paragraph said "a tap to undo"
+ * before #232 added that question, and is corrected rather than deleted.
  *
  * Nothing here touches Android, Room or a sensor.
  */

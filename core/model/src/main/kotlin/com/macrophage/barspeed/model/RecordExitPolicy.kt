@@ -277,10 +277,15 @@ object RecordExitPolicy {
      * separately below.
      *
      * RESTING loses less and still loses something no reprocessing can get
-     * back. Every set is durably written by then, but the session row is open,
-     * and the R-R intervals collected across the rest window live only in
-     * memory — the per-set HR streams keep the in-set beats, nothing keeps
-     * these. The last set's rep count and effort rating also stop being
+     * back. Every set is durably written by then. With no close asked for, or
+     * one whose session write failed, the session row is open; with a close
+     * whose session write landed and whose final rest window did not
+     * ([SessionCloseState.REST_UNSAVED], #333), the row is closed and only
+     * that window is missing. While the row is open, the R-R intervals
+     * collected across the rest window live only in memory — the per-set HR
+     * streams keep the in-set beats, nothing keeps these; once the session
+     * write has landed the HRV computed from them is stored, and what is left
+     * in memory is the window's heart-rate samples. The last set's rep count and effort rating also stop being
      * correctable, because the only screen that can edit them is this one.
      *
      * [write] and [close] are required rather than defaulted so that a caller

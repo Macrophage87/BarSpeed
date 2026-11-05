@@ -110,6 +110,22 @@ object RestControlPolicy {
         if (close == SessionCloseState.FAILED) SessionCloseState.NONE else close
 
     /**
+     * Whether READY's START SET may be drawn and operated while the close is
+     * in [close] (#49, #333).
+     *
+     * READY is the second door to a set. It draws the session-close controls
+     * as the rest screen does, so a close can be asked for there, and it is
+     * reached with a session row both by a continued session (#48) and by a
+     * body-weight refusal taken from the rest screen. Its START SET was drawn
+     * whatever the close was doing.
+     *
+     * Groundwork: answers true in every state, which is what READY did before
+     * this function existed.
+     */
+    @Suppress("UnusedParameter", "FunctionOnlyReturningConstant") // The rule arrives with its red (#49).
+    fun readyMayStartSet(close: SessionCloseState): Boolean = true
+
+    /**
      * The controls to draw while the close is in [close] and the lifter has
      * asked to finish but not yet answered the session rating (#159).
      *

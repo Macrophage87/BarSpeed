@@ -59,6 +59,22 @@ object SaveToPhonePolicy {
         else -> SaveOutcome.REFUSE
     }
 
+    /**
+     * The outcome for a picker result, where the screen knows which export
+     * the returning picker was opened for, [pickedKind], and the ViewModel
+     * knows which export its held bytes are, [heldKind] (null where none are
+     * held).
+     *
+     * Two pickers can be open at once: a second Save to phone tap before the
+     * first picker draws opens a second one over it, and each build replaces
+     * the one set of held bytes (#37).
+     *
+     * Groundwork: counts any held bytes as this picker's, which is what the
+     * one-kind flow did before this function existed.
+     */
+    fun onPickedFor(documentCreated: Boolean, heldKind: SaveKind?, pickedKind: SaveKind?): SaveOutcome =
+        onPicked(documentCreated = documentCreated, bytesHeld = heldKind != null, kind = pickedKind)
+
     /** What the lifter is told when an export could not be written at all. */
     const val REFUSED_MESSAGE = "Nothing was saved. Tap Save to phone again."
 }
