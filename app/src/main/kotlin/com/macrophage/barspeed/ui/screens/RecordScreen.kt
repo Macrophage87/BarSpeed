@@ -260,8 +260,11 @@ fun RecordScreen(navController: NavController, viewModel: RecordViewModel = view
                         // as something being broken. Labelled with the ROLE
                         // rather than "IMU"/"IMU B" so the dot that goes amber
                         // names the unit to go and look at -- and the armed
-                        // one is not always A (#156).
-                        val roster = state.roster
+                        // one is not always A (#156). DURING A SET it is the
+                        // roster the set was armed with, not the live one: a
+                        // unit relabelled mid-set must not move a dot the
+                        // capture underneath it did not move (#171 item 3).
+                        val roster = state.barRoster
                         // Volt means FRAMES ARE ARRIVING on these two, not
                         // that a link is up (#213). The strap passes nothing,
                         // because nothing publishes its frame arrivals and a

@@ -2356,6 +2356,10 @@ private fun inSetState(
     leadInRunning: Boolean,
 ): RecordState = s.copy(
     stage = Stage.IN_SET,
+    // The roster `beginSet` armed this set with, read off the same state `s`
+    // it read it from, so the top bar can go on drawing it while the live
+    // roster moves underneath the set (#171 item 3).
+    armedRoster = s.roster,
     setElapsedS = 0,
     live = LiveSetState(),
     manualSet = manualSet,
@@ -3602,7 +3606,22 @@ data class RecordState(
      * foreground are two steps, and between them nothing has reported.
      */
     val foregroundFailure: ForegroundStartFailure? = null,
+    /**
+     * The [roster] the set in progress was armed with, frozen by `inSetState`
+     * when it began, or null before the session's first set.
+     *
+     * Not cleared between sets; [barRoster] is the one reader and it asks
+     * whether a set is recording before using it (#171 item 3).
+     */
+    val armedRoster: SensorRoster? = null,
 ) {
+    /**
+     * What the top bar's sensor dots are drawn from: [armedRoster] while a set
+     * records, [roster] otherwise. [SensorCapturePolicy.shownRoster] decides,
+     * in `:core:model` where it is pinned.
+     */
+    val barRoster: SensorRoster get() = SensorCapturePolicy.shownRoster(roster, armedRoster, stage == Stage.IN_SET)
+
     val currentSlot: PlannedSlot? get() = queue.getOrNull(queueIndex)
     val nextSlot: PlannedSlot? get() = queue.getOrNull(queueIndex + 1)
 
