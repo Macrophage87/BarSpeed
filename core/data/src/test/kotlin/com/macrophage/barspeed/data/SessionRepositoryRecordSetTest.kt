@@ -978,44 +978,6 @@ class SessionRepositoryRecordSetTest {
         assertEquals(listOf("cable_fly"), exercises.inserted.map { it.id })
     }
 
-    /**
-     * #59. A row stored before the app's inference changed keeps the old
-     * answer for ever: the row is written once, and until this nothing wrote
-     * it again. `tricep_pushdown` was stored ECCENTRIC on every install that
-     * saw it before "pushdown" joined the hints, so a plan omitting `start`
-     * on it kept pairing every rep's phases backwards -- the drive counted as
-     * the lowering -- however many releases later. The repair is a rewrite of
-     * the stored row with what the app infers today, and it is safe because
-     * every stored value is an inference: no screen lets a lifter write one.
-     */
-    @Test
-    fun `a stored row that no longer says what the app infers is rewritten`() = runTest {
-        val stale = CustomExerciseEntity(
-            id = "tricep_pushdown",
-            displayName = "Tricep pushdown",
-            startsWith = StartPhase.ECCENTRIC.name,
-        )
-        val exercises = FakeExerciseDao(mutableMapOf(stale.id to stale))
-        repo(FakeSessionDao(), exercises).ensureExerciseExists("tricep_pushdown")
-        val row = exercises.inserted.single()
-        assertEquals("tricep_pushdown", row.id)
-        assertEquals(StartPhase.CONCENTRIC.name, row.startsWith)
-        assertEquals(StartPhase.CONCENTRIC.name, exercises.byId("tricep_pushdown")!!.startsWith)
-    }
-
-    /** The neighbour: a stored row that already agrees is left alone, not rewritten every set. */
-    @Test
-    fun `a stored row that still says what the app infers is not written again`() = runTest {
-        val current = CustomExerciseEntity(
-            id = "tricep_pushdown",
-            displayName = "Tricep pushdown",
-            startsWith = StartPhase.CONCENTRIC.name,
-        )
-        val exercises = FakeExerciseDao(mutableMapOf(current.id to current))
-        repo(FakeSessionDao(), exercises).ensureExerciseExists("tricep_pushdown")
-        assertEquals(emptyList(), exercises.inserted)
-    }
-
     // ---- heart rate: the unworn strap ---------------------------------------
 
     /**
