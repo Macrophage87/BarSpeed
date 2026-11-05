@@ -455,18 +455,28 @@ class StreamingSetTracker(
          * in progress; so this is tested on every sample, against the run's
          * own duration on the reconstructed clock.
          *
-         * DERIVED FROM THE COMMITTED CORPUS, AND FITTED WITH A SMALL MARGIN.
-         * Over the twenty-one captures `LiveCapCalibrationTest` scores, the
-         * longest live run at or under [DspConfig.maxRunDisplacementM] lasts
-         * 5.94 s; this is the first whole second above it, and that test pins
-         * both figures and that no in-cap run outlasts it. Eleven of the
-         * twenty-two over-cap runs do. The margin over the longest real run is
-         * 0.06 s, and that is chosen on the direction it fails in: a genuine
-         * phase longer than this loses its caption for the rest of the run --
-         * a label WITHHELD, never a wrong one -- which is the owner's ruling
-         * for a figure the analysis cannot bound. Nothing measures how often a
-         * real unguided phase runs past six seconds.
+         * FITTED OVER TWENTY-ONE CAPTURES, WITH A SMALL MARGIN, AND NOT OVER
+         * THE WHOLE COMMITTED CORPUS. Over the twenty-one captures
+         * `LiveCapCalibrationTest` scores, the longest live run at or under
+         * [DspConfig.maxRunDisplacementM] lasts 5.94 s; this is the first whole
+         * second above it, and that test pins both figures and that no in-cap
+         * run there outlasts it. Eleven of the twenty-two over-cap runs do. The
+         * margin over the longest in-cap run is 0.06 s, and that is chosen on
+         * the direction it fails in: a genuine phase longer than this loses
+         * its caption for the rest of the run -- a label WITHHELD, never a
+         * wrong one -- which is the owner's ruling for a figure the analysis
+         * cannot bound.
          *
+         * Outside those twenty-one it does fire on in-cap runs. Over the
+         * sixty-eight captures of `CandidateCorpus.ALL`, five in-cap runs of
+         * 6.33 to 7.31 s, on four tempo-prescribed captures (a 1120 pushdown,
+         * a 3010 cable row, bench and overhead press), outlast it, and on each
+         * the label is withdrawn for the rest of the run. Whether those are
+         * slow genuine phases or drift under the cap is not measured;
+         * `LiveCapCalibrationTest` pins the five. This paragraph used to call
+         * the bound "derived from the committed corpus", which claimed the
+         * wider set; it was fitted on the subset.
+
          * NOT [DspConfig.maxRunDisplacementM] and not a second statement of
          * it. That is a displacement, and it gates the COUNT; this is a
          * duration, and it gates a LABEL. #95 records why one constant is not

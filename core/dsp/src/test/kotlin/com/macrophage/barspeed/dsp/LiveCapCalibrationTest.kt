@@ -312,6 +312,49 @@ class LiveCapCalibrationTest {
     }
 
     @Test
+    fun `outside the captures the bound was fitted on, five in-cap runs outlast it`() {
+        // The test above fits [StreamingSetTracker.MAX_LABELLED_RUN_S] over
+        // THIS FILE'S twenty-one captures, and its KDoc used to call the bound
+        // "derived from the committed corpus". The committed corpus is wider:
+        // [CandidateCorpus.ALL] holds sixty-eight captures, the twenty-one
+        // among them. Over all sixty-eight, five in-cap runs last longer than
+        // the bound, on four captures, every one of them outside the fitted
+        // twenty-one and every one a tempo-prescribed set. On each, the
+        // tracker withdraws the label for the rest of that run.
+        //
+        // Not settled here: whether those five are genuine slow phases or
+        // drift that stayed under the displacement cap. Either way the label
+        // is withheld, never wrong, which is the direction the bound fails in.
+        //
+        // Durations are the rebuilt model's [liveRuns]. Its licence above is
+        // on REP COUNT only, and pins nothing about where a run starts or
+        // ends, so these figures are the model's, not the tracker's private
+        // run state.
+        val c = DspConfig()
+        val bound = StreamingSetTracker.MAX_LABELLED_RUN_S
+        val fitted = corpus.map { it.first.removeSuffix(".csv") }.toSet()
+        assertEquals(fitted, fitted.intersect(CandidateCorpus.ALL.map { it.fixture }.toSet()), "the fitted subset")
+        assertEquals(68, CandidateCorpus.ALL.size, "captures in the wider corpus")
+        val outlasting = CandidateCorpus.ALL.flatMap { cap ->
+            liveRuns(load("${cap.fixture}.csv"), cap.direction, c)
+                .filter { it.displacementM <= c.maxRunDisplacementM && it.durationS > bound }
+                .map { cap.fixture to "%.2f".format(java.util.Locale.US, it.durationS) }
+        }
+        assertEquals(
+            listOf(
+                "field-bench-3010-6rep-s37-set05" to "6.84",
+                "field-cablerow-3010-8rep-s42-set10" to "7.20",
+                "field-ohp-3010-8rep-s37-set01" to "6.43",
+                "field-pushdown-1120-14rep-s41-set16" to "6.33",
+                "field-pushdown-1120-14rep-s41-set16" to "7.31",
+            ),
+            outlasting.sortedWith(compareBy({ it.first }, { it.second })),
+            "in-cap runs past the bound, with their durations in seconds",
+        )
+        assertEquals(0, outlasting.count { it.first in fitted }, "of those, on a capture the bound was fitted on")
+    }
+
+    @Test
     fun `no movement label outlasts the phase label bound on any capture`() {
         // The behaviour #95 asks for, on the published state itself rather
         // than the model: while [LiveSetState.phase] names a movement, the run
