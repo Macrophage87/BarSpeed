@@ -188,6 +188,58 @@ class PlanImportWarningTest {
         )
     }
 
+    /**
+     * #68. The shape check read only a DECLARED kind, so a kind the app
+     * reached by itself -- the seed's, or the guess from the id -- that
+     * contradicts the set's own shape imported with no word. The set is still
+     * measured on what it prescribes, so no number is fabricated; what the
+     * lifter is not told is that the classification still decides whether the
+     * set is guided, whether the peak-velocity readout shows, and what plate
+     * maths it gets. The two halves differ in what the author can do about
+     * it, so they say different things.
+     */
+    @Test
+    fun `a guessed kind that contradicts the set's shape is warned about too`() {
+        val result = parse("""{"exercise":"sled_push","sets":[{"reps":4}]}""")
+
+        assertEquals(
+            listOf(
+                undeclaredStart("sled_push"),
+                "sessions[0].exercises[0]: no \"kind\" is declared and the app guessed carry for " +
+                    "sled_push from the id, but the plan prescribes reps - the set is measured on reps " +
+                    "either way. Declare \"kind\" if the guess is wrong.",
+            ),
+            result.warnings,
+        )
+    }
+
+    @Test
+    fun `a built-in kind that contradicts the set's shape is warned about too`() {
+        val result = parse("""{"exercise":"kettlebell_swing","sets":[{"duration_s":60}]}""")
+
+        assertEquals(
+            listOf(
+                "sessions[0].exercises[0]: kettlebell_swing is a built-in explosive exercise, but the " +
+                    "plan prescribes duration_s - the set is measured on the clock either way. Declare " +
+                    "\"kind\" if the plan means a different movement.",
+            ),
+            result.warnings,
+        )
+    }
+
+    /** The neighbours: a kind that agrees with the shape, from either source, says nothing. */
+    @Test
+    fun `a seed or guessed kind that agrees with the set's shape draws no shape warning`() {
+        listOf(
+            """{"exercise":"plank","sets":[{"duration_s":30}]}""",
+            """{"exercise":"farmers_walk","sets":[{"duration_s":40}]}""",
+            """{"exercise":"back_squat","sets":[{"reps":5}]}""",
+            """{"exercise":"sled_push","start":"bottom","sets":[{"duration_s":20}]}""",
+        ).forEach { exercise ->
+            assertEquals(emptyList(), parse(exercise).warnings, exercise)
+        }
+    }
+
     @Test
     fun `a declared kind that only contradicts the guess is informational`() {
         // pallof_hold, not hanging_leg_raise. The first version of this test
