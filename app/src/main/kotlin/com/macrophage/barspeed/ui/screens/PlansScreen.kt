@@ -240,7 +240,13 @@ fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewMo
                     TextButton(onClick = { viewModel.approve(summary.planId) }) { Text("Approve") }
                 },
                 dismissButton = {
-                    TextButton(onClick = { viewModel.discard(summary.planId) }) { Text("Discard") }
+                    // Reopened from "Make active" on a stored plan, the gate
+                    // closes and keeps it; only a fresh import is discarded.
+                    if (result.stored) {
+                        TextButton(onClick = viewModel::dismissImportResult) { Text("Cancel") }
+                    } else {
+                        TextButton(onClick = { viewModel.discard(summary.planId) }) { Text("Discard") }
+                    }
                 },
             )
         }
