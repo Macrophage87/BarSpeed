@@ -57,7 +57,7 @@
     },
     "csvHeaderHrm": {
       "type": "string",
-      "description": "The header row of every *_hrm.csv, *_rest_before_hrm.csv and *_rest_after_hrm.csv in the zip."
+      "description": "The header row THIS build writes for every *_hrm.csv, *_rest_before_hrm.csv and *_rest_after_hrm.csv: `timestamp_ms,hr_bpm,rr_ms,contact` since export 1.26 (#82). Stored streams are copied into the zip verbatim, each with its own header line, so a stream recorded by an earlier build still has three columns, `timestamp_ms,hr_bpm,rr_ms`: read each file's own header for its width, never this key. `contact` is `1` where the strap reported skin contact, `0` where it reported none, and EMPTY where it said nothing; a three-column file means the same as empty on every row, never either reported value."
     },
     "csvHeaderCues": {
       "type": "string",

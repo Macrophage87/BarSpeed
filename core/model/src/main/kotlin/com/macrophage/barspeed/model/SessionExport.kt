@@ -2842,6 +2842,28 @@ data class SessionExport(
          * descriptions; `HrTrustTest > the set's mean is truncated, never
          * rounded` and `SessionHeartRateTest > the mean is truncated as
          * endSession truncates it, never rounded` pin the arithmetic.
+         *
+         * 1.26 (#82, the strap's sensor-contact report): every raw
+         * heart-rate CSV -- `hrm`, `rest_before_hrm`, `rest_after_hrm` -- gains a
+         * fourth column, `contact`, and `meta.json`'s `csvHeaderHrm` follows it.
+         * `1` the strap reported skin contact, `0` it reported none, EMPTY it
+         * said nothing (Sensor Contact Support clear). A three-column stream
+         * written before this build decodes as EMPTY, never as either reported
+         * value; [SensorContact.NOT_RECORDED] is that third state. Stored streams
+         * are exported verbatim, so an archive spanning both builds holds both
+         * widths.
+         *
+         * WHAT MOVES HERE: a sample with no R-R interval whose strap reported no
+         * contact is no longer trusted, so it reaches no figure of a set's `hr`
+         * block. No R-R and no report is still trusted on its bpm, and a sample
+         * with possible R-R intervals is never overruled. UNMEASURED: whether
+         * the strap in use sets Sensor Contact Support at all. NOT RETROACTIVE.
+         * No key is added, removed, renamed or retyped, and no database column
+         * moves.
+         *
+         * PINNED. `SchemaSensorContactContractTest` asserts this entry and the
+         * `hr` block's sentence; `HrTrustTest`, `HrCsvTest`, `SetJournalTest` and
+         * `HeartRateMeasurementParserTest` pin the behaviour.
          */
         const val SCHEMA_VERSION = "1.26"
 

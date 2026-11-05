@@ -6,7 +6,7 @@
   "sensorModel": "WitMotion WT901BLECL",
   "analysisFile": "session.json",
   "csvHeaderImu": "timestamp_ms,ax_g,ay_g,az_g,wx_dps,wy_dps,wz_dps,roll_deg,pitch_deg,yaw_deg,sample_idx",
-  "csvHeaderHrm": "timestamp_ms,hr_bpm,rr_ms",
+  "csvHeaderHrm": "timestamp_ms,hr_bpm,rr_ms,contact",
   "csvHeaderCues": "timestamp_ms,cue",
   "csvHeaderReps": "timestamp_ms",
   "csvHeaderPrep": "prep_started_ms,work_started_ms",
