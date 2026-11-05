@@ -26,11 +26,12 @@ import java.io.File
  * three levels, the object's `required` keys, its `dependentRequired` rules
  * and its `allOf` if/then rules -- the set descriptor's four, which tie
  * `rollExcursionBasis`, on the set and on each `sensors` entry, to whether
- * the set carries `workStartedAt_ms`. So, ON A PATH THE CALLING TEST'S
- * FIXTURES REACH, a writer change that emits `workStartedAt_ms` without
- * `prepStartedAt_ms`, or a work start without the basis word that must go
- * with it, reds here and not only in a consumer's validator; a path no
- * fixture reaches reds nowhere. The `allOf` reading is deliberately narrow:
+ * the set carries `prepStartedAt_ms` -- a stored prep window; until #337 they
+ * keyed on `workStartedAt_ms`, which a no-prep set now writes alone. So, ON A
+ * PATH THE CALLING TEST'S FIXTURES REACH, a writer change that emits
+ * `prepStartedAt_ms` without `workStartedAt_ms`, or a prep window without the
+ * basis word that must go with it, reds here and not only in a consumer's
+ * validator; a path no fixture reaches reds nowhere. The `allOf` reading is deliberately narrow:
  * an `if` may use only `required` and `not`, a `then` only `properties`,
  * `items`, `enum` and `type`, and any other keyword throws rather than being
  * skipped, so a rule this cannot read fails loudly instead of passing. Not
