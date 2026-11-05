@@ -30,6 +30,11 @@ import kotlin.test.assertTrue
  *  4. a declared kind contradicting the guess. Informational.
  *  5. an unrecognised key. Extraneous by definition; nothing was lost.
  */
+/** What the import gate adds for a carry prescribed in reps (#63). */
+private const val CARRY_IN_REPS =
+    " A carry prescribed in reps is counted by the lifter, and no velocity, range or power is " +
+        "published for it."
+
 class PlanImportWarningTest {
     private fun parse(vararg exercises: String): PlanImport.Result = PlanImport.parse(
         """
@@ -207,9 +212,30 @@ class PlanImportWarningTest {
                 undeclaredStart("sled_push"),
                 "sessions[0].exercises[0]: no \"kind\" is declared and the app guessed carry for " +
                     "sled_push from the id, but the plan prescribes reps - the set is measured on reps " +
-                    "either way. Declare \"kind\" if the guess is wrong.",
+                    "either way. Declare \"kind\" if the guess is wrong." + CARRY_IN_REPS,
             ),
             result.warnings,
+        )
+    }
+
+    /**
+     * #63. A carry prescribed in reps is counted by the lifter and none of
+     * its figures is published (RepAnalysisPolicy), which the line above
+     * did not say: "measured on reps" read as though the sensor measured
+     * them. Said for a built-in carry as for a guessed one; a hold
+     * prescribed in reps is still segmented, and its line does not move.
+     */
+    @Test
+    fun `a built-in carry prescribed in reps is told its figures are withheld`() {
+        val result = parse("""{"exercise":"farmers_walk","sets":[{"reps":3}]}""")
+
+        assertEquals(
+            listOf(
+                "sessions[0].exercises[0]: farmers_walk is a built-in carry exercise, but the plan " +
+                    "prescribes reps - the set is measured on reps either way. Declare \"kind\" if the " +
+                    "plan means a different movement." + CARRY_IN_REPS,
+            ),
+            result.warnings.filter { "built-in" in it },
         )
     }
 
