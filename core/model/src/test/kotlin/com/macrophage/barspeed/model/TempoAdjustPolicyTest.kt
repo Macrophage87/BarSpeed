@@ -112,9 +112,13 @@ class TempoAdjustPolicyTest {
         )
     }
 
+    /** Either stroke may spell X since #258 (plan schema 1.15); no pause may. */
     @Test
-    fun `a tempo string may not spell a zero stroke and only the up stroke may spell X`() {
-        assertEquals((1..9).map { it.toString() }, TempoAdjustPolicy.spellable(TempoAdjustPolicy.DOWN_STROKE))
+    fun `a tempo string may not spell a zero stroke and either stroke may spell X`() {
+        assertEquals(
+            (1..9).map { it.toString() } + "X",
+            TempoAdjustPolicy.spellable(TempoAdjustPolicy.DOWN_STROKE),
+        )
         assertEquals((0..9).map { it.toString() }, TempoAdjustPolicy.spellable(TempoAdjustPolicy.BOTTOM_PAUSE))
         assertEquals(
             (1..9).map { it.toString() } + "X",
