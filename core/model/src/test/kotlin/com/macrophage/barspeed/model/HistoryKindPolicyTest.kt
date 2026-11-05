@@ -33,4 +33,32 @@ class HistoryKindPolicyTest {
     fun `a stored kind that agrees with the seed list reads as both say`() {
         assertEquals(ExerciseKind.HOLD, HistoryKindPolicy.of(stored = ExerciseKind.HOLD, seeded = ExerciseKind.HOLD))
     }
+
+    /**
+     * RED until the stored kind is read (#57). A plan that declared a lift
+     * explosive recorded it as explosive, and the rest screen charted its peak
+     * velocity; History must read the same answer rather than the seed's.
+     */
+    @Test
+    fun `a stored explosive kind wins over a dynamic seed`() {
+        assertEquals(
+            ExerciseKind.EXPLOSIVE,
+            HistoryKindPolicy.of(stored = ExerciseKind.EXPLOSIVE, seeded = ExerciseKind.DYNAMIC),
+        )
+    }
+
+    /** RED, the other direction: a seeded explosive lift a plan declared dynamic charts as dynamic. */
+    @Test
+    fun `a stored dynamic kind wins over an explosive seed`() {
+        assertEquals(
+            ExerciseKind.DYNAMIC,
+            HistoryKindPolicy.of(stored = ExerciseKind.DYNAMIC, seeded = ExerciseKind.EXPLOSIVE),
+        )
+    }
+
+    /** RED: a custom exercise has no seed, and its stored kind is the only answer there is. */
+    @Test
+    fun `a custom exercise reads its stored kind`() {
+        assertEquals(ExerciseKind.EXPLOSIVE, HistoryKindPolicy.of(stored = ExerciseKind.EXPLOSIVE, seeded = null))
+    }
 }

@@ -68,4 +68,14 @@ class FailureProvenancePolicyTest {
     fun `a failure recorded before its author was stored draws Failed`() {
         assertEquals("Failed", FailureProvenancePolicy.historyWord(failed = true, failedByLifter = null))
     }
+
+    /**
+     * RED until the word splits (#169 item 1). A stored `false` is a real
+     * statement -- the set failed, the app derived it, the lifter never said
+     * so -- and History drew it as the lifter's own "Failed".
+     */
+    @Test
+    fun `a failure only the app derived draws Short of target`() {
+        assertEquals("Short of target", FailureProvenancePolicy.historyWord(failed = true, failedByLifter = false))
+    }
 }
