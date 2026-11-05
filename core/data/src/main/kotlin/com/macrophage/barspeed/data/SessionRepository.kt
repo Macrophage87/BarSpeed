@@ -21,9 +21,11 @@ import com.macrophage.barspeed.model.SkippedSet
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.VoiceCue
 import com.macrophage.barspeed.model.VoidSetPolicy
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import kotlin.coroutines.CoroutineContext
 
 /** Everything the record flow needs to persist about a finished set. */
 data class CompletedSet(
@@ -306,10 +308,38 @@ data class CompletedSet(
     val failedByLifter: Boolean? = null,
 )
 
+/**
+ * What a session row is opened with, carried by the first set of a session so
+ * the two can reach the database together (#48).
+ *
+ * [timeZone] has no default, for [SessionRepository.startSession]'s reason: it
+ * is a fact that exists only at recording time, and a defaulted field is one a
+ * caller can silently stop filling. Null is a legitimate value, written out.
+ */
+data class SessionOpening(
+    val planName: String?,
+    val planSessionName: String?,
+    val startedAtMs: Long,
+    val timeZone: RecordedTimeZone?,
+)
+
+/** The two ids [SessionRepository.recordFirstSet] produced: the session it opened and its first set. */
+data class RecordedFirstSet(val sessionId: Long, val setId: Long)
+
 class SessionRepository(
     private val sessionDao: SessionDao,
     private val exerciseDao: ExerciseDao,
     private val json: Json = Json { ignoreUnknownKeys = true },
+    /**
+     * Where a set's streams are CSV-encoded and gzipped before the insert
+     * (#36). Defaulted last, so every positional call keeps compiling and
+     * keeps meaning what it meant; a test passes its own to see the work
+     * reach it.
+     *
+     * `internal` rather than private so a constructor property that a build
+     * reads nowhere yet is not an unused private member.
+     */
+    internal val encodeContext: CoroutineContext = Dispatchers.Default,
 ) {
     val sessions: Flow<List<SessionEntity>> = sessionDao.observeSessions()
 
@@ -327,19 +357,35 @@ class SessionRepository(
         planSessionName: String?,
         startedAtMs: Long,
         timeZone: RecordedTimeZone?,
-    ): Long {
-        return sessionDao.insertSession(
-            SessionEntity(
-                startedAtMs = startedAtMs,
-                // Written as a pair or not at all. The columns are separately
-                // nullable because Room has no other option, but a row carrying
-                // an offset and no zone is a state nothing here produces.
-                zoneId = timeZone?.id,
-                utcOffsetMinutes = timeZone?.utcOffsetMinutes,
-                planName = planName,
-                planSessionName = planSessionName,
-            ),
-        )
+    ): Long = sessionDao.insertSession(
+        sessionEntityOf(SessionOpening(planName, planSessionName, startedAtMs, timeZone)),
+    )
+
+    private fun sessionEntityOf(opening: SessionOpening) = SessionEntity(
+        startedAtMs = opening.startedAtMs,
+        // Written as a pair or not at all. The columns are separately
+        // nullable because Room has no other option, but a row carrying
+        // an offset and no zone is a state nothing here produces.
+        zoneId = opening.timeZone?.id,
+        utcOffsetMinutes = opening.timeZone?.utcOffsetMinutes,
+        planName = opening.planName,
+        planSessionName = opening.planSessionName,
+    )
+
+    /**
+     * Store the FIRST set of a session, opening the session row it hangs off
+     * (#48).
+     *
+     * Two writes, as the record screen makes them today: [startSession]'s
+     * row, then [recordSet]'s set. When the set's insert fails and the lifter
+     * then discards the set, the row stays behind with no set under it, and
+     * Home draws a 0-set session card for a workout that recorded nothing. A
+     * retry reuses the row, because the screen has already read its id back;
+     * nothing reclaims it if the lifter never retries.
+     */
+    suspend fun recordFirstSet(opening: SessionOpening, orderIdx: Int, set: CompletedSet): RecordedFirstSet {
+        val sessionId = sessionDao.insertSession(sessionEntityOf(opening))
+        return RecordedFirstSet(sessionId, recordSet(sessionId, orderIdx, set))
     }
 
     /**
@@ -354,18 +400,18 @@ class SessionRepository(
      * `@Transaction` on [SessionDao.insertSetWithStreams], which no test here
      * can observe.
      */
-    suspend fun recordSet(sessionId: Long, orderIdx: Int, set: CompletedSet): Long {
-        // Summarised over the samples the strap's own report supports, not
-        // over every sample that arrived. A bpm of zero is the strap saying it
-        // has no reading, and a reported R-R interval of zero is a claim that
-        // no time passed between two beats; averaging either in as a value is
-        // how a strap lying on a table came to publish a plausible resting
-        // heart rate. What is stored is untouched -- the gzipped stream below
-        // keeps every sample, zeros included.
-        val hr = HrTrust.summarize(set.hrSamples)
+    suspend fun recordSet(sessionId: Long, orderIdx: Int, set: CompletedSet): Long =
+        sessionDao.insertSetWithStreams(setRowOf(sessionId, orderIdx, set), streamsOf(set))
+
+    /**
+     * Every raw stream belonging to [set], CSV-encoded and gzipped. This is
+     * the expensive half of a set write: the whole IMU capture is encoded and
+     * compressed here, once per stream.
+     */
+    private fun streamsOf(set: CompletedSet): List<RawStreamEntity> =
         // setId is stamped by the DAO once the row exists; these carry a
         // placeholder until then.
-        val streams = buildList {
+        buildList {
             if (set.imuSamples.isNotEmpty()) {
                 add(
                     RawStreamEntity(
@@ -470,91 +516,98 @@ class SessionRepository(
                 )
             }
         }
-        return sessionDao.insertSetWithStreams(
-            SetRecordEntity(
-                sessionId = sessionId,
-                orderIdx = orderIdx,
-                exerciseId = set.exerciseId,
-                exerciseName = set.exerciseName,
-                loadKg = set.loadKg,
-                plannedLoadKg = set.plannedLoadKg,
-                // The planned / working / actual triple (#157): the target the
-                // set RAN against, beside the plan's frozen figure and the
-                // actual one. Copied as the caller froze them, never filled
-                // from a sibling -- a working figure read off the plan is the
-                // defect this column exists to end.
-                workingLoadKg = set.workingLoadKg,
-                // What the caller says the load arithmetic used, never a
-                // lookup made here: the app holds one body weight and it
-                // moves, so a reading taken at write time would already be a
-                // different fact from the one totalKg added (#220).
-                bodyWeightKg = set.bodyWeightKg,
-                // The word the caller froze when the set ended, never a
-                // reading of the plan taken here: the plan can have been
-                // edited between the tap and this write (#244).
-                rpeScale = set.rpeScale,
-                // Three counters in precedence order, and the order is the
-                // trust order rather than an accident: a count a PERSON stated
-                // wins, then the count the sensor called while the lifter was
-                // watching it, then the batch segmenter's -- which is what a
-                // set nobody counted has always stored (#286).
-                actualReps = set.manualReps ?: set.liveReps ?: set.analysis.reps.size,
-                repsManual = set.manualReps != null,
-                // Stored whether or not it is the figure above. A correction
-                // rewrites actualReps and cannot reach this, which is the whole
-                // point of the column: the sensor's own count survives the
-                // lifter disagreeing with it.
-                liveReps = set.liveReps,
-                plannedReps = set.plannedReps,
-                workingReps = set.workingReps,
-                actualDurationS = set.actualDurationS,
-                durationEndedBy = set.durationEndedBy,
-                plannedDurationS = set.plannedDurationS,
-                workingDurationS = set.workingDurationS,
-                side = set.side,
-                plannedSide = set.plannedSide,
-                rpe = set.rpe,
-                failed = set.failed,
-                failedByLifter = set.failedByLifter,
-                warmup = set.warmup,
-                added = set.added,
-                tempo = set.tempo,
-                plannedTempo = set.plannedTempo,
-                targetMeanConVelMps = set.targetMeanConVelMps,
-                velocityLossStopPct = set.velocityLossStopPct,
-                plannedRestS = set.plannedRestS,
-                restStartedAtMs = set.restStartedAtMs,
-                plannedPrepS = set.plannedPrepS,
-                prepS = set.prepS,
-                workBegan = set.workBegan,
-                startedAtMs = set.startedAtMs,
-                endedAtMs = set.endedAtMs,
-                // The live tracker's latch rides in the analysis blob (#302):
-                // null encodes to nothing, so a set without one is stored
-                // byte for byte as it was before the field existed.
-                analysisJson = json.encodeToString(
-                    SetAnalysis.serializer(),
-                    set.analysis.copy(liveCountTrusted = set.liveCountTrusted),
-                ),
-                // Written only when the caller states one. There is no default
-                // to fall back on: an invented geometry reads exactly like a
-                // measured one and would be believed.
-                geometryJson =
-                set.geometry?.let { json.encodeToString(ResolvedGeometry.serializer(), it) },
-                // Written whenever the caller states one, which is every set
-                // that is not the plain one-sensor case -- including a set
-                // that met two PAIRED units it could not tell apart. What
-                // arrived is observable from the streams; what was IN THE WAY
-                // is observable from nothing, so leaving this null on a
-                // shortfall would make it indistinguishable from an ordinary
-                // one-sensor set forever.
-                sensorsJson =
-                set.sensors?.let { json.encodeToString(RecordedSensors.serializer(), it) },
-                hrEndOfSetBpm = hr.endOfSetBpm,
-                hrAvgBpm = hr.avgBpm,
-                hrMaxBpm = hr.maxBpm,
+
+    private fun setRowOf(sessionId: Long, orderIdx: Int, set: CompletedSet): SetRecordEntity {
+        // Summarised over the samples the strap's own report supports, not
+        // over every sample that arrived. A bpm of zero is the strap saying it
+        // has no reading, and a reported R-R interval of zero is a claim that
+        // no time passed between two beats; averaging either in as a value is
+        // how a strap lying on a table came to publish a plausible resting
+        // heart rate. What is stored is untouched -- the gzipped stream
+        // keeps every sample, zeros included.
+        val hr = HrTrust.summarize(set.hrSamples)
+        return SetRecordEntity(
+            sessionId = sessionId,
+            orderIdx = orderIdx,
+            exerciseId = set.exerciseId,
+            exerciseName = set.exerciseName,
+            loadKg = set.loadKg,
+            plannedLoadKg = set.plannedLoadKg,
+            // The planned / working / actual triple (#157): the target the
+            // set RAN against, beside the plan's frozen figure and the
+            // actual one. Copied as the caller froze them, never filled
+            // from a sibling -- a working figure read off the plan is the
+            // defect this column exists to end.
+            workingLoadKg = set.workingLoadKg,
+            // What the caller says the load arithmetic used, never a
+            // lookup made here: the app holds one body weight and it
+            // moves, so a reading taken at write time would already be a
+            // different fact from the one totalKg added (#220).
+            bodyWeightKg = set.bodyWeightKg,
+            // The word the caller froze when the set ended, never a
+            // reading of the plan taken here: the plan can have been
+            // edited between the tap and this write (#244).
+            rpeScale = set.rpeScale,
+            // Three counters in precedence order, and the order is the
+            // trust order rather than an accident: a count a PERSON stated
+            // wins, then the count the sensor called while the lifter was
+            // watching it, then the batch segmenter's -- which is what a
+            // set nobody counted has always stored (#286).
+            actualReps = set.manualReps ?: set.liveReps ?: set.analysis.reps.size,
+            repsManual = set.manualReps != null,
+            // Stored whether or not it is the figure above. A correction
+            // rewrites actualReps and cannot reach this, which is the whole
+            // point of the column: the sensor's own count survives the
+            // lifter disagreeing with it.
+            liveReps = set.liveReps,
+            plannedReps = set.plannedReps,
+            workingReps = set.workingReps,
+            actualDurationS = set.actualDurationS,
+            durationEndedBy = set.durationEndedBy,
+            plannedDurationS = set.plannedDurationS,
+            workingDurationS = set.workingDurationS,
+            side = set.side,
+            plannedSide = set.plannedSide,
+            rpe = set.rpe,
+            failed = set.failed,
+            failedByLifter = set.failedByLifter,
+            warmup = set.warmup,
+            added = set.added,
+            tempo = set.tempo,
+            plannedTempo = set.plannedTempo,
+            targetMeanConVelMps = set.targetMeanConVelMps,
+            velocityLossStopPct = set.velocityLossStopPct,
+            plannedRestS = set.plannedRestS,
+            restStartedAtMs = set.restStartedAtMs,
+            plannedPrepS = set.plannedPrepS,
+            prepS = set.prepS,
+            workBegan = set.workBegan,
+            startedAtMs = set.startedAtMs,
+            endedAtMs = set.endedAtMs,
+            // The live tracker's latch rides in the analysis blob (#302):
+            // null encodes to nothing, so a set without one is stored
+            // byte for byte as it was before the field existed.
+            analysisJson = json.encodeToString(
+                SetAnalysis.serializer(),
+                set.analysis.copy(liveCountTrusted = set.liveCountTrusted),
             ),
-            streams,
+            // Written only when the caller states one. There is no default
+            // to fall back on: an invented geometry reads exactly like a
+            // measured one and would be believed.
+            geometryJson =
+            set.geometry?.let { json.encodeToString(ResolvedGeometry.serializer(), it) },
+            // Written whenever the caller states one, which is every set
+            // that is not the plain one-sensor case -- including a set
+            // that met two PAIRED units it could not tell apart. What
+            // arrived is observable from the streams; what was IN THE WAY
+            // is observable from nothing, so leaving this null on a
+            // shortfall would make it indistinguishable from an ordinary
+            // one-sensor set forever.
+            sensorsJson =
+            set.sensors?.let { json.encodeToString(RecordedSensors.serializer(), it) },
+            hrEndOfSetBpm = hr.endOfSetBpm,
+            hrAvgBpm = hr.avgBpm,
+            hrMaxBpm = hr.maxBpm,
         )
     }
 

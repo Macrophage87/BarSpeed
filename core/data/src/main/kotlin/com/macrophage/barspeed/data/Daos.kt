@@ -74,6 +74,29 @@ interface SessionDao {
         return setId
     }
 
+    /**
+     * A new session row, its first set row and every raw stream of that set,
+     * in one transaction (#48). Returns the session's id and then the set's.
+     *
+     * [set] carries a placeholder [SetRecordEntity.sessionId]; the real one is
+     * only known once the session row is inserted, so it is stamped here, as
+     * [insertSetWithStreams] stamps the streams' set id.
+     *
+     * A default-bodied member for [insertSetWithStreams]'s reason: an abstract
+     * one would have to be implemented by every hand-written fake. Whether the
+     * database commits the three inserts together or not at all is Room's
+     * `@Transaction`, which no test in this module can observe.
+     */
+    @Transaction
+    suspend fun insertSessionWithFirstSet(
+        session: SessionEntity,
+        set: SetRecordEntity,
+        streams: List<RawStreamEntity>,
+    ): Pair<Long, Long> {
+        val sessionId = insertSession(session)
+        return sessionId to insertSetWithStreams(set.copy(sessionId = sessionId), streams)
+    }
+
     @Query("SELECT * FROM sessions ORDER BY startedAtMs DESC")
     fun observeSessions(): Flow<List<SessionEntity>>
 
