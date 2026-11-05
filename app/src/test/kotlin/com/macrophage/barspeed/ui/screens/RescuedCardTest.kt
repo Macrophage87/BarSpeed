@@ -194,15 +194,15 @@ class RescuedCardTest {
 
     @Test
     fun `a restorable, fragment or uncomputed card carries no restore note`() {
-        assertNull(rescuedRestoreNote(RestoreVerdict.Restorable(19), 20))
-        assertNull(rescuedRestoreNote(RestoreVerdict.Refused(RestoreRefusal.NO_DATABASE_FILE, null), 20))
-        assertNull(rescuedRestoreNote(null, 20))
+        assertNull(rescuedRestoreNote(RestoreVerdict.Restorable(19), 20, emptySet()))
+        assertNull(rescuedRestoreNote(RestoreVerdict.Refused(RestoreRefusal.NO_DATABASE_FILE, null), 20, emptySet()))
+        assertNull(rescuedRestoreNote(null, 20, emptySet()))
     }
 
     @Test
     fun `every other refusal says what stands in the way`() {
         val notes = (RestoreRefusal.entries - RestoreRefusal.NO_DATABASE_FILE).associateWith {
-            rescuedRestoreNote(RestoreVerdict.Refused(it, 21), 20)
+            rescuedRestoreNote(RestoreVerdict.Refused(it, 21), 20, emptySet())
         }
         for ((reason, note) in notes) assertTrue(!note.isNullOrBlank(), "$reason has no note")
         assertEquals(notes.size, notes.values.toSet().size, "two refusals share one note")
@@ -213,7 +213,7 @@ class RescuedCardTest {
         assertEquals(
             "Can't restore into this build: this is database version 21 and this build reads up to 20. " +
                 "Install a build at database version 21 or newer to restore it.",
-            rescuedRestoreNote(RestoreVerdict.Refused(RestoreRefusal.NEWER_THAN_THIS_BUILD, 21), 20),
+            rescuedRestoreNote(RestoreVerdict.Refused(RestoreRefusal.NEWER_THAN_THIS_BUILD, 21), 20, emptySet()),
         )
     }
 
@@ -270,6 +270,25 @@ class RescuedCardTest {
     }
 
     // ---- round 2 review of #112 (A's N3): a dead RESTORE says why -----------
+
+    /**
+     * GUARD, added because round 3's review found the order unpinned (A's
+     * N3): a refused card draws no RESTORE, so a recording hold has nothing
+     * to grey out there, and its refusal -- what would let it be restored --
+     * must not be replaced by a note about the holds.
+     */
+    @Test
+    fun `a refused rescue's note is the same whatever is held`() {
+        val holdSets = listOf(emptySet<RecordingHold>()) + RecordingHold.entries.map { setOf(it) } +
+            listOf(RecordingHold.entries.toSet())
+        for (reason in RestoreRefusal.entries) {
+            val verdict = RestoreVerdict.Refused(reason, 21)
+            val idle = rescuedRestoreNote(verdict, 20, emptySet())
+            for (held in holdSets) {
+                assertEquals(idle, rescuedRestoreNote(verdict, 20, held), "$reason's note changed with $held held")
+            }
+        }
+    }
 
     @Test
     fun `a restorable rescue held by a recording says why RESTORE is dead`() {

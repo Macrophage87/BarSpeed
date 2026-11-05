@@ -82,12 +82,17 @@ sealed interface RescueOutcome {
  *
  * NOTHING ON THE NORMAL LAUNCH PATH CHANGES: with no [PENDING] marker and a
  * database at or below the compiled version, this returns
- * [RescueOutcome.NotNeeded] and moves nothing. Every failure to move, record
- * or clear a rescue is [RescueOutcome.Failed], on which `AppDatabase.build`
- * throws. No exception escapes this function; the launch's throw is the
- * caller's. An earlier version of this paragraph said every failure and
- * every doubt resolves to NotNeeded; that stopped being true when Failed
- * began to stop the launch, and was found by round 2's review.
+ * [RescueOutcome.NotNeeded] and moves nothing. Every failure to move or
+ * record a rescue is [RescueOutcome.Failed], on which `AppDatabase.build`
+ * throws; so is a later launch's failure to clear the marker of a finished
+ * one. A marker that will not delete at the end of the rescue that wrote it
+ * leaves that launch [RescueOutcome.Rescued] (see `moveInto`). No exception
+ * escapes this function; the launch's throw is the caller's. An earlier
+ * version of this paragraph said every failure and every doubt resolves to
+ * NotNeeded; that stopped being true when Failed began to stop the launch,
+ * and was found by round 2's review. The version after it said every
+ * failure to clear a rescue is Failed, which the end of `moveInto` never
+ * was; found by round 3's review.
  */
 object DatabaseRescue {
     /** Where rescued databases live, beside the in-flight set journals. */
@@ -243,9 +248,12 @@ object DatabaseRescue {
      * main file already in the directory means every move was done and only
      * the bookkeeping was left, so nothing at the path is touched and the
      * launch decides afresh; and a named directory that does not exist means
-     * nothing had moved, so the same -- provided the marker can be removed;
-     * if it cannot, that launch is [RescueOutcome.Failed] and does not open,
-     * and every later launch tries again. A move into a name that is already
+     * nothing had moved, so the same. In both of these, and for a marker that
+     * names no `db-` directory at all, the marker is removed and the launch
+     * decides afresh; if it cannot be removed, that launch is
+     * [RescueOutcome.Failed] and does not open, and every later launch tries
+     * again. [deleteMarker] is that removal, a parameter so a test can make
+     * it fail, as [move] is. A move into a name that is already
      * taken is refused, never made. Any failure once [PENDING] is written
      * leaves it in place and returns [RescueOutcome.Failed], on which the
      * launch does not open; a failure before it is written has moved nothing.
@@ -261,6 +269,7 @@ object DatabaseRescue {
         rescueRoot: File,
         compiledVersion: Int,
         move: (source: File, dest: File) -> Boolean = File::renameTo,
+        deleteMarker: (File) -> Boolean = File::delete,
     ): RescueOutcome = runCatching {
         val marker = File(rescueRoot, PENDING)
         if (marker.exists()) {
@@ -268,8 +277,8 @@ object DatabaseRescue {
             val target = File(rescueRoot, name)
             val unfinished = name.startsWith(DIR_PREFIX) && target.isDirectory &&
                 !File(target, databaseFile.name).exists()
-            if (unfinished) return moveInto(databaseFile, target, marker, move)
-            if (!marker.delete()) return RescueOutcome.Failed("could not clear ${marker.name}")
+            if (unfinished) return moveInto(databaseFile, target, marker, move, deleteMarker)
+            if (!deleteMarker(marker)) return RescueOutcome.Failed("could not clear ${marker.name}")
         }
         val stored = storedVersion(databaseFile)
         if (DatabaseDowngradePolicy.decide(stored, compiledVersion) == DatabaseOpenAction.OPEN) {
@@ -282,7 +291,7 @@ object DatabaseRescue {
         val temp = File(marker.path + ".tmp")
         writeSynced(temp, target.name)
         if (!temp.renameTo(marker)) return RescueOutcome.Failed("could not record the rescue")
-        moveInto(databaseFile, target, marker, move)
+        moveInto(databaseFile, target, marker, move, deleteMarker)
     }.getOrElse { RescueOutcome.Failed(it::class.simpleName ?: "unknown") }
 
     /**
@@ -296,6 +305,12 @@ object DatabaseRescue {
      * reasoned from delayed-allocation semantics, not observed on a device,
      * and no test here can tell a synced write from an unsynced one. Round 2
      * review, A's N1. Throws on failure; both callers catch.
+     *
+     * The file is synced; the directory that holds it is not. On a file
+     * system that does not commit renames in the order they were made, the
+     * rename of the marker can still be lost after power loss while a later
+     * rename -- a `-wal` into the rescue directory -- survives. That residual
+     * is not closed here; it is a `[Field]` question. Round 3 review, B's N3.
      */
     internal fun writeSynced(file: File, text: String) {
         FileOutputStream(file).use { out ->
@@ -314,6 +329,7 @@ object DatabaseRescue {
         target: File,
         marker: File,
         move: (source: File, dest: File) -> Boolean,
+        deleteMarker: (File) -> Boolean,
     ): RescueOutcome {
         for (source in moveOrder(databaseFile)) {
             if (!source.isFile) continue
@@ -325,7 +341,7 @@ object DatabaseRescue {
         // rescue. The next launch finds the main file already in the target
         // and only retries removing it; if that retry fails too, that launch
         // is Failed and does not open. Nothing is lost either way.
-        marker.delete()
+        deleteMarker(marker)
         return RescueOutcome.Rescued(target)
     }
 }

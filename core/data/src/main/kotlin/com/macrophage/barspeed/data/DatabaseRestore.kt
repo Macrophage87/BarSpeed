@@ -69,11 +69,12 @@ sealed interface RestoreOutcome {
  * whole set at the path, because [safeToOpen] asks where every file of both
  * databases is rather than relying on the order; the journal records each
  * database's file names when the swap began so that question can be asked.
- * The one exception is a journal this build cannot read, named at
- * [safeToOpen]. An earlier version of this paragraph said moves into the path
- * go in the same order as moves out; that is true of the swap only, was
- * quoted as false by round 1's review (A3) and kept by its reply, and was
- * found again by round 2's.
+ * The one exception is a journal this build cannot read, or one written
+ * before the file sets were recorded, named at [safeToOpen]. An earlier
+ * version of this paragraph said moves into the path go in the same order
+ * as moves out; that is true of the swap only, was quoted as false by
+ * round 1's review (A3) and kept by its reply, and was found again by
+ * round 2's.
  *
  * A RESTORE THAT DOES NOT OPEN IS UNDONE. After the last move the phase is
  * [RestorePhase.UNVERIFIED], and only [markOpened] -- called from Room's own
@@ -169,11 +170,14 @@ class DatabaseRestore(
      * which refuses a lone sidecar and nothing else. That is the one
      * remaining path on which a stuck restore can open a main file whose
      * `-wal` went into a rescue directory: a journal from a later build read
-     * after a downgrade, or one damaged on disk. It is kept rather than
-     * refused because a refusal stops every launch over a bookkeeping file
-     * even when the database at the path is whole and untouched, which is
-     * the case a journal that cannot be read most often is. Round 2 review,
-     * A's N1 and B's N4.
+     * after a downgrade, one damaged on disk, or one written before the file
+     * sets were recorded (only intermediate builds of the #112 work wrote
+     * those). It is kept rather than refused because a refusal would stop
+     * every launch, including ones where the database at the path is whole,
+     * over a file this build cannot read; which of the two an unreadable
+     * journal more often means has not been measured, since no device has
+     * produced one. Round 2 review, A's N1 and B's N4; the frequency claim
+     * this replaced was found by round 3's (A3, B2).
      */
     fun safeToOpen(): Boolean {
         val live = databaseFile.parentFile ?: File(".")

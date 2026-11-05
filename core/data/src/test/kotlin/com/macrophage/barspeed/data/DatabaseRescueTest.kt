@@ -528,6 +528,48 @@ class DatabaseRescueTest {
     }
 
     /**
+     * GUARD, added because round 3's review found it unpinned (A's N2): a
+     * marker left behind by a finished rescue, or naming a directory that
+     * does not exist, must be removed before the launch decides afresh. If
+     * it will not go, that launch is Failed and does not open, rather than
+     * opening with a marker that a later launch could take for an
+     * unfinished rescue of whatever database is then at the path.
+     */
+    @Test
+    fun `a stale marker that will not delete stops the launch`() {
+        for (finished in listOf(true, false)) {
+            cleanUp()
+            val done = File(rescueRoot(), "db-1000").apply { mkdirs() }
+            if (finished) File(done, "accelerometer_lifting.db").writeText("the rescued database")
+            if (!finished) done.delete()
+            File(rescueRoot(), DatabaseRescue.PENDING).writeText("db-1000")
+            val file = db(20)
+            val bytes = file.readBytes().toList()
+
+            val outcome = DatabaseRescue.rescue(file, rescueRoot(), 20, deleteMarker = { false })
+            assertTrue(outcome is RescueOutcome.Failed, "finished=$finished: expected Failed, got $outcome")
+            assertEquals(bytes, file.readBytes().toList(), "finished=$finished: the database in place moved")
+            assertTrue(File(rescueRoot(), DatabaseRescue.PENDING).isFile, "finished=$finished: marker gone")
+        }
+    }
+
+    /**
+     * GUARD, added with the one above (round 3 review, A's N1 and N2): the
+     * other half of the same choice. At the end of the rescue that wrote
+     * it, a marker that will not delete does not undo the rescue: every
+     * file has moved, so the launch is Rescued, and it is the NEXT launch
+     * that finds the marker and retries removing it.
+     */
+    @Test
+    fun `a complete rescue whose marker will not delete is still Rescued`() {
+        val file = db(10)
+        val dir = assertIsRescued(DatabaseRescue.rescue(file, rescueRoot(), 9, deleteMarker = { false }))
+        assertTrue(File(dir, file.name).isFile, "the database did not reach the rescue directory")
+        assertTrue(!file.exists(), "the database is still at the path")
+        assertEquals(dir.name, File(rescueRoot(), DatabaseRescue.PENDING).readText().trim())
+    }
+
+    /**
      * GUARD, added after the fix because a mutation survived it: POSIX
      * rename replaces its destination silently, so a finish that moved a
      * file into a name already taken in the rescue directory would destroy
