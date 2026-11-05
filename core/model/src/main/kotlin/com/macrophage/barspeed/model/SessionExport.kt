@@ -1100,6 +1100,14 @@ data class SessionExport(
          * `30X0` is `maxIntent` under today's contract however its
          * `geometry.concentric` was declared.
          *
+         * Plan schema 1.15 (#258, 0.2.0) lifted the digit-3 limit above:
+         * digit 1 may be `X`, so a lat pulldown at `X010` is now `maxIntent`
+         * and a bench press at the same `X010`, whose digit 1 is its
+         * lowering, stays `controlled`; see [VelocityLossRegime]. The
+         * paragraph above is the 1.20 record and stands as written. The
+         * published description of the key says the same, description only;
+         * this document's version does not move for it.
+         *
          * Additive to a reader that ignores it -- no key changes type, none
          * stops being written -- but NOT to a validator, because the key is a
          * CLOSED enum, so a reader validating against 1.18 rejects a document
