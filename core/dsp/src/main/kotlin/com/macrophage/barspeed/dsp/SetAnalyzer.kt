@@ -21,9 +21,10 @@ data class RepAnalysis(
      */
     val eccS: Double?,
     /**
-     * Seconds the bar was still at the BOTTOM turnaround of this rep, between
-     * the rep's own two movement phases -- and null when this rep has no
-     * bottom turnaround inside it to measure.
+     * Seconds between the end of this rep's first detected movement phase and
+     * the start of its second, at the BOTTOM turnaround -- the segmenter's
+     * gap, not a measured dwell (#92, see `repMetrics`) -- and null when this
+     * rep has no bottom turnaround inside it to measure.
      *
      * On a lift that starts at the top, the bottom is between the two phases
      * and this carries it. On a lift that starts at the bottom, the bottom is
@@ -448,8 +449,9 @@ object SetAnalyzer {
      * is `sensorOnStack` it would then be tempting to read it under the
      * declaration. It is not done, for three reasons: the signature is a
      * fitted bound that a unit lying still reads as readily as one on a stack
-     * (`StackRollSignature`'s own KDoc), so it confirms the stack term and
-     * nothing else; the inversion that rides with a drive-down stack
+     * (`StackRollSignature`'s own KDoc), so it is at most consistent with the
+     * stack term, and says nothing about the inversion or the ratio; the
+     * inversion that rides with a drive-down stack
      * declaration is exactly the term no stream can measure
      * ([LiftDirection.mountSpecificBesidesStack]); and the narrowing was
      * argued from archived captures only, with no field set having hit the
@@ -475,11 +477,15 @@ object SetAnalyzer {
      * be on the stack, where a drive-down cable lift moves it opposite to the
      * lifter and the same swapped record is published. The signature cannot
      * tell a stack from a sled or from a unit lying still, so a fallback onto
-     * a sled-mounted partner -- a leg press -- is refused with it: that is the
+     * a sled-mounted partner -- a leg press -- or onto a stack partner on a
+     * cable whose stack moves with the handle -- a low-pulley curl -- is
+     * refused with it. Neither publishes a swap; either would be read at a
+     * travel ratio and in a plane nobody declared for that unit. That is the
      * rule's cost, chosen over publishing a swap nobody can see. Over the
-     * committed corpus every barbell stream reads
-     * [StackMountSignal.NOT_ON_STACK], so a barbell fallback is analysed as
-     * before; so is any fallback whose partner nothing measured.
+     * committed corpus every barbell stream -- 53, pinned by
+     * `StackMountFieldTest` -- reads [StackMountSignal.NOT_ON_STACK], so a
+     * barbell fallback is analysed as before; so is any fallback whose
+     * partner nothing measured.
      */
     fun analyze(
         samples: List<ImuSample>,
@@ -758,7 +764,8 @@ object SetAnalyzer {
         // Bar power P = m(g + a)v over the drive, with m the declared load and
         // a, v the series' motion divided back to the frame that load is in
         // (below). The gate decides WHETHER that product is published, and it
-        // is kept as it stands -- the owner's ruling on issue #116. Each clause
+        // is kept as it stands -- kept by the owner's default for 0.2.0 on
+        // issue #116. Each clause
         // was re-examined against the frame handling #26 corrected, and each
         // excludes a figure this formula would get WRONG, not one it would get
         // right; PowerGateTest pins all three.
@@ -830,23 +837,34 @@ object SetAnalyzer {
         // segmenter cannot separate the two. Publishing it as a pause is what
         // issue #93 measured at 22.73 s.
         //
-        // IT IS THE STACK'S OR THE BAR'S STILLNESS, NOT THE LOAD COMING OFF
-        // (#92). Nothing in this pipeline assumes a turnaround unloads: the
+        // IT IS THE GAP BETWEEN THE REP'S TWO DETECTED MOVEMENT RUNS, NOT A
+        // MEASURED DWELL, AND NOT THE LOAD COMING OFF (#92). It is the time
+        // the segmenter found THIS STREAM still between the two phases -- the
+        // motion of what the sensor rode, not the force on the limb -- so it
+        // says nothing about whether the load came off at the turnaround.
+        // Nothing in this pipeline assumes a turnaround unloads: the
         // segmenter pairs a movement run with the next opposite one across
         // whatever still runs lie between, and on a reversal with no dwell
         // that is only the dead-band crossing, so it publishes a pause near
-        // zero rather than missing the boundary (TurnaroundPauseTest). And
-        // nothing can tell a
-        // machine that keeps the load on the lifter through the reversal --
-        // a seated leg curl, on the lifter's account -- from one that does
-        // not: the stream is the stack's motion, not the force on the limb.
-        // Measured on this tree over the committed captures, the figure does
-        // not separate them either: median turnaround 0.04-0.05 s on the
-        // four field-legcurl-1030 captures and 0.07-0.08 s on the three leg
-        // press captures, with SetAnalyzer's own defaults. So no declared
-        // "load stays on" property exists to withhold it on, and none is
-        // added: a declaration with nothing measured for it to change would
-        // be consumed by a rule nobody can check.
+        // zero rather than missing the boundary (TurnaroundPauseTest, which
+        // bounds that zero-dwell figure only at 0.15 s or under). The
+        // converse does not hold: a figure near zero does not show the
+        // reversal was dwell-free. On session 29 the owner's estimator,
+        // independent of segmentation, put turnaround dwell at 0.10-0.14 s on
+        // leg press, single-leg press and seated leg curl alike (0.13 s on the
+        // leg curl, n=33), where this figure under-reads it.
+        //
+        // Measured at a6d3c4f2 by a scratch run over the committed captures
+        // with SetAnalyzer's own defaults, NOT committed and NOT pinned: every
+        // median is under 0.1 s -- 0.04-0.05 s on the four field-legcurl-1030
+        // captures and 0.07-0.08 s on the three leg-press ones; the leg curl
+        // reads lower, on four captures against three, but nothing like the
+        // 40x spread #92 was filed on, and nothing a "load stays on" rule
+        // could key on. So no declared "load stays on" property is added: a
+        // declaration with nothing measured for it to change would be
+        // consumed by a rule nobody can check. Whether a pause under the
+        // segmenter's resolution should be published at all is put to the
+        // owner, not decided here.
         val bottomPause = if (direction.startsAtTop) span.turnaroundPauseS else null
         val topPause = if (direction.startsAtTop) null else span.turnaroundPauseS
         return RepAnalysis(

@@ -927,10 +927,13 @@ private fun liveStackSignal(feeding: List<ImuSample>, workStartedAtMs: Long?): S
  * is [armedCaptureOf]'s business and deliberately not this function's, so
  * nothing in `:app` can measure one unit's roll and attribute it to the other.
  *
- * A NULL [exercise] OR [prepWindow] IS A SET THAT ASKS NOTHING AND A LOOSER
- * WINDOW, in that order: no declaration means the verdict is never consulted,
- * and no window means it is taken over the whole capture, which can only refuse
- * a stack candidate and never invent one.
+ * A NULL [exercise] OR [prepWindow] IS A LOOSER QUESTION, in that order: no
+ * declaration means the verdict never chooses the unit, though since #279 it is
+ * still measured and acted on where the analysis fell back; no window means it
+ * is taken over the whole capture, which can only refuse a stack candidate and
+ * never invent one. Under #279 the looser window has a second consequence of
+ * the same sign: it can only let a stack-clipped partner through to analysis
+ * (under-refuse), never refuse a unit that moved.
  */
 internal fun RecordState.captureAt(
     armed: RecordedSensors?,

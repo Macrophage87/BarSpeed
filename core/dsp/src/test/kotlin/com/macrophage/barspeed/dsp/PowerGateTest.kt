@@ -8,8 +8,8 @@ import kotlin.test.assertTrue
 /**
  * Which declarations `SetAnalyzer.repMetrics` publishes power under. Issue #116.
  *
- * The gate is `loadKg > 0 && concentricUp && !sensorInverted`, and the owner's
- * ruling on #116 is to KEEP it. Its KDoc was rewritten to say what each clause
+ * The gate is `loadKg > 0 && concentricUp && !sensorInverted`, and it is
+ * KEPT by the owner's default for 0.2.0 on #116. Its KDoc was rewritten to say what each clause
  * excludes and why; these pins hold the behaviour that KDoc describes, clause
  * by clause, so a reader can check the prose against something that runs.
  * Before this file nothing asserted that any declaration published NO power --

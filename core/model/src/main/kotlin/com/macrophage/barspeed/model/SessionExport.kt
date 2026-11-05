@@ -2946,12 +2946,13 @@ data class SessionExport(
          * `FallbackMountGeometryTest`'s synthetic negation pair. It now also
          * fires where the declaration names no mount and the fallen-back
          * unit's own `StackRollSignature` read
-         * [StackMountSignal.ON_STACK]. A sled-mounted or still partner reads
+         * [StackMountSignal.ON_STACK]. A sled-mounted or still partner, or a
+         * stack partner on a cable whose stack moves with the handle, reads
          * the same and is refused with it -- the cost of a fitted bound, stated
-         * on the word's description -- while all 52 barbell streams in the
-         * committed corpus read moved (measured for this entry over each
-         * stream's cue- and work-start-bounded window and over its whole
-         * capture; the nearest, field-42 set 5's bench press, at 5.685
+         * on the word's description -- while all 53 barbell streams in the
+         * committed corpus read moved (pinned by `StackMountFieldTest`;
+         * measured over each stream's cue- and work-start-bounded window and
+         * over its whole capture; the nearest, field-42 set 5's bench press, at 5.685
          * degrees against a 3.0 bound).
          *
          * Under 1.26 and not a mint: 1.26 is unreleased, minted on this branch

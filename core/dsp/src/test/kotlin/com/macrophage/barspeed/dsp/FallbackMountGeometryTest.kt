@@ -446,7 +446,8 @@ class FallbackMountGeometryTest {
      * nothing measured, is analysed exactly as it was: the signature cannot
      * place that unit on a stack, so there is no evidence the declaration
      * fails to describe it. Over-refusal is the defect a refusal invites,
-     * and every barbell stream in the corpus reads moved.
+     * and every barbell stream in the corpus reads moved
+     * (`StackMountFieldTest`, all 53 on both windows).
      */
     @Test
     fun `a fallback under a mount-free declaration onto a unit not read as riding a load is analysed`() {

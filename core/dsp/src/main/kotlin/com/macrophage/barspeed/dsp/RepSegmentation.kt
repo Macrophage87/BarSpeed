@@ -95,8 +95,8 @@ data class LiftDirection(
      * swapped concentric and eccentric that `FallbackMountGeometryTest`
      * measures in the other direction. Refusing on `analysedUnitFellBack`
      * alone would close it and would also refuse every ordinary two-unit
-     * fallback. Since #279 `SetAnalyzer.analyze` closes it with a
-     * MEASUREMENT instead -- the fallen-back unit's own `StackRollSignature`
+     * fallback. Since #279 `SetAnalyzer.analyze` closes it where the
+     * partner's roll reads ON_STACK, with a MEASUREMENT instead -- the fallen-back unit's own `StackRollSignature`
      * -- because no per-unit mount is on the record; this property is
      * unchanged and still answers only what the declaration names.
      *

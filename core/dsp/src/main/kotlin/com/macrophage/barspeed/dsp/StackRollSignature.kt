@@ -141,7 +141,10 @@ object StackRollSignature {
      * [RollExcursion.Basis.WHOLE_CAPTURE] already means: that window includes
      * the walk-up and the re-rack, so a stack unit still reads quiet and a
      * handled unit reads moved all the more. The looser window can only refuse
-     * a stack candidate, never invent one.
+     * a stack candidate, never invent one. Under #279 it has a second
+     * consequence of the same sign: on a mount-free fallback it can only let a
+     * stack-clipped partner through to analysis (under-refuse), never refuse a
+     * unit that moved.
      */
     fun of(samples: List<ImuSample>, workStartedAtMs: Long?, end: SetEnd): StackMountSignal {
         val windowed = RollExcursion.inWindow(samples, workStartedAtMs, end)

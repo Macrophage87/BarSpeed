@@ -18,7 +18,11 @@ import kotlin.test.assertTrue
  * resolves every rep and publishes a turnaround near zero: a value, not an
  * absence and not a merged rep. The same lift with a
  * prescribed 1 s hold publishes a figure near that hold, so the two shapes
- * are told apart by the figure itself.
+ * are told apart by the figure itself. The converse is NOT pinned and does
+ * not hold: the zero-dwell bound is 0.15 s, so a figure near zero does not
+ * show a reversal was dwell-free, and a short real dwell (#92's owner
+ * estimate is 0.10-0.14 s on session 29) may publish a figure under that
+ * bound too.
  *
  * Characterization of the shipped pipeline on synthetic streams; nothing here
  * was measured on a machine, and nothing here can say whether a load came off

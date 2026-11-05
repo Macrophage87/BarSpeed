@@ -261,19 +261,30 @@ enum class NoRepsReason(val wireName: String) {
      * inversion cannot be told from a real one by anybody.
      *
      * WHAT A REFUSED SET RECORDS FOR ITS REP COUNT. `SessionRepository`'s
-     * `recordSet` stores `actualReps = manualReps ?: analysis.reps.size`, so a
-     * refused set records 0 reps unless the lifter corrects the count: session
-     * volume counts it as 0 and the export publishes `reps: 0`. Raw streams
-     * are archived either way.
+     * `recordSet` stores `actualReps = manualReps ?: liveReps ?:
+     * analysis.reps.size`. A refused set resolved no reps, so it records the
+     * lifter's correction where there is one, else the LIVE count where the
+     * sensor counted the set live, and 0 only where neither exists: session
+     * volume and the export's `reps` follow that same value. Raw streams are
+     * archived either way.
      *
      * A SECOND SHAPE SINCE #279 (export 1.26). The declaration names NO
      * mount -- it describes the lifter's end -- and the unit the analysis fell
      * back to read [com.macrophage.barspeed.model.StackMountSignal.ON_STACK]
      * by its own `StackRollSignature`. The partner may then be on a stack the
-     * declaration does not describe, and reading it under the lifter's
-     * geometry publishes the same swap. A sled-mounted or still partner reads
-     * the same and is refused with it; one that moved, or that nothing
-     * measured, is analysed as before.
+     * declaration does not describe. On a drive-down cable lift that stack
+     * moves opposite to the lifter, and reading it under the lifter's
+     * geometry publishes the same swap. Where it would move WITH the lifter --
+     * a drive-up declaration: a low-pulley curl, a leg press sled -- there is
+     * no swap, and the refusal rests on something else: the partner would be
+     * read at a travel ratio and in a plane nobody declared for it. The rule
+     * refuses both, because the signature cannot tell them apart from the
+     * record; a sled-mounted or still partner, and a stack partner on a cable
+     * whose stack moves with the handle, are refused with it -- that is the
+     * cost. One that moved, or that nothing measured, is analysed as before.
+     * The set keeps its count on the rule above: a mount-free fallback is the
+     * shape on which a live count keeps running (`LiveFallbackPolicy` rule
+     * 2), so such a set records the live count where one ran, not 0.
      *
      * NOT RETROACTIVE. The value is computed when a set is analysed and
      * frozen into its stored analysis, so no set already on disk gains it.
