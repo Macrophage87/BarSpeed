@@ -106,9 +106,9 @@ class ManualDoneBoundTest {
      * `calledOver` answers the RECORD's question and is unchanged by any of
      * this: a terminal word was spoken on this set and here is when.
      *
-     * `RestClockPolicy`'s seed instant is this question, which is why it is
-     * still the milestone's own instant on a manual set. The rest after a set
-     * begins when the lifter stopped lifting, whoever said so.
+     * Which instant the rest after a set runs from is a third question, and
+     * `RestStart.of` owns it (#284); `RestStartTest` pins its answers. This
+     * pins only what the record says.
      */
     @Test
     fun `the record's answer is any terminal word, whoever spoke it`() {

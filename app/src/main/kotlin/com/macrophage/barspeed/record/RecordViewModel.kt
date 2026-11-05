@@ -23,6 +23,7 @@ import com.macrophage.barspeed.dsp.LiveRepCounter
 import com.macrophage.barspeed.dsp.LiveRepCounters
 import com.macrophage.barspeed.dsp.LiveSetState
 import com.macrophage.barspeed.dsp.RepCall
+import com.macrophage.barspeed.dsp.RestStart
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.SetAnalyzer
 import com.macrophage.barspeed.dsp.SetEnd
@@ -2459,15 +2460,18 @@ private fun RecordState.endingCall(clockEnded: Boolean, prepCase: PrepCase, spok
  *
  * [sensorEndAtMs] is the release, and only where one DECIDED the recorded
  * seconds (#259) -- `TimedEnd.restFromMs`, never a release that was found and
- * refused. The rule and the fallback for a set nothing called over are
- * `RestClockPolicy`'s; what lives here is the wiring.
+ * refused. [guided] is the set's `guidedSet` and [journal]'s rep marks are the
+ * set's own; which cue or mark on the record seeds the instant is
+ * `RestStart`'s (#284), the ordering `RestClockPolicy`'s, and what lives here
+ * is the wiring.
  */
-private fun restStartedFrom(cues: List<VoiceCue>, sensorEndAtMs: Long?, endedAtMs: Long): Long =
-    RestClockPolicy.startedAtMs(
-        setOverCueAtMs = (SetEnd.calledOver(cues) as? SetEnd.Cued)?.atMs,
-        sensorEndAtMs = sensorEndAtMs,
-        endedAtMs = endedAtMs,
-    )
+private fun restStartedFrom(
+    cues: List<VoiceCue>,
+    guided: Boolean,
+    journal: SetJournal?,
+    sensorEndAtMs: Long?,
+    endedAtMs: Long,
+): Long = RestStart.of(cues, guided, journal?.repMarks.orEmpty(), sensorEndAtMs, endedAtMs)
 
 /**
  * What a finished timed set ended at: the seconds recorded, the word saying who
@@ -5300,7 +5304,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // Where the rest after this set runs from: once, here, carried on the
         // frozen write, and read by both the countdown and the rest-HR window
         // below (#178). [restStartedFrom] holds the argument and the wiring.
-        val restStartedAtMs = restStartedFrom(cueBuffer.toList(), timedEnd?.restFromMs, endedAtMs)
+        val restStartedAtMs = restStartedFrom(cueBuffer.toList(), s.guidedSet, journal, timedEnd?.restFromMs, endedAtMs)
         pendingWrite =
             PendingSetWrite(
                 // The definition SetAnalyzer is handed and the description the
