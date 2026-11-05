@@ -31,6 +31,20 @@ class CustomExerciseRepairTest {
         assertEquals(CustomExerciseRepair.inferredRow("cable_fly"), CustomExerciseRepair.repaired("cable_fly", stored))
     }
 
+    /**
+     * The read half, lifted from `SessionRepository.exerciseById`: a row that
+     * says what the app infers today is read as the definition the app builds
+     * for an id with no row at all, so a stored row and no row agree.
+     */
+    @Test
+    fun `a row that agrees with today's inference is read as the inferred definition`() {
+        val ids = listOf("cable_fly", "tricep_pushdown", "seated_leg_curl", "pallof_hold", "lat_pulldown", "sled_push")
+        for (id in ids) {
+            val read = CustomExerciseRepair.definition(id, CustomExerciseRepair.inferredRow(id))
+            assertEquals(ExerciseDef.inferred(id), read, id)
+        }
+    }
+
     @Test
     fun `the row written for a new id is the inference, field by field`() {
         assertEquals(

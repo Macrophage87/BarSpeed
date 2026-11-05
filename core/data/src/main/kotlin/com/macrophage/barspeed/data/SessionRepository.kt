@@ -19,7 +19,6 @@ import com.macrophage.barspeed.model.SensorCapturePolicy
 import com.macrophage.barspeed.model.SessionHeartRate
 import com.macrophage.barspeed.model.SessionRpe
 import com.macrophage.barspeed.model.SkippedSet
-import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.StoredExerciseRow
 import com.macrophage.barspeed.model.VoiceCue
 import com.macrophage.barspeed.model.VoidSetPolicy
@@ -962,33 +961,21 @@ class SessionRepository(
      * does not cover, which is why the line is here rather than left to
      * `resolve` alone -- so a future caller of this definition without
      * going through `resolve` cannot disagree with the plan path (round 2
-     * finding 7). But this is the PLAN path only: its only caller is
-     * `PlanQueue.kt`'s `flattenPlan`. A set started from the exercise
-     * picker with no plan at all does not reach this method --
-     * `RecordState.currentExercise` resolves it instead, through
-     * [ExerciseDef.resolvedById], which seeds `bodyweight` from
-     * [SetGeometryPolicy.bodyweightMount] (#61, #229 item 3) and nothing
-     * else: `sensorOnStack` is still the plain `false` default, never
-     * [ExerciseDef.ridesStack]. So an
-     * ad-hoc set on a stack machine still records bar-mounted today. This is
-     * unreachable in practice rather than merely uncovered:
-     * `RecordState.exerciseOptions` is `ExerciseDef.SEED`, and no id in
-     * [ExerciseDef.STACK_MOUNTED_IDS] is a seed entry, so the picker offers
-     * no machine this method's stack default would ever apply to.
-     * Reconciling the two paths is not done in this change.
+     * finding 7). This is the PLAN path: its only caller is `PlanQueue.kt`'s
+     * `flattenPlan`. A set started from the exercise picker with no plan at
+     * all does not reach this method -- `RecordState.currentExercise`
+     * resolves it through [ExerciseDef.resolvedById], which falls back to
+     * [ExerciseDef.inferred] for a non-seed id, the definition this
+     * method's own fallback builds, so the two paths agree on start, kind
+     * and stack mount for an id with no stored row (#69 item 4). The picker
+     * offers `ExerciseDef.SEED` alone, so that ad-hoc case is unreachable
+     * today.
      */
     suspend fun exerciseById(id: String): ExerciseDef {
         ExerciseDef.seedById(id)?.let { return it }
         val custom = exerciseDao.byId(id)
         return if (custom != null) {
-            ExerciseDef(
-                custom.id,
-                custom.displayName,
-                StartPhase.valueOf(custom.startsWith),
-                kind = ExerciseDef.inferKind(custom.id),
-                isCustom = true,
-                sensorOnStack = ExerciseDef.ridesStack(custom.id),
-            )
+            CustomExerciseRepair.definition(custom.id, StoredExerciseRow(custom.displayName, custom.startsWith))
         } else {
             ExerciseDef.inferred(id)
         }
