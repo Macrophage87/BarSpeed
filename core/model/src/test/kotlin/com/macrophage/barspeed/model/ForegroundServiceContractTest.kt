@@ -133,6 +133,21 @@ class ForegroundServiceContractTest {
     }
 
     @Test
+    fun `each FgsTypeChoice carries the platform type its manifest token names`() {
+        // #52(b). RecordingService hands the platform `choice.platformType`
+        // and nothing else, so this pair is the last hop between the policy's
+        // choice and what API 34 checks. Swapping the two values is #21
+        // verbatim: the policy picks SPECIAL_USE and the platform is handed
+        // connectedDevice. The literals are android-35's
+        // ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE (1 shl 4) and
+        // FOREGROUND_SERVICE_TYPE_SPECIAL_USE (1 shl 30); this module cannot
+        // see ServiceInfo, so `FgsTypePlatformTest` in :app holds the same
+        // pair against the platform's own constants.
+        assertEquals(0x10, FgsTypeChoice.CONNECTED_DEVICE.platformType)
+        assertEquals(0x40000000, FgsTypeChoice.SPECIAL_USE.platformType)
+    }
+
+    @Test
     fun `every FgsTypeChoice names a permission this test knows how to check`() {
         assertEquals(
             FgsTypeChoice.entries.map { it.manifestToken }.toSet(),
