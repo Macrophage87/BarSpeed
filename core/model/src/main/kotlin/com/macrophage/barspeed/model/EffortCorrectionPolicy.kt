@@ -74,7 +74,9 @@ object EffortCorrectionPolicy {
      * [ratedDescription] is the gym-facing wording of whichever tile the
      * lifter's own rating lit, or null when the set carries no rating at all.
      * [failed] is the effective verdict, the lifter's tap OR-ed with the
-     * derived shortfall, which is what the line is coloured by.
+     * derived shortfall, which is what the line is coloured by. [tappedFailed]
+     * is the lifter's own half of it (`RecordState.lastSetTappedFailed`), kept
+     * apart for the reason [selection] keeps it apart (#169).
      *
      * SEAM ONLY at this commit: the unrated case returns the empty string,
      * which stands for what the screen does today -- draw no line and, with
@@ -84,7 +86,8 @@ object EffortCorrectionPolicy {
      * and nothing on screen to give it one. The differential is in the commit
      * after this.
      */
-    fun lineText(ratedDescription: String?, failed: Boolean): String = when {
+    @Suppress("UNUSED_PARAMETER", "UnusedParameter")
+    fun lineText(ratedDescription: String?, failed: Boolean, tappedFailed: Boolean): String = when {
         ratedDescription != null && failed -> "$ratedDescription · short of target"
         ratedDescription != null -> ratedDescription
         failed -> FAILED
@@ -93,6 +96,13 @@ object EffortCorrectionPolicy {
 
     /** The line's wording for a set carrying only the derived shortfall. */
     const val FAILED = "Failed"
+
+    /**
+     * The wording the line will give a derive-only failure (#169 item 2), so
+     * the app's own judgement and the lifter's word stop reading alike. Not
+     * yet returned by [lineText].
+     */
+    const val SHORT_OF_TARGET = "Short of target"
 
     /**
      * The line's wording for a set that carries no effort statement of any

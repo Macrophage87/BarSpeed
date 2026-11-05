@@ -36,21 +36,32 @@ class EffortLineUnratedTest {
      */
     @Test
     fun `a set carrying no effort statement says it is not rated`() {
-        assertEquals(EffortCorrectionPolicy.NOT_RATED, EffortCorrectionPolicy.lineText(null, failed = false))
+        assertEquals(
+            EffortCorrectionPolicy.NOT_RATED,
+            EffortCorrectionPolicy.lineText(null, failed = false, tappedFailed = false),
+        )
     }
 
     /**
-     * An unrated set the app judged short says the shortfall and nothing else,
-     * because the shortfall is the app's verdict and not the lifter's word.
+     * An unrated set the LIFTER called failed says so in the word they tapped,
+     * and nothing else.
      *
-     * Green against the seam. Kept because it is the boundary of the case
-     * above: the fix must add wording to the no-facts case WITHOUT putting
-     * "Not rated" next to a derived failure, which would read as the lifter
-     * having declined to rate a set the app already graded.
+     * Was `an unrated set the app judged short reads as failed`, which passed
+     * `failed = true` with no way to say whose failure it was, and so pinned
+     * the shared word #139 chose while the state could not tell the two apart.
+     * It can now (#169), and that test is RENAMED to the tapped case, which
+     * keeps the shipped word. The derive-only case is its own differential.
+     *
+     * Kept because it is the boundary of the case above: wording the no-facts
+     * case must not put "Not rated" next to a failure, which would read as the
+     * lifter having declined to rate a set that was already graded.
      */
     @Test
-    fun `an unrated set the app judged short reads as failed`() {
-        assertEquals(EffortCorrectionPolicy.FAILED, EffortCorrectionPolicy.lineText(null, failed = true))
+    fun `an unrated set the lifter called failed reads as failed`() {
+        assertEquals(
+            EffortCorrectionPolicy.FAILED,
+            EffortCorrectionPolicy.lineText(null, failed = true, tappedFailed = true),
+        )
     }
 
     /**
@@ -62,10 +73,13 @@ class EffortLineUnratedTest {
      */
     @Test
     fun `a rated set reads back its own wording, with the shortfall beside it`() {
-        assertEquals("Hard — a little left", EffortCorrectionPolicy.lineText("Hard — a little left", failed = false))
+        assertEquals(
+            "Hard — a little left",
+            EffortCorrectionPolicy.lineText("Hard — a little left", failed = false, tappedFailed = false),
+        )
         assertEquals(
             "Hard — a little left · short of target",
-            EffortCorrectionPolicy.lineText("Hard — a little left", failed = true),
+            EffortCorrectionPolicy.lineText("Hard — a little left", failed = true, tappedFailed = false),
         )
     }
 
@@ -81,9 +95,9 @@ class EffortLineUnratedTest {
     @Test
     fun `no combination leaves the line blank`() {
         listOf(null, "Warm-up — barely work", "Max — hit my limit").forEach { description ->
-            listOf(false, true).forEach { failed ->
-                val text = EffortCorrectionPolicy.lineText(description, failed)
-                assertEquals(true, text.isNotBlank(), "description=$description failed=$failed")
+            listOf(false to false, true to false, true to true).forEach { (failed, tapped) ->
+                val text = EffortCorrectionPolicy.lineText(description, failed, tapped)
+                assertEquals(true, text.isNotBlank(), "description=$description failed=$failed tapped=$tapped")
             }
         }
     }

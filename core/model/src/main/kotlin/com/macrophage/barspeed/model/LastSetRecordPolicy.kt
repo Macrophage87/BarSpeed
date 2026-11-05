@@ -147,18 +147,21 @@ object LastSetRecordPolicy {
      *
      * [ratedDescription] is the gym-facing wording of whichever effort tile the
      * lifter's own rating lit, or null for a set carrying no rating at all.
+     * [tappedFailed] is the lifter's own half of [failed], which the effort
+     * clause's wording reads (#169).
      */
     fun status(
         ratedDescription: String?,
         rpe: Int?,
         failed: Boolean,
+        tappedFailed: Boolean,
         limiter: SetLimiter?,
         limiterNote: String?,
         timed: Boolean,
         warmupDeclared: Boolean,
         warmupMark: Boolean?,
     ): String {
-        val clauses = mutableListOf(EffortCorrectionPolicy.lineText(ratedDescription, failed))
+        val clauses = mutableListOf(EffortCorrectionPolicy.lineText(ratedDescription, failed, tappedFailed))
         if (SetLimiterPolicy.offersCorrection(failed, rpe, limiter)) {
             val label = SetLimiterPolicy.lineLabel(failed)
             clauses += "$label: ${SetLimiterPolicy.lineText(limiter, limiterNote, timed, failed)}"
