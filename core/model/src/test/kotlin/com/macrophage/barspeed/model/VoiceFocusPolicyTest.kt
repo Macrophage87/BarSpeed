@@ -36,7 +36,9 @@ class VoiceFocusPolicyTest {
     private val start: (VoiceFocusState) -> VoiceFocusState = VoiceFocusPolicy::setStarted
     private val end: (VoiceFocusState) -> VoiceFocusState = VoiceFocusPolicy::setEnded
 
-    private fun say(id: String): (VoiceFocusState) -> VoiceFocusState = { VoiceFocusPolicy.spoke(it, id) }
+    /** A word handed to the engine that the engine then starts playing. */
+    private fun say(id: String): (VoiceFocusState) -> VoiceFocusState =
+        { VoiceFocusPolicy.started(VoiceFocusPolicy.spoke(it, id), id) }
 
     private fun done(id: String): (VoiceFocusState) -> VoiceFocusState = { VoiceFocusPolicy.finished(it, id) }
 
@@ -78,8 +80,57 @@ class VoiceFocusPolicyTest {
      */
     @Test
     fun `a set that has spoken holds focus between its words`() {
-        val spoken = VoiceFocusPolicy.spoke(VoiceFocusPolicy.setStarted(idle), "a")
+        val handed = VoiceFocusPolicy.spoke(VoiceFocusPolicy.setStarted(idle), "a")
+        val spoken = VoiceFocusPolicy.started(handed, "a")
         assertTrue(VoiceFocusPolicy.holds(VoiceFocusPolicy.finished(spoken, "a")))
+    }
+
+    /** A start reported for a word outside any set marks no set as spoken (#340). */
+    @Test
+    fun `a word that starts outside a set leaves nothing held once it finishes`() {
+        val playing = VoiceFocusPolicy.started(VoiceFocusPolicy.spoke(idle, "3"), "3")
+        assertFalse(VoiceFocusPolicy.holds(VoiceFocusPolicy.finished(playing, "3")))
+    }
+
+    /**
+     * A start reported for a word that has since been replaced is about a
+     * word no longer playing, and must not be what marks the set (#340).
+     */
+    @Test
+    fun `a start reported for a replaced word is not the set's word`() {
+        val replaced = VoiceFocusPolicy.spoke(VoiceFocusPolicy.spoke(idle, "a"), "b")
+        assertEquals(replaced, VoiceFocusPolicy.started(replaced, "a"))
+    }
+
+    /**
+     * A cadence speaks whatever the cue toggle says (`GuidedCadenceRunner`),
+     * so switching the cues off under one must leave the set's focus where it
+     * is: releasing it would raise the music under the next word (#340).
+     */
+    @Test
+    fun `switching the cues off under a cadence keeps the set's focus`() {
+        val spoken = say("Down")(VoiceFocusPolicy.setStarted(idle))
+        val quiet = VoiceFocusPolicy.finished(spoken, "Down")
+        assertTrue(VoiceFocusPolicy.holds(VoiceFocusPolicy.cuesSwitchedOff(quiet, cadenceSpeaks = true)))
+    }
+
+    /** A permanent loss means the platform dropped the request: nothing is held (#340). */
+    @Test
+    fun `a permanent loss leaves nothing held`() {
+        assertFalse(VoiceFocusPolicy.heldAfter(held = true, change = VoiceFocusChange.LOSS))
+        assertFalse(VoiceFocusPolicy.heldAfter(held = false, change = VoiceFocusChange.LOSS))
+    }
+
+    /**
+     * A transient loss -- a phone call -- leaves the request on the
+     * platform's stack, which hands focus back with a GAIN when the call
+     * ends; so the request is still owed an abandon (#340).
+     */
+    @Test
+    fun `a held request stays held through a transient loss and a gain`() {
+        assertTrue(VoiceFocusPolicy.heldAfter(held = true, change = VoiceFocusChange.LOSS_TRANSIENT))
+        assertTrue(VoiceFocusPolicy.heldAfter(held = true, change = VoiceFocusChange.LOSS_TRANSIENT_CAN_DUCK))
+        assertTrue(VoiceFocusPolicy.heldAfter(held = true, change = VoiceFocusChange.GAIN))
     }
 
     /**
