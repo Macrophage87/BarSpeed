@@ -31,9 +31,12 @@ data class StoredExerciseRow(val displayName: String, val startsWith: String)
  * says ([SetGeometryPolicy.resolve]), so rewriting the row loses no lifter's
  * statement.
  *
- * What a rewrite reaches, stated so it is not over-read: only sets recorded
- * AFTER it. A recorded set freezes its own resolved geometry onto its row at
- * set end, so no recorded set is re-labelled.
+ * What the repair reaches, stated so it is not over-read: every plan queue
+ * built after the upgrade, the first one included, because [definition]
+ * reads a stored row through [repaired] before the row is rewritten. The
+ * rewrite itself still happens at set end, in `ensureExerciseExists`. No
+ * recorded set is re-labelled: a recorded set freezes its own resolved
+ * geometry onto its row at set end.
  */
 object CustomExerciseRepair {
     /** What `ensureExerciseExists` writes for [id] today. */
@@ -51,14 +54,25 @@ object CustomExerciseRepair {
      * it: `SessionRepository.exerciseById`'s stored-row branch, lifted here
      * so `:core:model` can pin what a stored row turns into. The kind and
      * the stack mount are recomputed from the id, as [ExerciseDef.inferred]
-     * does; the display name and the start phase are the row's.
+     * does; the display name and the start phase are the row's AFTER
+     * [repaired], so a stale row is read as today's inference before
+     * `ensureExerciseExists` rewrites it (#59). The queue is built when the
+     * session card is tapped and the rewrite happens at set end, so without
+     * this the first session after an upgrade ran on the stale start.
+     *
+     * Every stored value is an inference, so the result equals
+     * [ExerciseDef.inferred] for every row this app writes: the stored row
+     * no longer decides anything on this path.
      */
-    fun definition(id: String, stored: StoredExerciseRow): ExerciseDef = ExerciseDef(
-        id,
-        stored.displayName,
-        StartPhase.valueOf(stored.startsWith),
-        kind = ExerciseDef.inferKind(id),
-        isCustom = true,
-        sensorOnStack = ExerciseDef.ridesStack(id),
-    )
+    fun definition(id: String, stored: StoredExerciseRow): ExerciseDef {
+        val row = repaired(id, stored) ?: stored
+        return ExerciseDef(
+            id,
+            row.displayName,
+            StartPhase.valueOf(row.startsWith),
+            kind = ExerciseDef.inferKind(id),
+            isCustom = true,
+            sensorOnStack = ExerciseDef.ridesStack(id),
+        )
+    }
 }
