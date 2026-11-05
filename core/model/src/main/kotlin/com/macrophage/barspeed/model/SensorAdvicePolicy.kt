@@ -9,9 +9,9 @@ enum class SensorAdvice {
     UNRESPONSIVE,
 
     /**
-     * The phone's own Bluetooth read disabled when the connect failed (#103).
-     * DECLARED, NOT YET ANSWERED: [SensorAdvicePolicy.forState] does not
-     * return this yet, and nothing sets [ConnectionState.Failed.phoneBluetoothOff].
+     * The phone's own Bluetooth read disabled when the connect failed (#103):
+     * `GattClient.connect()` reads the adapter when `connectGatt` returns
+     * null and sets [ConnectionState.Failed.phoneBluetoothOff] from it.
      */
     TURN_ON_PHONE_BLUETOOTH,
 }
@@ -24,15 +24,24 @@ enum class SensorAdvice {
  * the card this feeds is gated on `!imuConnected` and reaches Connecting and
  * Disconnected too -- both keep the advice they already had, unchanged,
  * because neither promises anything more specific is true than "not
- * connected yet." Only [ConnectionState.Failed.linkEstablished] changes the
+ * connected yet." Only [ConnectionState.Failed]'s two booleans change the
  * answer, deliberately: keying on the reason string instead would pass every
  * test in this file that uses two different strings and still be wrong,
- * which is why one test holds the string fixed and varies only the boolean.
+ * which is why one test per boolean holds the string fixed and varies only
+ * that boolean.
+ *
+ * [ConnectionState.Failed.phoneBluetoothOff] is read first (#103): with the
+ * phone's radio off nothing about the sensor can be fixed before it, so that
+ * advice outranks an established link. No producer sets both today.
  */
 object SensorAdvicePolicy {
     fun forState(state: ConnectionState): SensorAdvice = when (state) {
         is ConnectionState.Failed ->
-            if (state.linkEstablished) SensorAdvice.UNRESPONSIVE else SensorAdvice.PAIR_OR_POWER
+            when {
+                state.phoneBluetoothOff -> SensorAdvice.TURN_ON_PHONE_BLUETOOTH
+                state.linkEstablished -> SensorAdvice.UNRESPONSIVE
+                else -> SensorAdvice.PAIR_OR_POWER
+            }
         is ConnectionState.Connected, is ConnectionState.Connecting, is ConnectionState.Disconnected ->
             SensorAdvice.PAIR_OR_POWER
     }

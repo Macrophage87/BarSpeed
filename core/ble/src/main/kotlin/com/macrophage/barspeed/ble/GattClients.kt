@@ -108,7 +108,21 @@ abstract class GattClient(protected val context: Context) {
                 device.connectGatt(context, autoConnect, callback, android.bluetooth.BluetoothDevice.TRANSPORT_LE)
             gatt = opened
             if (opened == null) {
-                stateFlow.value = ConnectionState.Failed("Bluetooth is off or the link was refused")
+                // connectGatt's null says only that no link was opened, not
+                // why (#103). The adapter's own state is a fact this call can
+                // read, so the phone's Bluetooth being off is told apart from
+                // a link refused with Bluetooth on, and SensorAdvicePolicy can
+                // say which to fix. isEnabled is true only in STATE_ON, so an
+                // adapter turning on or off reads as off -- which it is, for
+                // the link that was just refused. What connectGatt actually
+                // returns with the adapter off has not been watched on a
+                // device: [Field].
+                stateFlow.value =
+                    if (!adapter.isEnabled) {
+                        ConnectionState.Failed(PHONE_BLUETOOTH_OFF_REASON, phoneBluetoothOff = true)
+                    } else {
+                        ConnectionState.Failed(LINK_REFUSED_REASON)
+                    }
             }
             opened != null
         } catch (e: SecurityException) {
@@ -160,6 +174,16 @@ abstract class GattClient(protected val context: Context) {
     private companion object {
         /** Issue #20's own wording; it is what the Devices screen renders. */
         const val PERMISSION_DENIED_REASON = "Bluetooth permission not granted"
+
+        /** `connectGatt` returned null and the adapter read disabled (#103). */
+        const val PHONE_BLUETOOTH_OFF_REASON = "Phone Bluetooth is off"
+
+        /**
+         * `connectGatt` returned null with the adapter on (#103). This was
+         * "Bluetooth is off or the link was refused" while nothing here read
+         * the adapter; the first half is now its own reason.
+         */
+        const val LINK_REFUSED_REASON = "The link was refused"
     }
 
     protected fun updateBattery(pct: Int) {

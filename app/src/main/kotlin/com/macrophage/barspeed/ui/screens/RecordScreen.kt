@@ -864,6 +864,15 @@ private fun SetupStage(state: RecordState, viewModel: RecordViewModel) {
  * provable preconditions read straight off the three early returns in
  * `GattClient.connect()`, not a claim about which cause a lifter hits more
  * often; this repository has never measured that.
+ *
+ * What PAIR_OR_POWER no longer covers is the phone's Bluetooth being off when
+ * `connectGatt` refused the link (#103): `connect()` now reads the adapter
+ * there and the card says TURN_ON_PHONE_BLUETOOTH instead. The phone's
+ * Bluetooth is still named under PAIR_OR_POWER for the two early returns
+ * above and for Connecting and Disconnected, which read no adapter. The
+ * advice is latched by the effect above until the next Failed, so after the
+ * lifter turns Bluetooth on the card can keep this wording through the
+ * reconnect's Connecting, until the block leaves composition on Connected.
  */
 private fun imuAdviceText(advice: SensorAdvice): String = when (advice) {
     SensorAdvice.PAIR_OR_POWER ->
