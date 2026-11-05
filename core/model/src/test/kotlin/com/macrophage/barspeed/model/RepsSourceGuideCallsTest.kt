@@ -61,6 +61,22 @@ class RepsSourceGuideCallsTest {
         assertEquals(RepsSource.CORRECTED, RepsSourcePolicy.published(5, true, false, guideCounted = false, 6, 3))
     }
 
+    /**
+     * field-47 set 4: the lifter stopped after 8 while the guide called on to
+     * 10, and the row records 8. The 8 is the lifter's correction of the
+     * guide's count, not a count the metronome made, and the word says so.
+     */
+    @Test
+    fun `a guided set the lifter stopped short of the guide's count is corrected`() {
+        assertEquals(RepsSource.CORRECTED, guided(recordedReps = 8, guideCalls = 10))
+    }
+
+    /** The same correction upward: the lifter did more than the guide called. */
+    @Test
+    fun `a guided set recorded above the guide's count is corrected`() {
+        assertEquals(RepsSource.CORRECTED, guided(recordedReps = 11, guideCalls = 10))
+    }
+
     /** A timed set publishes no word, guide or not. */
     @Test
     fun `a timed set publishes no word whatever the guide called`() {
