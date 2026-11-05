@@ -74,6 +74,7 @@ import com.macrophage.barspeed.model.RecordedTimeZone
 import com.macrophage.barspeed.model.RecordingHold
 import com.macrophage.barspeed.model.RemoveSetControl
 import com.macrophage.barspeed.model.RemoveSetTarget
+import com.macrophage.barspeed.model.RepAnalysisPolicy
 import com.macrophage.barspeed.model.RepCountPolicy
 import com.macrophage.barspeed.model.RepCounter
 import com.macrophage.barspeed.model.RepTap
@@ -5274,6 +5275,12 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                         // "30s of 45s -- just short".
                         timedVerdicts(p.actualDurationS, p.targetDurationS),
                     )
+                    // A set measured on reps whose kind has no reps for the
+                    // segmenter to find (#63): its figures are withheld and its
+                    // stream is still written with the row.
+                    // RepAnalysisPolicyTest pins which shapes reach here.
+                    !RepAnalysisPolicy.segmentsReps(p.isTimed, p.exercise.kind) ->
+                        SetAnalysis(emptyList(), 0.0, null, null, listOf(RepAnalysisPolicy.WITHHELD_NOTE))
                     p.samples.size >= SensorCapturePolicy.MIN_ANALYSABLE_FRAMES ->
                         // The set's own cue track, frozen into the pending
                         // write alongside the samples. It carries the set's

@@ -588,10 +588,12 @@ data class PlanFile(
      * [SetGeometryPolicy.resolve]'s `base` is the stored exercise, and this has
      * only the id, so it passes the base values every definition
      * `SessionRepository.exerciseById` can return carries at this tree -- no
-     * [ExerciseDef.SEED] entry and no custom or unseen id is inverted,
-     * horizontal or drive-down, and each takes its stack term from the same
-     * [ExerciseDef.ridesStack] table [SetGeometryPolicy.stackMount] reads. A
-     * definition that ever sets one of those would be read differently here.
+     * [ExerciseDef.SEED] entry and no custom or unseen id is inverted or
+     * drive-down, and each takes its stack term from the same
+     * [ExerciseDef.ridesStack] table [SetGeometryPolicy.stackMount] reads. The
+     * plane is read off the seed entry, as resolve() reads it off its base, so
+     * an omitted "plane" means the same thing in both (#63). A definition that
+     * ever sets one of the others would be read differently here.
      *
      * Silent when the plan declares the key either way, [stackSeeded]'s rule.
      */
@@ -602,7 +604,8 @@ data class PlanFile(
             base = false,
             onStack = SetGeometryPolicy.stackMount(exercise.exercise, false, exercise.sensorOnStack).onStack,
             concentricUp = exercise.concentric?.let { it == "up" } ?: true,
-            horizontal = exercise.plane?.let { it == "horizontal" } ?: false,
+            horizontal = exercise.plane?.let { it == "horizontal" }
+                ?: (ExerciseDef.seedById(exercise.exercise)?.horizontal ?: false),
         )
         if (!applied) return null
         if (exercise.sensorOnStack == true) {
