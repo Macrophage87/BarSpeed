@@ -406,27 +406,26 @@ class SessionExportRepMarksTest {
     }
 
     /** Twelve reps, rep k's drive starting at [drives] k. */
-    private fun stampedAnalysis(drives: List<Long>): SetAnalysis =
-        noReps.copy(
-            sampleRateHz = 99.4,
-            reps =
-            drives.mapIndexed { i, at ->
-                RepAnalysis(
-                    index = i,
-                    eccS = 1.0,
-                    bottomPauseS = null,
-                    conS = 1.0,
-                    topPauseS = null,
-                    meanConVelMps = 0.3,
-                    peakConVelMps = 0.5,
-                    meanEccVelMps = -0.2,
-                    peakEccVelMps = -0.3,
-                    romM = 0.2,
-                    peakPowerW = null,
-                    driveStartedAtMs = at,
-                )
-            },
-        )
+    private fun stampedAnalysis(drives: List<Long>): SetAnalysis = noReps.copy(
+        sampleRateHz = 99.4,
+        reps =
+        drives.mapIndexed { i, at ->
+            RepAnalysis(
+                index = i,
+                eccS = 1.0,
+                bottomPauseS = null,
+                conS = 1.0,
+                topPauseS = null,
+                meanConVelMps = 0.3,
+                peakConVelMps = 0.5,
+                meanEccVelMps = -0.2,
+                peakEccVelMps = -0.3,
+                romM = 0.2,
+                peakPowerW = null,
+                driveStartedAtMs = at,
+            )
+        },
+    )
 
     /** The guide's twelve marks, one per 4004 ms cycle, as a 1120 set leaves them. */
     private val grid = (1..12).map { 5_000L + it * 4_004L }
