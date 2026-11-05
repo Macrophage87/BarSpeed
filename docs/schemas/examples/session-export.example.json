@@ -408,6 +408,42 @@
           "summary": { "meanConVel_mps": 0.35, "peakConVel_mps": 0.6, "meanEcc_s": 2.4, "meanCon_s": 1.3, "meanRom_m": 0.58 }
         }
       ]
+    },
+    {
+      "exercise": "farmers_walk",
+      "sets": [
+        {
+          "load_kg": 30,
+          "load_lb": 66.1,
+          "reps": 40,
+          "repsSource": "manual",
+          "repsManual": true,
+          "plannedReps": 40,
+          "rest_s": 120,
+          "sensors": {
+            "count": 1,
+            "expected": ["a"],
+            "present": ["a"]
+          },
+          "geometry": {
+            "plane": "horizontal",
+            "sensorOnStack": false,
+            "sensorInverted": false,
+            "travelRatio": 1,
+            "kind": "carry",
+            "bodyweight": false,
+            "source": {
+              "plane": "seeded",
+              "kind": "seeded",
+              "travelRatio": "default",
+              "sensorOnStack": "default",
+              "bodyweight": "default",
+              "sensorInverted": "default"
+            }
+          },
+          "summary": { "noRepsReason": "carryNotSegmented" }
+        }
+      ]
     }
   ]
 }

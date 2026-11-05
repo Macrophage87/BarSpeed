@@ -2866,6 +2866,38 @@ data class SessionExport(
          * PINNED. `ShortOrStillUnitTest` is the differential;
          * `SchemaSensorCoverageContractTest` asserts this entry and the three
          * descriptions.
+         *
+         * 1.26 FURTHER ENTRY (#63, a carry counted in reps): [SetSummaryExport.noRepsReason]
+         * GAINS A TENTH WORD, `carryNotSegmented`, in [VALID_NO_REPS_REASONS].
+         * A carry prescribed in reps is kept off the segmenter by
+         * `RepAnalysisPolicy.segmentsReps`, and its document read `reps`
+         * beside an empty summary -- a set nobody measured, the collapse 1.18
+         * added the key to undo. `SetAnalyzer.withheldCarry` now records the
+         * word when the stream held at least
+         * [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES] samples, and nothing on a
+         * shorter stream, as a sensorless set records nothing. A CLOSED enum
+         * gains a value, so a 1.25 validator rejects a 1.26 document carrying
+         * it. NOT RETROACTIVE; `DATABASE_VERSION` does NOT move -- the word
+         * rides in `analysisJson`.
+         *
+         * PINNED. `WithheldCarryReasonTest` in `:core:dsp` is the differential,
+         * `SessionExportNoRepsReasonTest` in `:core:data` the export's, and
+         * `SchemaCarryNotSegmentedContractTest` asserts the constant, the
+         * description, this entry and the example.
+         *
+         * 1.26 FURTHER ENTRY (#258, `velocityLossRegime` on an explosive digit
+         * 1): NO RULE MOVES, ONE ANSWER BECOMES REACHABLE. Plan schema 1.15
+         * lets a vertical concentric-down lift write `X` in tempo digit 1, its
+         * drive, so `X010` on a lat pulldown is [VelocityLossRegime.MAX_INTENT]
+         * where no earlier plan could reach it; a bench press at `X010` stays
+         * [VelocityLossRegime.CONTROLLED], its digit 1 being the lowering. The
+         * key's description already said so (lane L5); this entry is the log
+         * line a reader comparing a 1.25 export with a 1.26 one needs. The 1.20
+         * entry above stays as the record of what was reachable then.
+         * `DATABASE_VERSION` does NOT move.
+         *
+         * PINNED. `SchemaVelocityLossRegimeContractTest` asserts this entry and
+         * the decision for both lifts.
          */
         const val SCHEMA_VERSION = "1.26"
 
@@ -2929,10 +2961,12 @@ data class SessionExport(
          * from the side that can see both.
          *
          * Each value names WHICH GATE emptied the rep list and claims nothing
-         * about the bar or the lifter, with ONE exception: `mountNotDeclared`
-         * says the segmenter was never run, because the analysis had moved
-         * onto a unit whose mount nothing on the record declares (#247, schema
-         * 1.20). `runsExceedDisplacementCap` in
+         * about the bar or the lifter, with TWO exceptions, each saying the
+         * segmenter was never run: `mountNotDeclared`, because the analysis
+         * had moved onto a unit whose mount nothing on the record declares
+         * (#247, schema 1.20), and `carryNotSegmented`, because the set is a
+         * carry counted in reps, which no carry's stream is segmented for
+         * (#63, schema 1.26). `runsExceedDisplacementCap` in
          * particular says the set's movement runs displaced further than any
          * real phase can, which the DSP reads as unanchored integration drift;
          * no capture in this repository has been checked against a tape
@@ -2949,6 +2983,7 @@ data class SessionExport(
                 "driveBelowMinRom",
                 "beforeWorkStart",
                 "mountNotDeclared",
+                "carryNotSegmented",
             )
 
         /**

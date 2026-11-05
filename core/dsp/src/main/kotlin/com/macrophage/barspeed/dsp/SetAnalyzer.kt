@@ -3,6 +3,7 @@ package com.macrophage.barspeed.dsp
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.PhaseCoverage
 import com.macrophage.barspeed.model.RepAnalysisPolicy
+import com.macrophage.barspeed.model.SensorCapturePolicy
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.TempoScoreLabel
@@ -1010,6 +1011,12 @@ object SetAnalyzer {
      * test-gated: `RecordViewModel` decides WHICH sets reach it, through the
      * policy, and calls this for the analysis.
      *
+     * It names [NoRepsReason.CARRY_NOT_SEGMENTED] when the stream could have
+     * been segmented -- [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES] or more
+     * samples -- and nothing when it could not, which is what a set with no
+     * stream records: the word says which gate emptied the rep list, and on
+     * too short a stream the carry gate is not the one that did.
+     *
      * @param sampleCount how many samples the set's analysed stream holds.
      */
     fun withheldCarry(sampleCount: Int): SetAnalysis {
@@ -1020,6 +1027,8 @@ object SetAnalyzer {
             velocityLossPct = null,
             tempoCompliance = null,
             verdicts = listOf(RepAnalysisPolicy.WITHHELD_NOTE),
+            noRepsReason =
+            NoRepsReason.CARRY_NOT_SEGMENTED.takeIf { sampleCount >= SensorCapturePolicy.MIN_ANALYSABLE_FRAMES },
         )
     }
 
