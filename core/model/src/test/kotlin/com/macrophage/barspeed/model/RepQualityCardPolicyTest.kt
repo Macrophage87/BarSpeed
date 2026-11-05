@@ -50,4 +50,22 @@ class RepQualityCardPolicyTest {
         assertEquals(RepQualityLayout.NONE, layout(hasReps = false, hasVerdicts = false))
         assertEquals(RepQualityLayout.NONE, layout(hasReps = false, hasVerdicts = false, explosive = true))
     }
+
+    /**
+     * #281: a set #247 refuses has an empty rep list by construction and
+     * carries its reason as a verdict. The rest screen is the one window in
+     * which the set can still be corrected, so the reason is drawn, as text,
+     * with no chart there is nothing to plot on.
+     */
+    @Test
+    fun `a refused set with no reps draws its reason`() {
+        assertEquals(RepQualityLayout.VERDICTS, layout(hasReps = false))
+    }
+
+    /** Whatever kind of chart the set would have had, none is drawn without reps. */
+    @Test
+    fun `a set with no reps draws its verdicts whatever chart it would have had`() {
+        assertEquals(RepQualityLayout.VERDICTS, layout(hasReps = false, explosive = true))
+        assertEquals(RepQualityLayout.VERDICTS, layout(hasReps = false, gradedEccentric = true))
+    }
 }
