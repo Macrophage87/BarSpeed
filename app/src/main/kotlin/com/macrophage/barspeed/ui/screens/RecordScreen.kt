@@ -103,6 +103,7 @@ import com.macrophage.barspeed.model.SensorAdvice
 import com.macrophage.barspeed.model.SensorAdvicePolicy
 import com.macrophage.barspeed.model.SensorCapturePolicy
 import com.macrophage.barspeed.model.SensorRoster
+import com.macrophage.barspeed.model.SessionFinishedCopy
 import com.macrophage.barspeed.model.SessionNotClosedCopy
 import com.macrophage.barspeed.model.SessionPreview
 import com.macrophage.barspeed.model.SessionPreviewPolicy
@@ -4361,7 +4362,7 @@ private fun SlotCard(
 
 @Composable
 private fun FinishedStage(state: RecordState, navController: NavController) {
-    Text("Session saved.", style = MaterialTheme.typography.headlineSmall)
+    Text(SessionFinishedCopy.headline(state.sessionId != null), style = MaterialTheme.typography.headlineSmall)
     Spacer(Modifier.height(12.dp))
     state.sessionId?.let { id ->
         Button(
