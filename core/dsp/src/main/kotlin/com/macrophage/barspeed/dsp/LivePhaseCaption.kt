@@ -36,12 +36,19 @@ import com.macrophage.barspeed.model.Phase
  *   plan left `concentric` at the default, where the stack rises as the
  *   lifter pulls the handle down. No word there says up or down: the strokes
  *   read "Driving" and "Returning" and either pause "Pause", as on a
- *   horizontal lift. This also covers the frame #280's fallback can rebuild
- *   the tracker into, since a rebuild is reachable only from this
- *   declaration and changes only the stack term.
- * - Inverted, the tracker reads the lifter's end of the cable, so a drive
+ *   horizontal lift. A #280 rebuild ON the stack changes nothing here. A
+ *   rebuild OFF the stack from this declaration is the first "not covered"
+ *   case below: the screen still passes the declaration, so the words stay
+ *   neutral, but on a drive-down lift left at the default the rebuilt
+ *   tracker's [Phase.CONCENTRIC] is the lifter's return, and the ring reads
+ *   it "Driving". On a drive-up lift rebuilt off the stack the handle rises
+ *   with the drive, and the words stay true.
+ * - Inverted, the tracker reads the stack's travel turned round, so a drive
  *   declared down on the stack (rule 3 of `SetGeometryPolicy.stackInversion`)
- *   reads "Driving down".
+ *   reads "Driving down". That is the lifter's stroke only where the unit
+ *   does ride the stack. With the unit on the rope under a stack-table mount
+ *   (#334's capture), the inversion is applied to a frame that needed none,
+ *   and the strokes read reversed: the "declaration is wrong" case below.
  *
  * Not covered, and not this caption's to fix: where the declaration is
  * wrong about a frame it does read -- a drive-down lift measured OFF the
