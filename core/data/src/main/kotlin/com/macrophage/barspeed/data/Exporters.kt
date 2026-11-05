@@ -565,6 +565,12 @@ class SessionExporter(
             // appears only in the detailed export leaves the summary-only
             // reader holding the numbers with the warning removed.
             sensors = sensorsExport(record, streams, roleByAddress, geometry?.kind),
+            // Which contract the build that RECORDED this set analysed it
+            // under (#38), copied from the row and never filled in: null on
+            // every row written before database v21 stays absent, because
+            // this build's version on a set it did not analyse is the very
+            // claim the key exists to stop making.
+            analysisSchemaVersion = record.analysisSchemaVersion,
             repMetrics =
             if (includeRepDetail && reps.isNotEmpty()) {
                 reps.map {
@@ -1382,6 +1388,9 @@ class RawExporter(
         // the lifter never said so -- and omitting it would lose exactly the
         // half of the record #216 exists to add.
         FailureProvenancePolicy.published(record.failed, record.failedByLifter)?.let { bool("failedByLifter", it) }
+        // The recording build's contract (#38), as session.json publishes it.
+        // Two writers, one fact; [str] drops the null every pre-v21 row holds.
+        str("analysisSchemaVersion", record.analysisSchemaVersion)
         // The reason, in the archive's manifest as well as in the session
         // document. Two writers, one fact: a change wired into only one of
         // them publishes half a record, and which half depends on which file
