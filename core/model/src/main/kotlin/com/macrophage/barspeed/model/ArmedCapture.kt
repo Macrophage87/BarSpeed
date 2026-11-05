@@ -129,7 +129,14 @@ fun armedCaptureOf(
     // the captures are taken from, so nothing here can judge one stream and
     // publish another.
     val framesByRole = byRole.mapValues { it.value.size }
-    val analysable = SensorCapturePolicy.analysable(armed?.expected.orEmpty(), framesByRole)
+    // How long each unit ran and whether it moved (#242, #287), measured per
+    // BUFFER for the reason the roll signal below is: a role cannot be paired
+    // with the other unit's figures. A buffer too short to answer leaves its
+    // role out of the map, which `analysable` reads as unjudged.
+    val spanMsByRole = byRole.mapNotNull { (role, buffer) -> UnitMotion.spanMs(buffer)?.let { role to it } }.toMap()
+    val stillByRole = byRole.mapNotNull { (role, buffer) -> UnitMotion.still(buffer)?.let { role to it } }.toMap()
+    val analysable =
+        SensorCapturePolicy.analysable(armed?.expected.orEmpty(), framesByRole, spanMsByRole, stillByRole)
     // `analysable` is still read here as well, because the silence words below
     // key off the list rather than off the choice. It is NOT read again to make
     // the choice: `analysedFrom` composes it with `analysedStream` once (#211),
@@ -151,6 +158,8 @@ fun armedCaptureOf(
             framesByRole = framesByRole,
             declaresStackMount = declaresStackMount,
             signalByRole = signalByRole,
+            spanMsByRole = spanMsByRole,
+            stillByRole = stillByRole,
         )
     // Which armed roles delivered too few frames to analyse, and what the app
     // could see of each one's link when the set ended (#213, #209). The roles

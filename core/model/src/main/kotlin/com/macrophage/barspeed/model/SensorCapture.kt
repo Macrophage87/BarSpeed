@@ -110,6 +110,14 @@ data class RecordedSensors(
      * list, and reading `expected` against `present` no longer tells a reader
      * which unit the analysis moved off. This flag does.
      *
+     * AND TWO MORE CAUSES SINCE #242 AND #287: an armed unit that delivered
+     * enough frames but stopped early beside its partner, or never moved while
+     * its partner did -- [SensorCapturePolicy.analysable] states both. "Went
+     * quiet" above now covers those: in each the armed unit cannot stand for
+     * the set, and `SetAnalyzer`'s refusal under a mount-specific declaration
+     * (#247) is the right answer for all three, since in each the partner's
+     * mount is one nobody declared.
+     *
      * A separate fact rather than a comparison a reader is left to make.
      * "Analysed the preferred unit" and "analysed the only unit that turned
      * up" are different statements about how much the figures below can be
@@ -439,6 +447,31 @@ object SensorCapturePolicy {
      * says its figures are worth having.
      */
     const val MIN_ANALYSABLE_FRAMES = 8
+
+    /**
+     * One second: the least a unit's stream may end short of its partner's
+     * before [analysable] judges that it stopped early (#242).
+     *
+     * ARGUED FROM THE COMMITTED CORPUS, which `UnitMotionFieldTest` measures:
+     * every committed two-unit capture's two spans agree within 94 ms, field-42
+     * set 11's included, whose role a streamed at about 44 Hz beside role b's
+     * 99. One second is ten times that, so ordinary start and stop jitter does
+     * not reach it; the eight frames #242 was filed for cover 70 ms of a set
+     * that ran for tens of seconds and are nowhere near it.
+     */
+    const val SPAN_MARGIN_MS = 1_000L
+
+    /**
+     * A tenth: on a set longer than ten seconds the shortfall [analysable]
+     * allows grows with the set, so a unit that dropped during the last few
+     * seconds of a long set -- the re-rack, by the time it is that late --
+     * keeps an analysis that already covers the work. A unit that delivered
+     * half the set does not. Where between those two a unit stops covering
+     * the work is a judgement about where the reps fall, which no count here
+     * can see; the bound is set to move the analysis only when a large share
+     * of the set is missing.
+     */
+    const val SPAN_SHORTFALL_SHARE = 0.1
 
     /** The wire spelling of a role: the lowercased name, as the published schemas state. */
     fun wireOf(role: SensorRole): String = role.name.lowercase()
@@ -899,9 +932,53 @@ object SensorCapturePolicy {
      * with no buffer rather than a role nobody looked at; it is answered the
      * same way a zero is, and that is said here rather than left to a default
      * a reader has to find.
+     *
+     * TWO MORE REFUSALS SINCE #242 AND #287, both judged against the PARTNER,
+     * because neither is a property of one stream alone:
+     *
+     * - A unit that delivered enough frames but whose stream ENDED short of
+     *   the longest delivered span by more than [allowedShortfallMs] stopped
+     *   early (#242). Eight frames is a stream the estimator accepts, and the
+     *   figures computed from it described 70 ms of a set that ran for tens of
+     *   seconds. Spans and not frame counts, because a slower unit over the
+     *   same seconds sends fewer frames: field-42's role a sent 0.44 of its
+     *   partner's.
+     * - A unit that NEVER MOVED -- [UnitMotion.still] -- while a covering
+     *   partner did (#287). Its figures would describe a unit lying still.
+     *   Never when every unit is still: there is then nothing better to point
+     *   the analysis at, and the empty-handed answer stays the one it was.
+     *
+     * A role with no entry in [spanMsByRole] or [stillByRole] is UNJUDGED on
+     * that question and stays, so every caller that passes counts alone --
+     * the live readout's `LiveFeed` and the orphan store's `SetJournal` --
+     * gets exactly the answer it got before. Those two are named as the near
+     * neighbours #242's fix does not reach: an interrupted capture recovered
+     * from disk is still judged by its frame counts alone.
      */
-    fun analysable(expected: List<SensorRole>, framesByRole: Map<SensorRole, Int>): List<SensorRole> =
-        expected.filter { (framesByRole[it] ?: 0) >= MIN_ANALYSABLE_FRAMES }
+    fun analysable(
+        expected: List<SensorRole>,
+        framesByRole: Map<SensorRole, Int>,
+        spanMsByRole: Map<SensorRole, Long> = emptyMap(),
+        stillByRole: Map<SensorRole, Boolean> = emptyMap(),
+    ): List<SensorRole> {
+        val delivered = expected.filter { (framesByRole[it] ?: 0) >= MIN_ANALYSABLE_FRAMES }
+        val longest = delivered.mapNotNull { spanMsByRole[it] }.maxOrNull()
+        val covering =
+            delivered.filter { role ->
+                val span = spanMsByRole[role]
+                longest == null || span == null || longest - span <= allowedShortfallMs(longest)
+            }
+        val partnerMoved = covering.any { stillByRole[it] == false }
+        return covering.filterNot { partnerMoved && stillByRole[it] == true }
+    }
+
+    /**
+     * How far short of the longest delivered span a unit's own may end and
+     * still be judged to have covered the set (#242): [SPAN_MARGIN_MS], or
+     * [SPAN_SHORTFALL_SHARE] of the longest span where that is more.
+     */
+    fun allowedShortfallMs(longestSpanMs: Long): Long =
+        maxOf(SPAN_MARGIN_MS, (longestSpanMs * SPAN_SHORTFALL_SHARE).toLong())
 
     /**
      * Which stream the figures come from, from the frame counts alone (#211).
@@ -947,5 +1024,7 @@ object SensorCapturePolicy {
         armed: SensorRole?,
         expected: List<SensorRole>,
         framesByRole: Map<SensorRole, Int>,
-    ): AnalysedStream = analysedStream(armed, analysable(expected, framesByRole))
+        spanMsByRole: Map<SensorRole, Long> = emptyMap(),
+        stillByRole: Map<SensorRole, Boolean> = emptyMap(),
+    ): AnalysedStream = analysedStream(armed, analysable(expected, framesByRole, spanMsByRole, stillByRole))
 }
