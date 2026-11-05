@@ -290,15 +290,41 @@ class RescuedCardTest {
         }
     }
 
+    // ---- round 3 review of #112 (A2, B1): the note names what would change it --
+
+    /**
+     * A set-end write or a session close finishes on its own, so waiting is
+     * the true instruction; and it is the one to give while either is
+     * running, whether or not the screen's own hold is held beside it.
+     */
     @Test
-    fun `a restorable rescue held by a recording says why RESTORE is dead`() {
-        for (hold in RecordingHold.entries) {
+    fun `a restorable rescue held by a write says RESTORE comes back when it has saved`() {
+        val saving = listOf(RecordingHold.SET_WRITE, RecordingHold.SESSION_CLOSE)
+        val holdSets = saving.map { setOf(it) } + saving.map { setOf(it, RecordingHold.SESSION) } +
+            listOf(RecordingHold.entries.toSet())
+        for (held in holdSets) {
             assertEquals(
-                "Can't restore yet: a session is open, or a set or session is still saving. " +
-                    "RESTORE works again once it has finished.",
-                rescuedRestoreNote(RestoreVerdict.Restorable(19), 20, setOf(hold)),
-                "RESTORE dead while $hold is held, with nothing on the card to say why",
+                "Can't restore yet: a set or session is still saving. RESTORE works again once it has finished.",
+                rescuedRestoreNote(RestoreVerdict.Restorable(19), 20, held),
+                "RESTORE dead while $held is held",
             )
         }
+    }
+
+    /**
+     * The record screen's own hold, alone. By the code, leaving that screen
+     * clears its ViewModel, whose onCleared releases the hold, so while Home
+     * is drawn this is the leak RecordingHold.SESSION's KDoc names (a task
+     * swipe; read from the code, not observed). Nothing will finish, so the
+     * note must not tell the lifter to wait; it names what does clear the
+     * holds, the process ending.
+     */
+    @Test
+    fun `a restorable rescue held only by the record screen's hold says how to clear it`() {
+        assertEquals(
+            "Can't restore yet: BarSpeed still counts a recording as running. If you are not recording, " +
+                "force-stop BarSpeed in Android settings or restart the phone, and RESTORE comes back.",
+            rescuedRestoreNote(RestoreVerdict.Restorable(19), 20, setOf(RecordingHold.SESSION)),
+        )
     }
 }
