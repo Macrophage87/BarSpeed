@@ -29,7 +29,10 @@ import kotlin.test.assertEquals
  * the same reason.
  */
 class VelocityLossRegimeTempoScheduleContractTest {
-    private val tempos = listOf("3010", "1030", "30X0", "2011", "0000")
+    // X010 and X0X0 since #258 (plan schema 1.15): digit 1 can be explosive,
+    // which is the drive on a vertical concentric-down lift and the lowering
+    // on every other shape, so the invariant has a new place to break.
+    private val tempos = listOf("3010", "1030", "30X0", "2011", "0000", "X010", "X0X0")
 
     @Test
     fun `the regime is max intent exactly when the schedule's concentric has no prescribed seconds`() {
@@ -61,7 +64,31 @@ class VelocityLossRegimeTempoScheduleContractTest {
                 }
             }
         }
-        assertEquals(40, rows, "the cross product lost rows, so this pin covers less than it reads as covering")
+        assertEquals(56, rows, "the cross product lost rows, so this pin covers less than it reads as covering")
+    }
+
+    /**
+     * The two #258 rows asserted by name. A pulldown at `X010` drives down as
+     * fast as it can, so the guide gives its concentric no seconds and the
+     * regime reads it as max intent; a bench press at the same `X010` lowers
+     * explosively and drives in one second, which is a controlled drive, and
+     * reading it as max intent would grade a prescribed one-second press as
+     * if the lifter had been told to go flat out.
+     */
+    @Test
+    fun `an explosive digit 1 is max intent on a pulldown and controlled on a bench press`() {
+        val pulldown = LiftDirection(startsWith = StartPhase.CONCENTRIC, concentricUp = false)
+        assertEquals(null, TempoSchedule.of(Tempo.parse("X010"), pulldown).concentricS)
+        assertEquals(
+            VelocityLossRegime.MAX_INTENT,
+            VelocityLossRegime.of("X010", concentricUp = false, horizontal = false, kind = ExerciseKind.DYNAMIC),
+        )
+        val bench = LiftDirection(startsWith = StartPhase.ECCENTRIC, concentricUp = true)
+        assertEquals(1.0, TempoSchedule.of(Tempo.parse("X010"), bench).concentricS)
+        assertEquals(
+            VelocityLossRegime.CONTROLLED,
+            VelocityLossRegime.of("X010", concentricUp = true, horizontal = false, kind = ExerciseKind.DYNAMIC),
+        )
     }
 
     /**

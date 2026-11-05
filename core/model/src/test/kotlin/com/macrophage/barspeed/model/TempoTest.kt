@@ -56,13 +56,19 @@ class TempoTest {
     }
 
     /**
-     * "X" is taken on the up stroke and nowhere else. A down stroke, a pause
-     * or a top pause written "X" is refused, so the explosive marker belongs
-     * to one digit rather than to the notation.
+     * "X" is taken on either STROKE and on no pause (#258, plan schema 1.15).
+     * Digit 1 joined digit 3 because on a vertical concentric-down lift -- a
+     * pulldown, a pushdown -- digit 1 is the drive, and the drive is what X
+     * describes. Which stroke X is honoured on is the lift's business, read by
+     * role downstream; the notation only has to be able to say it. A pause
+     * written "X" is still refused: a pause has no speed.
      */
     @Test
-    fun `X is accepted on the up stroke alone`() {
-        assertNull(Tempo.parseOrNull("X010"))
+    fun `X is accepted on either stroke and on no pause`() {
+        assertEquals(Tempo(null, 0.0, 1.0, 0.0), Tempo.parseOrNull("X010"))
+        assertEquals(Tempo(null, 0.0, 1.0, 0.0), Tempo.parseOrNull("x-0-1-0"), "the dash form and lower case too")
+        assertEquals(Tempo(null, 0.0, null, 0.0), Tempo.parseOrNull("X0X0"))
+        assertEquals("X010", Tempo.parse("X010").notation(), "and it round-trips")
         assertNull(Tempo.parseOrNull("3X10"))
         assertNull(Tempo.parseOrNull("301X"))
         assertNull(Tempo.parse("30X0").upS)
@@ -95,8 +101,8 @@ class TempoTest {
 
     /**
      * A null DOWN stroke is "X", written back as one (#258). Built directly
-     * rather than parsed, because the type can hold one whatever [Tempo.parse]
-     * accepts; this pins the notation and the flag, and nothing about parsing.
+     * rather than parsed, so this pins the notation and the flag whatever
+     * [Tempo.parse] accepts; the parse half is the test above.
      */
     @Test
     fun `a null down stroke is explosive and is written back as X`() {
