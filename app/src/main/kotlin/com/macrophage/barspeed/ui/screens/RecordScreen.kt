@@ -87,6 +87,7 @@ import com.macrophage.barspeed.model.GuidedRepCaption
 import com.macrophage.barspeed.model.HistoryTarget
 import com.macrophage.barspeed.model.Implement
 import com.macrophage.barspeed.model.ImplementLoad
+import com.macrophage.barspeed.model.LatestSession
 import com.macrophage.barspeed.model.LeadInPolicy
 import com.macrophage.barspeed.model.LiveCountReadout
 import com.macrophage.barspeed.model.Phase
@@ -107,6 +108,7 @@ import com.macrophage.barspeed.model.SessionFinishedCopy
 import com.macrophage.barspeed.model.SessionNotClosedCopy
 import com.macrophage.barspeed.model.SessionPreview
 import com.macrophage.barspeed.model.SessionPreviewPolicy
+import com.macrophage.barspeed.model.SessionResumePolicy
 import com.macrophage.barspeed.model.SessionRpe
 import com.macrophage.barspeed.model.SetCardValue
 import com.macrophage.barspeed.model.SetCardValues
@@ -157,6 +159,9 @@ import com.macrophage.barspeed.ui.components.VerdictChip
 import com.macrophage.barspeed.ui.components.rememberArmedDelivery
 import com.macrophage.barspeed.ui.components.velocityLossColor
 import kotlinx.coroutines.delay
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 private const val DEFAULT_VELOCITY_LOSS_STOP_PCT = 20.0
@@ -711,6 +716,42 @@ private fun PreviewStage(state: RecordState, viewModel: RecordViewModel) {
 }
 
 /**
+ * "Continue this session?" (#48), raised on entry when [SessionResumePolicy]
+ * found a session an earlier visit left open.
+ *
+ * Both answers are buttons, and neither is a dismissal in disguise. An outside
+ * tap or a back press is "Start a new one", which writes nothing: the earlier
+ * row stays exactly as it was, so the cheap answer is the one that cannot
+ * change history. The words come from the policy, where a test reaches them;
+ * the start time is rendered here, in the phone's zone, because that is where
+ * the lifter is reading it.
+ */
+@Composable
+private fun ResumeSessionDialog(offer: LatestSession, viewModel: RecordViewModel) {
+    val startedAt =
+        Instant.ofEpochMilli(offer.startedAtMs)
+            .atZone(ZoneId.systemDefault())
+            .format(DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault()))
+    AlertDialog(
+        onDismissRequest = viewModel::declineResume,
+        title = { Text(SessionResumePolicy.TITLE) },
+        text = {
+            Text(
+                SessionResumePolicy.body(offer, startedAt),
+                style = MaterialTheme.typography.bodySmall,
+                color = BarColors.Sub,
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = viewModel::continueSession) { Text(SessionResumePolicy.CONTINUE_LABEL) }
+        },
+        dismissButton = {
+            TextButton(onClick = viewModel::declineResume) { Text(SessionResumePolicy.START_NEW_LABEL) }
+        },
+    )
+}
+
+/**
  * The one line under the session name.
  *
  * Warm-ups are named rather than netted out. "8 sets, 3 of them warm-ups" and
@@ -811,6 +852,7 @@ private fun PreviewBlockCard(block: PreviewBlock, unit: WeightUnit) {
 
 @Composable
 private fun SetupStage(state: RecordState, viewModel: RecordViewModel) {
+    state.resumeOffer?.let { ResumeSessionDialog(it, viewModel) }
     if (!state.imuConnected) {
         // The permission banner replaces this card's advice rather than sitting
         // beside it. Since #262 the card is the whole of what a missing sensor

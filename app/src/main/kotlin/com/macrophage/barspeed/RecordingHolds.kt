@@ -74,6 +74,12 @@ class RecordingHolds(private val app: Application) {
         apply(RecordingServicePolicy.acquire(held, hold))
     }
 
+    /**
+     * Whether [hold] is held now. Read by the resume question (#48), which
+     * must not offer to continue a session an earlier visit is still writing.
+     */
+    fun isHeld(hold: RecordingHold): Boolean = hold in held
+
     /** Give up [hold], stopping the service if it was the last reason to run. */
     fun release(hold: RecordingHold) {
         apply(RecordingServicePolicy.release(held, hold))

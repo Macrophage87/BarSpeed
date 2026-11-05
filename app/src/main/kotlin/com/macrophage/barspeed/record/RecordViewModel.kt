@@ -57,6 +57,7 @@ import com.macrophage.barspeed.model.HoldEndSource
 import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.Implement
 import com.macrophage.barspeed.model.ImuSample
+import com.macrophage.barspeed.model.LatestSession
 import com.macrophage.barspeed.model.LeadInPolicy
 import com.macrophage.barspeed.model.LiveCountReadout
 import com.macrophage.barspeed.model.LiveFallback
@@ -87,6 +88,7 @@ import com.macrophage.barspeed.model.SensorCapturePolicy
 import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.model.SensorRoster
 import com.macrophage.barspeed.model.SessionCloseState
+import com.macrophage.barspeed.model.SessionResumePolicy
 import com.macrophage.barspeed.model.SetClockPolicy
 import com.macrophage.barspeed.model.SetCompletionPolicy
 import com.macrophage.barspeed.model.SetEndKind
@@ -2856,6 +2858,42 @@ internal fun startedNextSetState(s: RecordState): RecordState? {
 }
 
 /**
+ * Ask, once, whether an earlier visit left a session open that the lifter may
+ * want to continue (#48); every decision is [SessionResumePolicy.offer]'s.
+ *
+ * Launched from `init`, so it asks on entry and only on entry. The answer is
+ * written onto [RecordState.resumeOffer] only while the screen is still on
+ * SETUP: a lifter who has already chosen a session while the read ran has
+ * answered the question by choosing.
+ */
+private fun CoroutineScope.offerResume(
+    repository: SessionRepository,
+    holds: RecordingHolds,
+    state: MutableStateFlow<RecordState>,
+) = launch {
+    val nowMs = System.currentTimeMillis()
+    val writing = holds.isHeld(RecordingHold.SET_WRITE) || holds.isHeld(RecordingHold.SESSION_CLOSE)
+    val latest = repository.latestSession(nowMs - SessionResumePolicy.LOOKBACK_MS, nowMs)
+    val offer = SessionResumePolicy.offer(latest, nowMs, writing) ?: return@launch
+    if (state.value.stage == Stage.SETUP) state.value = state.value.copy(resumeOffer = offer)
+}
+
+/**
+ * The state "Continue it" leaves behind (#48): the earlier visit's row adopted
+ * as this session's, and the next set numbered after its last.
+ *
+ * The stage stays SETUP. The lifter still chooses the plan session or an
+ * ad-hoc start, and the set recorded next goes into the adopted row because
+ * [RecordState.sessionId] is already set -- the first-set path is the only one
+ * that opens a row, and it is not taken. Where the queue starts is not
+ * guessed: the earlier visit's position in it was never stored.
+ */
+private fun resumedState(s: RecordState): RecordState {
+    val offer = s.resumeOffer ?: return s
+    return s.copy(resumeOffer = null, sessionId = offer.sessionId, setsCompleted = offer.nextOrderIdx, resumed = true)
+}
+
+/**
  * The state a landed session close leaves behind. A free function for
  * [sessionOpeningOf]'s reason: `RecordViewModel` is what detekt's
  * `LargeClass` counts, and #333's close-state wiring had to be paid for.
@@ -3335,6 +3373,18 @@ data class RecordState(
      * are `SessionNotClosedCopy`'s; set and cleared with [sessionClose].
      */
     val closeUnwritten: UnwrittenClose? = null,
+    /**
+     * The open session an earlier visit left, while the "Continue this
+     * session?" prompt is up (#48), or null. [SessionResumePolicy] decides
+     * whether there is one to ask about.
+     */
+    val resumeOffer: LatestSession? = null,
+    /**
+     * Whether this session was continued from an earlier visit rather than
+     * started on this one (#48). Read by the close, whose HRV input covers
+     * only what this visit received.
+     */
+    val resumed: Boolean = false,
     /**
      * True once the lifter has tapped Finish session and before they have
      * answered or skipped the session rating (#159).
@@ -4191,6 +4241,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             holds.foregroundFailure.collect { stateFlow.value = stateFlow.value.copy(foregroundFailure = it) }
         }
+        viewModelScope.offerResume(sessionRepository, holds, stateFlow)
         viewModelScope.launch {
             container.planRepository.activePlan.collect { entity ->
                 val plan = entity?.let { container.planRepository.decode(it) }
@@ -5550,7 +5601,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             endedAtMs = System.currentTimeMillis(),
             // Snapshotted, not handed the live list: the passive HR collector
             // keeps appending to it for as long as this ViewModel lives.
-            rrMs = sessionRrMs.toList(),
+            rrMs = SessionResumePolicy.closeRrMs(stateFlow.value.resumed, sessionRrMs.toList()),
             sessionRpe = sessionRpe,
             restHrSamples = restHrBuffer.toList(),
             // Snapshotted with everything else the close freezes (#300). The
@@ -5613,6 +5664,12 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         holds.release(RecordingHold.SESSION)
         stateFlow.value = closedState(stateFlow.value)
     }
+
+    /** "Continue it" on the resume prompt (#48); every decision is [resumedState]'s. */
+    fun continueSession() = resumedState(stateFlow.value).let { stateFlow.value = it }
+
+    /** "Start a new one": the earlier row is left exactly as it is (#48). */
+    fun declineResume() = stateFlow.value.copy(resumeOffer = null).let { stateFlow.value = it }
 
     /** Back to the session picker; every decision is [previewCancelledState]'s. */
     fun abandonSetup() {
