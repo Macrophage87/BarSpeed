@@ -641,7 +641,7 @@ data class SetRecordEntity(
      * it. Export 1.1 made an unmeasured `ecc_s` null instead of 0.0, and a
      * set recorded under 1.0 still publishes its stored 0.0. (1.1 also moved
      * `velocityLoss_pct` to best-to-last, but that figure is not copied out:
-     * the exporter re-derives it from the stored reps, since 1.9, #83, so the
+     * the exporter re-derives it from the stored reps, since 1.10, #126, so the
      * blob's `velocityLossPct` is read by no export.) This column is what
      * lets the document say which contract each set's copied-out figures
      * were computed under.

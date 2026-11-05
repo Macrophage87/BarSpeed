@@ -2832,8 +2832,8 @@ data class SessionExport(
          * a set recorded under 1.0 still publishes `ecc_s` 0.0 for an
          * unmeasured eccentric inside documents claiming 1.1 and later, with
          * nothing in the set to say so. `velocityLoss_pct` is not among them:
-         * it has been re-derived from the stored reps at export since 1.9
-         * (#83). NOT RETROACTIVE: read from database v21's
+         * it has been re-derived from the stored reps at export since 1.10
+         * (#126). NOT RETROACTIVE: read from database v21's
          * `analysisSchemaVersion` column, null on every row an earlier build
          * wrote, so every set recorded before this build publishes the key
          * ABSENT, meaning not recorded -- no value is inferred from a date or
@@ -3947,16 +3947,22 @@ data class SetExport(
      * The document's [SessionExport.schemaVersion] names the build that
      * EXPORTS it. The analysis is computed once, when the set ends, and
      * stored; no export re-runs the analyzer over the stored samples. What
-     * the export COPIES OUT of it is the recording build's: the rep list and
-     * each rep's figures -- so a set recorded under 1.0 still publishes
-     * `ecc_s` 0.0 for an eccentric 1.0 did not measure -- the
-     * [tempoCompliance] grade, and [SetSummaryExport.noRepsReason]. What the
-     * export RE-DERIVES from the stored reps follows the exporting build's
-     * rules over the recording build's reps: [velocityLossPct] (since 1.9,
-     * #83, so 1.0's stored best-to-worst figure is never published),
+     * the export COPIES OUT of it is the recording build's, among them: the
+     * rep list and each rep's figures -- so a set recorded under 1.0 still
+     * publishes `ecc_s` 0.0 for an eccentric 1.0 did not measure -- the
+     * [tempoCompliance] grade (except its `byPhase` tally, whose phases the
+     * exporting build re-filters), [SetSummaryExport.noRepsReason],
+     * [refusedDetections], [refusedDetectionReason],
+     * [detectionsBeforeWorkStart] and [artefactSamples]. What the export
+     * RE-DERIVES from the stored reps follows the exporting build's rules
+     * over the recording build's reps: [velocityLossPct] (since 1.10, #126,
+     * so 1.0's stored best-to-worst figure is never published),
      * [velocityLossBasis], [velocityLossRegime], and the summary's means,
      * peaks and range. This key names the version the copied-out figures
-     * were computed under; the re-derived ones answer to the document's.
+     * were computed under; the re-derived ones answer to the document's,
+     * except that an aggregate of a copied-out figure inherits its meaning:
+     * the summary's `meanEcc_s` averages the reps' copied-out `ecc_s`, so a
+     * 1.0 set's 0.0 there is not a measured 0 s eccentric.
      *
      * ABSENT on every set recorded before database v21, the first build that
      * stored the fact. No stored value names the build that analysed an older
