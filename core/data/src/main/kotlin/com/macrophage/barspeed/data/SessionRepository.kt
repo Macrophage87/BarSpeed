@@ -707,13 +707,15 @@ class SessionRepository(
      * write can never delay or fail it.
      *
      * Both directions of failure are stated. If this throws, the caller's
-     * close reports FAILED and the frozen close is replayed; [endSession] is
-     * already guarded against writing twice and the decision below is guarded
-     * against inserting twice, so the retry never writes twice, though it is
-     * not free: [endSession]'s guard alone costs one read of the session row,
-     * and reaching this function again costs the set list and that set's raw
-     * streams a second time -- three reads to re-establish state before the
-     * retry can add the window that is missing. If the process dies before
+     * close reports REST_UNSAVED (#333: the session write landed and only this
+     * window is missing) and the frozen close is kept for a retry. The caller
+     * does not call [endSession] again once it has landed, and the decision
+     * below is guarded against inserting twice, so the retry never writes
+     * twice, though it is not free: reaching this function again costs the
+     * set list and that set's raw streams a second time -- two reads to
+     * re-establish state before the retry can add the window that is missing.
+     * [endSession]'s own guard against a second write still stands behind
+     * that, for a caller that does call it again. If the process dies before
      * the caller reaches this line, the window is lost -- it lives only in
      * `:app`'s heap until here -- and that is the SAME durability every other
      * rest window has between one set and the next. What changes is that this

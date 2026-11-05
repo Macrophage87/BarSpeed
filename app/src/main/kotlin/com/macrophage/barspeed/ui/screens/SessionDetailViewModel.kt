@@ -268,6 +268,12 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
             // It is removed rather than left under the name the lifter chose,
             // whether there was nothing to write or the write failed; if the
             // provider refuses, the message below still says the save failed.
+            // Where the picker offered to overwrite and returned a document
+            // that already existed, a failed write deletes it too, including
+            // the lifter's earlier file when nothing had been written over it
+            // yet. Named rather than designed away: whether a picker offers
+            // overwrite and what deleteDocument then removes is device
+            // behaviour no test here reaches. [Field]
             if (!ok) {
                 withContext(Dispatchers.IO) {
                     runCatching { DocumentsContract.deleteDocument(app.contentResolver, uri) }

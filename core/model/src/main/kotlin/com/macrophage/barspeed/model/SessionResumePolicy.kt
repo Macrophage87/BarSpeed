@@ -97,7 +97,9 @@ object SessionResumePolicy {
      * A continued session that has recorded no set on this visit writes no
      * window. The close attaches the window to the row's last set, which is
      * then the earlier visit's, and what this visit captured is the heart
-     * rate on READY, up to [RESUME_WINDOW_MS] later: written there it would
+     * rate on READY, at least as long after that set as the lifter was away
+     * (which the offer allows up to [RESUME_WINDOW_MS]) plus the time spent on
+     * READY: written there it would
      * state "the window after the last set" about samples that are not. The
      * window the earlier visit captured after that set was in its memory and
      * is gone, so the set keeps no window rather than a wrong one. Once this

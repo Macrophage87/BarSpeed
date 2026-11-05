@@ -284,8 +284,10 @@ object RecordExitPolicy {
      * that window is missing. While the row is open, the R-R intervals
      * collected across the rest window live only in memory — the per-set HR
      * streams keep the in-set beats, nothing keeps these; once the session
-     * write has landed the HRV computed from them is stored, and what is left
-     * in memory is the window's heart-rate samples. The last set's rep count and effort rating also stop being
+     * write has landed, whatever HRV the close computed from them is stored
+     * (none for a continued session, `SessionResumePolicy.closeRrMs`, or with
+     * too few beats), and what is left in memory is the window's heart-rate
+     * samples. The last set's rep count and effort rating also stop being
      * correctable, because the only screen that can edit them is this one.
      *
      * [write] and [close] are required rather than defaulted so that a caller
