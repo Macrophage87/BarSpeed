@@ -25,11 +25,13 @@ enum class RepsSource(val wireName: String) {
     METRONOME("metronome"),
 
     /**
-     * The sensor counted, and the lifter then disagreed -- in the set with
-     * `+1 REP`, or afterwards from the rest screen.
-     *
-     * `liveReps` is published beside it and holds what the sensor said, so the
-     * correction and the figure it corrected are both readable.
+     * A counter counted, and the lifter then disagreed. On a sensor set: in
+     * the set with `+1 REP`, or afterwards from the rest screen, and
+     * `liveReps` is published beside it holding what the sensor said. On a
+     * guided set (#336): the lifter recorded a count other than the one the
+     * cadence guide called, and the archive's rep marks hold the guide's
+     * calls. Either way the correction and the figure it corrected are both
+     * readable.
      */
     CORRECTED("corrected"),
 
@@ -65,13 +67,14 @@ enum class RepsSource(val wireName: String) {
  *
  * ## The three collapses, stated rather than hidden
  *
- * A corrected MANUAL set reads `manual` and a corrected METRONOME set reads
- * `metronome`. Both are honest about whose figure the count is -- a corrected
- * tally is still the lifter's statement -- and neither can be told from an
- * uncorrected one, because nothing on the row records that the rest-screen
- * control was used. A row written before the live count existed reads
- * `analysis` whenever `repsManual` is false, which is what such a row's
- * `actualReps` was: `set.manualReps ?: set.analysis.reps.size`.
+ * A corrected MANUAL set reads `manual`: a corrected tally is still the
+ * lifter's statement, and nothing on the row records that the rest-screen
+ * control was used. A corrected METRONOME set reads `corrected` where the
+ * set's archived rep marks say what the guide called and the recorded count
+ * differs from it (#336); it still reads `metronome` where no marks are
+ * stored, the collapse that remains. A row written before the live count
+ * existed reads `analysis` whenever `repsManual` is false, which is what such
+ * a row's `actualReps` was: `set.manualReps ?: set.analysis.reps.size`.
  *
  * The third is [guideCounted]'s: a row with NO STORED GEOMETRY cannot say what
  * kind of exercise it was, so its tempo is read as the guide. That is right for
@@ -129,10 +132,16 @@ object RepsSourcePolicy {
      * the guide counted and nothing else, since a `+1 REP` tap does nothing
      * there -- or null where no such stream is stored.
      *
-     * At this commit the two are read by nothing: the answer is [published]'s
-     * own over the first four.
+     * Where the four-input form would say [RepsSource.METRONOME] and the
+     * guide's count is known and differs from the recorded one, the recorded
+     * figure is the lifter's correction of the guide's count -- field-47 set
+     * 4, stopped at 8 while the guide called 10 -- and the word is
+     * [RepsSource.CORRECTED], as a corrected sensor count is. The guide's
+     * figure stays readable beside it in the archive's rep marks. Every other
+     * row reads as the four-input form says: a guided set at the guide's own
+     * count, a guided row with no stored marks (the collapse that remains),
+     * and every set no guide counted, whose marks are taps or absent.
      */
-    @Suppress("UNUSED_PARAMETER", "UnusedParameter")
     fun published(
         liveReps: Int?,
         repsManual: Boolean,
@@ -140,7 +149,11 @@ object RepsSourcePolicy {
         guideCounted: Boolean,
         recordedReps: Int,
         guideCalls: Int?,
-    ): RepsSource? = published(liveReps, repsManual, timed, guideCounted)
+    ): RepsSource? {
+        val word = published(liveReps, repsManual, timed, guideCounted)
+        val guideOverruled = guideCalls != null && guideCalls != recordedReps
+        return if (word == RepsSource.METRONOME && guideOverruled) RepsSource.CORRECTED else word
+    }
 
     /** The same answer as the published word, for a caller that wants the string. */
     fun publishedWord(liveReps: Int?, repsManual: Boolean, timed: Boolean, guideCounted: Boolean): String? =
