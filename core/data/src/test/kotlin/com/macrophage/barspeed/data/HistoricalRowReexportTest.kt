@@ -118,10 +118,11 @@ class HistoricalRowReexportTest {
     // ---- stored text, as the older builds wrote it -------------------------
 
     /** v0.1.0's `RepAnalysis`: every field non-null, `eccS` 0.0 when unmeasured. */
-    private fun oldRep(index: Int) =
-        """{"index":$index,"eccS":0.0,"bottomPauseS":0.0,"conS":0.8,"topPauseS":0.0,""" +
-            """"meanConVelMps":0.52,"peakConVelMps":0.91,"meanEccVelMps":0.0,"peakEccVelMps":0.0,""" +
-            """"romM":0.41,"peakPowerW":null}"""
+    private fun oldRep(index: Int): String {
+        val timings = """"index":$index,"eccS":0.0,"bottomPauseS":0.0,"conS":0.8,"topPauseS":0.0"""
+        val speeds = """"meanConVelMps":0.52,"peakConVelMps":0.91,"meanEccVelMps":0.0,"peakEccVelMps":0.0"""
+        return """{$timings,$speeds,"romM":0.41,"peakPowerW":null}"""
+    }
 
     /** v0.1.0's `SetAnalysis`, with its tempo compliance under the historical wire names. */
     private val v010Analysis =
@@ -157,21 +158,15 @@ class HistoricalRowReexportTest {
         }
     }
 
-    private fun stream(
-        id: Long,
-        setId: Long,
-        kind: String,
-        text: String,
-        rate: Double? = null,
-        role: String? = null,
-    ) = RawStreamEntity(
-        id = id,
-        setId = setId,
-        kind = kind,
-        csvGzip = Gzip.compress(text),
-        sampleRateHz = rate,
-        role = role,
-    )
+    private fun stream(id: Long, setId: Long, kind: String, text: String, rate: Double? = null, role: String? = null) =
+        RawStreamEntity(
+            id = id,
+            setId = setId,
+            kind = kind,
+            csvGzip = Gzip.compress(text),
+            sampleRateHz = rate,
+            role = role,
+        )
 
     // ---- the rows ----------------------------------------------------------
 
@@ -274,8 +269,7 @@ class HistoricalRowReexportTest {
         return SessionRepository(FakeSessionDao(session, rows, streams), FakeExerciseDao())
     }
 
-    private fun SessionExport.set(exercise: String) =
-        exercises.single { it.exercise == exercise }.sets.single()
+    private fun SessionExport.set(exercise: String) = exercises.single { it.exercise == exercise }.sets.single()
 
     // ---- the pins ----------------------------------------------------------
 
