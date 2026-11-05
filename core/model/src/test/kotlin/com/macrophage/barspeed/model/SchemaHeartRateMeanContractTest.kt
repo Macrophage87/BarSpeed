@@ -13,7 +13,8 @@ import kotlin.test.assertTrue
  * issue #296, filed under export 1.26.
  *
  * Nothing about the figures moves: each set's `hr.avgBpm` has always been
- * its trusted samples' mean truncated to a whole beat, and the session's
+ * truncated to a whole beat -- over its trusted samples since v0.1.39, over
+ * every sample before -- and the session's
  * `heartRate.avgBpm` the unweighted mean of those, truncated again. What was
  * missing is that neither key said so, and "average heart rate" reads as a
  * mean over the session's samples, which it is not. The behaviour is pinned

@@ -2893,10 +2893,12 @@ data class SessionExport(
          * 1.26 (#296, how the heart-rate means round) MINTS NO KEY
          * and changes no figure: the set `hr.avgBpm` and the session
          * `heartRate.avgBpm` gain the descriptions they never had, stating the
-         * rule every build has used. A set's figure is the mean of its trusted
-         * samples TRUNCATED toward zero to a whole beat, never rounded; the
-         * session's is the unweighted mean of those already-truncated figures,
-         * truncated again, and NOT A MEAN OVER SAMPLES. Field-42 (app 0.1.52):
+         * rounding every build has used. A set's figure is TRUNCATED toward
+         * zero to a whole beat, never rounded -- the mean of its trusted
+         * samples on a set recorded by v0.1.39 or later, of every sample on
+         * one recorded earlier; the session's is the unweighted mean of those
+         * already-truncated figures, truncated again, and NOT A MEAN OVER
+         * SAMPLES. Field-42 (app 0.1.52):
          * published 99, set figures averaging 99.25, unfloored set means 99.83,
          * all 1528 in-set samples 100.34; truncation and rounding differed on 9
          * of 16 sets. KEPT AND DESCRIBED, not redefined: both are frozen when
@@ -4838,8 +4840,9 @@ data class PhaseTallyExport(
 data class HrSetSummary(
     val endOfSetBpm: Int? = null,
     /**
-     * The trusted samples' mean TRUNCATED toward zero to a whole beat, never
-     * rounded (1.26, #296): 120 and 121 publish 120. Frozen at set end;
+     * The set's mean TRUNCATED toward zero to a whole beat, never rounded
+     * (1.26, #296): 120 and 121 publish 120. Over the trusted samples on a set
+     * recorded by v0.1.39 or later, over every sample before. Frozen at set end;
      * `HrStreamSummary.avgBpm` in `:core:hrm` computes it.
      */
     val avgBpm: Int? = null,
