@@ -10,7 +10,9 @@ import kotlin.test.assertEquals
  * How far a LIVE counted rep travels against the BATCH analysis of the same
  * capture, on the seated leg curl, pinned so the ratio cannot drift silently.
  * Issue #115. Characterization only: NOTHING IS FIXED HERE, and no constant is
- * retuned on it.
+ * retuned on it. #115 item 3 -- restate the two live displacement constants
+ * against corrected displacement, or keep them calibrated against the biased
+ * quantity and document that -- is an owner decision this file does not take.
  *
  * ## Why this is pinned at all
  *

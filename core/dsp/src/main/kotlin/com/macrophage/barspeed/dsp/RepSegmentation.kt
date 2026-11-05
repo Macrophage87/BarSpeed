@@ -220,11 +220,12 @@ data class RepSpan(
  * spread within one prescribed duration as between them -- and the corpus
  * holds no 4 s capture. Synthetic sets, where duration is set by
  * construction, do clip more on longer phases (#47's grid: 0.030 s at 1 s to
- * 0.828 s at 5 s), but a synthetic turnaround is a true still period and a
- * loaded one is not. Relayed from #47, not re-measured here. #47's own
- * diagnosis -- a 0.43 s eccentric read off a lowering of about 5 s -- also
- * names a failure mode other than dead-band clipping, so this note is not
- * the only way a phase reads short.
+ * 0.828 s at 5 s), but a synthetic pause is a true still period and a
+ * loaded turnaround is not. Relayed from #47, not re-measured here. #47's
+ * own diagnosis -- a 0.43 s eccentric read off a lowering of about 5 s,
+ * which at this tree reads null concentric-first and 2.46 s eccentric-first
+ * (FieldDataRegressionTest) -- also names a failure mode other than
+ * dead-band clipping, so this note is not the only way a phase reads short.
  */
 object RepSegmenter {
     /** [segmentDetailed]'s result: the spans, and the census of how they were arrived at. */

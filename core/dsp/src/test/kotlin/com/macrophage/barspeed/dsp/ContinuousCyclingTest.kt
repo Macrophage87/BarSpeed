@@ -103,7 +103,7 @@ class ContinuousCyclingTest {
     }
 
     @Test
-    fun `without the runaway correction the set collapses into one over-cap run and resolves nothing`() {
+    fun `without the runaway correction its largest run is over the cap and it resolves nothing`() {
         val anchored = VelocityEstimator.estimateAnchored(neverQuiet(), config, MovementPlane.VERTICAL)
         val runs = RepSegmenter.classifyRunsDetailed(anchored, RunThresholds.sensorFrame(config)).beforeDemotion
         val largest = runs.maxOf { RepSegmenter.displacement(anchored, it.startIdx, it.endIdx) }
