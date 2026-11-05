@@ -46,6 +46,27 @@ class SessionRepositoryExerciseRepairTest {
         assertEquals(StartPhase.CONCENTRIC.name, exercises.byId("tricep_pushdown")!!.startsWith)
     }
 
+    /**
+     * DIFFERENTIAL, #59 round 1 (A2/B4). `ensureExerciseExists` runs at set
+     * end, after `flattenPlan` has built the session's queue through this
+     * method. So a stale row's first session after an upgrade ran every set
+     * on the old start, and only the next session saw the rewrite. The read
+     * must answer with today's inference itself, and it writes nothing: the
+     * rewrite stays where it was.
+     */
+    @Test
+    fun `a plan queue built from a stale row reads today's start before the row is rewritten`() = runTest {
+        val stale = CustomExerciseEntity(
+            id = "tricep_pushdown",
+            displayName = "Tricep pushdown",
+            startsWith = StartPhase.ECCENTRIC.name,
+        )
+        val exercises = FakeExerciseDao(mutableMapOf(stale.id to stale))
+        val def = SessionRepository(FakeSessionDao(), exercises).exerciseById("tricep_pushdown")
+        assertEquals(StartPhase.CONCENTRIC, def.startsWith, "the queue still reads the stale ECCENTRIC row")
+        assertEquals(emptyList(), exercises.inserted, "reading the row is not where it is rewritten")
+    }
+
     /** The neighbour: a stored row that already agrees is left alone, not rewritten every set. */
     @Test
     fun `a stored row that still says what the app infers is not written again`() = runTest {

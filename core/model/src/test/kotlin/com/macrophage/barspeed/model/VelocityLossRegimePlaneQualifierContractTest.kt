@@ -65,6 +65,14 @@ class VelocityLossRegimePlaneQualifierContractTest {
 
     private fun prescribingLine() = prompt.lineSequence().first { "PRESCRIBING A TEMPO CHOOSES WHICH FIGURE" in it }
 
+    /**
+     * Rewritten in L5 review round 1 (A1/B1, #258). Plan schema 1.15 lets
+     * digit 1 be `X`, and [VelocityLossRegime.of] answers `maxIntent` for a
+     * pulldown at `X010`, so the closing sentence this pinned -- a VERTICAL
+     * concentric-down lift with a tempo is always `controlled` -- became
+     * false. The plane qualifier stays; the claim it qualified is now the
+     * 1.15 rule.
+     */
     @Test
     fun `the published regime key qualifies its concentric-down sentence to vertical work`() {
         val text = regimeDescription()
@@ -72,9 +80,19 @@ class VelocityLossRegimePlaneQualifierContractTest {
             "A concentric-DOWN lift carrying a tempo is always" in text,
             "the regime key still states the concentric-down rule with no plane on it: $text",
         )
+        assertFalse(
+            "A VERTICAL concentric-DOWN lift carrying a tempo is always `controlled`" in text ||
+                "plan contract accepts `X` only in digit 3" in text,
+            "the regime key still says a pulldown can never be maxIntent, which plan 1.15 made false: $text",
+        )
         assertTrue(
-            "A VERTICAL concentric-DOWN lift carrying a tempo is always `controlled`" in text,
-            "the regime key does not say WHICH plane the concentric-down rule holds for: $text",
+            "From plan schema 1.15 (#258) a VERTICAL concentric-DOWN lift can declare an explosive drive in digit 1" in
+                text,
+            "the regime key does not state the 1.15 rule for vertical concentric-down work: $text",
+        )
+        assertTrue(
+            "`X010` on a lat pulldown is `maxIntent`; the same `X010` on a bench press is `controlled`" in text,
+            "the regime key does not give the pulldown/bench differential: $text",
         )
     }
 
@@ -82,7 +100,7 @@ class VelocityLossRegimePlaneQualifierContractTest {
     fun `the published regime key names the horizontal case the concentric-down sentence excludes`() {
         val text = regimeDescription()
         assertTrue(
-            "HORIZONTAL work is not in that position" in text && "its concentric IS digit 3" in text,
+            "HORIZONTAL work never had that limit" in text && "its concentric IS digit 3" in text,
             "the regime key does not say why horizontal work escapes the concentric-down rule: $text",
         )
         assertTrue(
@@ -140,6 +158,12 @@ class VelocityLossRegimePlaneQualifierContractTest {
         )
     }
 
+    /**
+     * Rewritten in L5 review round 1 (A1/B1, #258): the same prompt told a
+     * coach to write a pulldown's explosive drive as `X010` and, in this
+     * bullet, that a concentric-down lift could never be `maxIntent` because
+     * the contract took `X` in digit 3 only. Both rules in one prompt.
+     */
     @Test
     fun `the plan prompt reading key qualifies its concentric-down sentence to vertical work`() {
         val line = velocityLossBullet()
@@ -147,12 +171,20 @@ class VelocityLossRegimePlaneQualifierContractTest {
             "A concentric-down lift carrying a tempo is always \"controlled\" for now" in line,
             "PLAN_PROMPT still states the concentric-down rule with no plane on it: $line",
         )
-        assertTrue(
-            "A VERTICAL concentric-down lift carrying a tempo is always \"controlled\" for now" in line,
-            "PLAN_PROMPT does not say WHICH plane the concentric-down rule holds for: $line",
+        assertFalse(
+            "is always \"controlled\" for now" in line || "accepts \"X\" only in digit 3" in line,
+            "PLAN_PROMPT's reading key still says a pulldown can never be maxIntent: $line",
         )
         assertTrue(
-            "a HORIZONTAL one can be \"maxIntent\"" in line,
+            "From plan schema 1.15 a VERTICAL concentric-down lift can declare an explosive drive in digit 1" in line,
+            "PLAN_PROMPT's reading key does not state the 1.15 rule for vertical concentric-down work: $line",
+        )
+        assertTrue(
+            "\"X010\" on a lat pulldown is \"maxIntent\"; the same \"X010\" on a bench press is \"controlled\"" in line,
+            "PLAN_PROMPT's reading key does not give the pulldown/bench differential: $line",
+        )
+        assertTrue(
+            "A HORIZONTAL lift can be \"maxIntent\" on \"30X0\"" in line,
             "PLAN_PROMPT does not tell a coach a horizontal tempo set can still be maxIntent: $line",
         )
     }

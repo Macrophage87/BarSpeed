@@ -45,6 +45,20 @@ class CustomExerciseRepairTest {
         }
     }
 
+    /**
+     * DIFFERENTIAL, #59 round 1 (A2/B4). The repair rewrites the row at set
+     * end, but the plan queue reads the row earlier, when the session card is
+     * tapped, so a stale row ran a whole session on the old start before the
+     * rewrite reached anything. The read has to say today's answer itself.
+     */
+    @Test
+    fun `a stale stored row is read as today's inference before anything rewrites it`() {
+        val stale = StoredExerciseRow("Tricep pushdown", StartPhase.ECCENTRIC.name)
+        val read = CustomExerciseRepair.definition("tricep_pushdown", stale)
+        assertEquals(StartPhase.CONCENTRIC, read.startsWith, "a stale ECCENTRIC row still drives the queue")
+        assertEquals(ExerciseDef.inferred("tricep_pushdown"), read)
+    }
+
     @Test
     fun `the row written for a new id is the inference, field by field`() {
         assertEquals(
