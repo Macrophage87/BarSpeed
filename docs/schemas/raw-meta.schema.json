@@ -410,7 +410,7 @@
             "eccentric",
             "concentric"
           ],
-          "description": "Which phase the set starts with. This and the next eight keys come from the set's stored geometry and are absent together on every set recorded before geometry was stored. This key, concentric and concentricSource -- the stroke words -- are written together or not at all, and only with the other six. The other six (plane, sensorOnStack, sensorInverted, travelRatio, kind, bodyweight) are written together, and without the stroke words on a set of kind hold or carry (#297, export 1.26): such a set has no stroke, so its stroke words would be an absence the resolver filled. session.json omits the same three words for it (geometry.publishesStroke)."
+          "description": "Which phase the set starts with. This and the next eight keys come from the set's stored geometry and are absent together on every set recorded before geometry was stored. This key, concentric and concentricSource -- the stroke words -- are written together or not at all, and only with the other six. The other six (plane, sensorOnStack, sensorInverted, travelRatio, kind, bodyweight) are written together, and without the stroke words on a set of kind hold or carry (#297, export 1.26): such a set has no stroke, so its stroke words would be an absence the resolver filled. session.json omits geometry.startsWith, geometry.concentric and their two geometry.source entries for such a set; GeometryExport.publishesStroke in the app's source makes both splits, and is not a key in either file."
         },
         "concentric": {
           "enum": [
