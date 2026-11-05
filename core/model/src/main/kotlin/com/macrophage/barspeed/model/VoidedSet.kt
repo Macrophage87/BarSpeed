@@ -286,9 +286,12 @@ object VoidSetPolicy {
      * mistap on a set that carries the lifter's own words deletes them. [reason]
      * is the stored reason, or null.
      *
-     * Today it never asks.
+     * It asks wherever a reason is stored. `SessionRepository.setVoided`
+     * stores a blank reason as null (via [reason]), so null is the only "no
+     * reason", and a set with none still comes off in one tap: there is
+     * nothing for a mistap to lose.
      */
-    fun unvoidAsks(reason: String?): Boolean = reason?.let { false } ?: false
+    fun unvoidAsks(reason: String?): Boolean = reason != null
 
     /**
      * The question asked before the mark comes off a set that carries [reason].
@@ -306,23 +309,17 @@ object VoidSetPolicy {
      * "are you sure" on a screen whose other destructive action deletes the
      * session invites reading this one as the same kind of act.
      *
-     * [setNumber] is the set's position in the SESSION, and the sentence says
-     * so rather than pairing it with the exercise. The only caller,
-     * `SessionDetailScreen`'s `VoidRow`, passes `record.orderIdx + 1`, and
-     * `orderIdx` is written from `RecordUiState.setsCompleted` -- one counter
-     * per session, never reset when the exercise changes. Pairing that number
-     * with the exercise name produced "Set 13 of Rope Dead Hang" for a set
-     * whose exercise has no thirteenth set, which is a worse thing for a
-     * confirmation to say than saying nothing: the lifter is being asked to
-     * identify the set they are about to mark. Do not "fix" this back to
-     * `Set N of <exercise>` without giving the caller a per-exercise counter
-     * first -- there is not one.
+     * [numberInExercise] is the set's place among its own exercise's sets, as
+     * [setNumberInExercise] counts it, so it is paired with the exercise: a
+     * lifter counting that exercise's cards reaches it (#232). It was the
+     * session-wide `orderIdx + 1`, attributed to the session because no
+     * per-exercise counter existed. That number is shown nowhere on the card,
+     * so it could not help the lifter identify the set they are about to mark.
      */
-    fun confirmation(exerciseName: String, setNumber: Int): String =
-        "Mark this $exerciseName set -- set $setNumber of the session -- as not " +
-            "performed. The set stays in this session with its sensor data and is " +
-            "still exported, marked; it stops counting toward volume and progression. " +
-            "You can undo this."
+    fun confirmation(exerciseName: String, numberInExercise: Int): String =
+        "Mark $exerciseName set $numberInExercise as not performed. The set stays in this " +
+            "session with its sensor data and is still exported, marked; it stops counting " +
+            "toward volume and progression. You can undo this."
 }
 
 /**
