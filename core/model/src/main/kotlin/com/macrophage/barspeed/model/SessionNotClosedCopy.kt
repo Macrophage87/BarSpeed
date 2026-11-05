@@ -29,8 +29,7 @@ object SessionNotClosedCopy {
      * false one can be seen: where `endSession` landed and only the final rest
      * did not, the session DID finish.
      */
-    fun title(unwritten: UnwrittenClose): String =
-        if (unwritten.sessionRow) NOT_FINISHED_TITLE else NOT_FINISHED_TITLE
+    fun title(unwritten: UnwrittenClose): String = if (unwritten.sessionRow) NOT_FINISHED_TITLE else NOT_FINISHED_TITLE
 
     /**
      * The prompt's body for what [unwritten] says is missing.
