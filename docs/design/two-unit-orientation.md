@@ -124,15 +124,20 @@ blend of two mountings.
   -- the boundary `SetEnd.of(cues, cadenceGuided = true)` returns, not
   `calledOver` -- and before the stream ends: the eleven completed sets of
   session 32 record 4.3-13.7 s past it (recorded on `SetEnd`). Only a set
-  that ends on a cadence `Done` has samples past its terminal cue. A set
-  ended by tap has none -- `endSet` cancels the sample collectors before it
-  reads the clock, so its last sample is never later than the tap -- and
-  that covers a tap-ended guided set (`Stopped`). An unguided rep set either
-  carries no word (voice off or no planned count) or carries `Done` as the
-  rep-count milestone (#285), which is not a call to stop lifting and opens
-  no closing window. A clock-ended timed set (`Time`) has none either: the
-  tick that speaks `Time` calls `endSet`, which cancels the collectors
-  first -- read from source; no clock-ended set has been measured.
+  that ends on a cadence `Done` has samples past the boundary `SetEnd.of`
+  returns. A set ended by tap has none -- `endSet` cancels the sample
+  collectors before it reads the clock, so its last sample is never later
+  than the tap -- and that covers a tap-ended guided set (`Stopped`). An
+  unguided rep set carries no word that bounds it: with the voice on it records
+  only `Rep N` / `Last rep` milestones (no planned count, as on every
+  sensor-counted set, or a lifter who stops short of it), with the voice
+  off nothing; or, at a reached planned count, `Done` as the rep-count
+  milestone (#285), which is not a call to stop lifting and opens no
+  closing window, though the lifter's extra reps past it are samples past
+  a cue `calledOver` counts as terminal. A clock-ended timed set (`Time`)
+  has none either: the tick that speaks `Time` calls `endSet`, which
+  cancels the collectors first -- read from source; no clock-ended set has
+  been measured.
   Field-41 set 21, a hang ended by tap at 5 s of 30, is the tap case: its
   last sample is 33 ms before its write. Each of those has no closing
   window, so the default below refuses it. Session 32's five failed sets were
