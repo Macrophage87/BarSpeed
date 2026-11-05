@@ -174,6 +174,55 @@ object DatabaseRestorePolicy {
     fun safeToOpenAfterStuck(mainPresent: Boolean, sidecarPresent: Boolean): Boolean = mainPresent || !sidecarPresent
 
     /**
+     * After a restore that could go neither forward nor back, whether the
+     * database's path holds exactly one database's complete set of files, so
+     * that Room may open it. Issue #112, round 1 review (A3, B2).
+     *
+     * A MAIN FILE AT THE PATH IS NOT A WHOLE DATABASE. Moving a database
+     * either way passes through states where its main file is in one place
+     * and its `-wal` in another -- out of the path the sidecars go first, so
+     * the main file sits there for a moment without its log -- and a stuck
+     * restore can stop in any of them. Opening such a main file shows a
+     * snapshot from before its last checkpoint, and the open writes a fresh
+     * `-wal` beside it, which makes every later attempt to put the old one
+     * back refuse: the split becomes permanent. Nothing at the path is no
+     * better: Room would create an empty database there, and the next launch
+     * meets it in the way of the move it has to finish.
+     *
+     * WHAT THIS ASKS INSTEAD. Every file of either database is at the path or
+     * in that database's own directory -- the displaced one's new rescue
+     * directory, or the restored one's source directory -- because a move is
+     * a rename and never leaves a copy. So, with [displacedFiles] and
+     * [restoredFiles] the names each database had when the swap began, and
+     * [inDisplacedDir] and [inSourceDir] the names in each directory now, a
+     * database is whole at the path when its directory holds none of its
+     * files and the other database has none at the path. Anything in a
+     * database's directory is that database's, including a file an earlier
+     * open created, so a non-empty directory is never whole whatever the
+     * recorded sets say. [mainAtPath] is checked as well, so a vanished main
+     * file is never taken for a whole one.
+     *
+     * Refusing means the launch throws -- a crash with every byte on disk,
+     * retried by every launch after it, which beats an open that splits a
+     * database from its log for good. [mainName] is the database file's name;
+     * the other names are its sidecars.
+     */
+    fun oneWholeDatabaseInPlace(
+        mainName: String,
+        displacedFiles: Set<String>,
+        restoredFiles: Set<String>,
+        inDisplacedDir: Set<String>,
+        inSourceDir: Set<String>,
+        mainAtPath: Boolean,
+    ): Boolean {
+        val displacedAtPath = displacedFiles - inDisplacedDir
+        val restoredAtPath = restoredFiles - inSourceDir
+        val displacedWhole = mainName in displacedFiles && inDisplacedDir.isEmpty() && restoredAtPath.isEmpty()
+        val restoredWhole = mainName in restoredFiles && inSourceDir.isEmpty() && displacedAtPath.isEmpty()
+        return mainAtPath && (displacedWhole || restoredWhole)
+    }
+
+    /**
      * The journal outranks the request: a journal means files have started
      * moving, and until it is resolved a request must not start a second swap
      * over the first. A swap left [RestorePhase.UNVERIFIED] by an earlier

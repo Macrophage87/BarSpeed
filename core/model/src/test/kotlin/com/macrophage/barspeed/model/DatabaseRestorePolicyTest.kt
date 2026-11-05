@@ -144,4 +144,62 @@ class DatabaseRestorePolicyTest {
         assertTrue(DatabaseRestorePolicy.safeToOpenAfterStuck(mainPresent = false, sidecarPresent = false))
         assertFalse(DatabaseRestorePolicy.safeToOpenAfterStuck(mainPresent = false, sidecarPresent = true))
     }
+
+    // ---- round 1 review (A3, B2): what a stuck restore may open ---------------
+
+    private val db = "a.db"
+    private val wal = "a.db-wal"
+    private val pair = setOf(db, wal)
+
+    private fun whole(
+        displaced: Set<String> = pair,
+        restored: Set<String> = pair,
+        inDisplaced: Set<String>,
+        inSource: Set<String>,
+        mainAtPath: Boolean = true,
+    ) = DatabaseRestorePolicy.oneWholeDatabaseInPlace(db, displaced, restored, inDisplaced, inSource, mainAtPath)
+
+    @Test
+    fun `before any move and after the last, one whole database is in place`() {
+        assertTrue(whole(inDisplaced = emptySet(), inSource = pair), "nothing moved yet")
+        assertTrue(whole(inDisplaced = pair, inSource = emptySet()), "every move done")
+    }
+
+    @Test
+    fun `a main file whose log is in its directory is not a whole database`() {
+        // The database in place lost its -wal to the displaced directory and kept its main file.
+        assertFalse(whole(inDisplaced = setOf(wal), inSource = pair))
+        // The restored main file came in; its -wal is still in the rescue's directory.
+        assertFalse(whole(inDisplaced = pair, inSource = setOf(wal)))
+    }
+
+    @Test
+    fun `a file of the other database at the path makes it not whole`() {
+        // Each database's own directory is empty, but a file of the other one is at the path.
+        assertFalse(whole(displaced = setOf(db), inDisplaced = emptySet(), inSource = setOf(db)))
+        assertFalse(whole(restored = setOf(db), inDisplaced = setOf(db), inSource = emptySet()))
+    }
+
+    @Test
+    fun `nothing at the path is not opened`() {
+        assertFalse(whole(inDisplaced = pair, inSource = pair, mainAtPath = false))
+    }
+
+    @Test
+    fun `a database with no main file of its own is never the whole one`() {
+        // The database in place had only a stray -wal: with nothing moved, the path holds no database.
+        assertFalse(whole(displaced = setOf(wal), inDisplaced = emptySet(), inSource = pair))
+    }
+
+    @Test
+    fun `a file an open created and an undo carried home still counts against the database`() {
+        // The restored database had no -wal when the swap began; an open made one and an undo
+        // carried it into the rescue's directory. The main file at the path is not whole.
+        assertFalse(whole(restored = setOf(db), inDisplaced = pair, inSource = setOf(wal)))
+    }
+
+    @Test
+    fun `a main file that vanished is not taken for a whole database`() {
+        assertFalse(whole(inDisplaced = emptySet(), inSource = pair, mainAtPath = false))
+    }
 }
