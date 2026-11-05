@@ -2,6 +2,7 @@ package com.macrophage.barspeed.ui.screens
 
 import android.app.Application
 import android.net.Uri
+import android.provider.DocumentsContract
 import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
@@ -12,6 +13,9 @@ import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.data.SetRecordEntity
 import com.macrophage.barspeed.data.repsSourceOf
 import com.macrophage.barspeed.model.RepsCountChip
+import com.macrophage.barspeed.model.SaveKind
+import com.macrophage.barspeed.model.SaveOutcome
+import com.macrophage.barspeed.model.SaveToPhonePolicy
 import com.macrophage.barspeed.model.SessionHeartRate
 import com.macrophage.barspeed.model.VelocityLossRegime
 import com.macrophage.barspeed.model.WeightUnit
@@ -221,21 +225,59 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
         }
     }
 
-    /** Write the pending export to the picked document. Null uri = picker cancelled. */
-    fun savePendingTo(uri: Uri?) {
-        val bytes = pendingSave ?: return
+    /**
+     * Write the pending export to the picked document. Null uri = picker
+     * cancelled.
+     *
+     * [kind] is the export the lifter asked for, as the screen kept it in its
+     * saved instance state, so it survives the Activity being destroyed behind
+     * the picker where [pendingSave] does not (#37). What happens is
+     * [SaveToPhonePolicy.onPicked]'s decision; this carries it out.
+     */
+    fun savePendingTo(uri: Uri?, kind: SaveKind?) {
+        val held = pendingSave
         pendingSave = null
-        if (uri == null) return
+        val outcome = SaveToPhonePolicy.onPicked(documentCreated = uri != null, bytesHeld = held != null, kind = kind)
+        if (uri == null || outcome == SaveOutcome.NOTHING) return
         viewModelScope.launch {
             val app = getApplication<Application>()
-            val ok =
-                withContext(Dispatchers.IO) {
-                    runCatching {
-                        app.contentResolver.openOutputStream(uri)?.use { it.write(bytes) } != null
-                    }.getOrDefault(false)
+            val bytes =
+                when (outcome) {
+                    SaveOutcome.WRITE_HELD -> held
+                    SaveOutcome.REGENERATE -> kind?.let { exportBytes(it) }
+                    SaveOutcome.NOTHING, SaveOutcome.REFUSE -> null
                 }
-            Toast.makeText(app, if (ok) "Saved" else "Save failed", Toast.LENGTH_SHORT).show()
+            val ok =
+                bytes != null &&
+                    withContext(Dispatchers.IO) {
+                        runCatching {
+                            app.contentResolver.openOutputStream(uri)?.use { it.write(bytes) } != null
+                        }.getOrDefault(false)
+                    }
+            // The picker created the document before it returned, so where
+            // there is nothing to write the file already exists, empty. It is
+            // removed rather than left under the name the lifter chose; if the
+            // provider refuses, the message below still says nothing was saved.
+            if (bytes == null) {
+                withContext(Dispatchers.IO) {
+                    runCatching { DocumentsContract.deleteDocument(app.contentResolver, uri) }
+                }
+            }
+            val message =
+                when {
+                    ok -> "Saved"
+                    bytes == null -> SaveToPhonePolicy.REFUSED_MESSAGE
+                    else -> "Save failed"
+                }
+            Toast.makeText(app, message, Toast.LENGTH_SHORT).show()
         }
+    }
+
+    /** The bytes of [kind], built again from the stored session (#37). */
+    private suspend fun exportBytes(kind: SaveKind): ByteArray? = when (kind) {
+        SaveKind.SUMMARY_JSON -> container.sessionExporter.exportJson(sessionId, false)?.toByteArray(Charsets.UTF_8)
+        SaveKind.DETAILED_JSON -> container.sessionExporter.exportJson(sessionId, true)?.toByteArray(Charsets.UTF_8)
+        SaveKind.RAW_ZIP -> container.rawExporter.buildZip(sessionId)
     }
 
     class Factory(private val app: Application, private val sessionId: Long) : ViewModelProvider.Factory {

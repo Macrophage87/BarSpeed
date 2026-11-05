@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.ui.screens
 
 import android.app.Application
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -27,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -41,6 +43,7 @@ import com.macrophage.barspeed.dsp.VelocityLoss
 import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.HistoryTarget
+import com.macrophage.barspeed.model.SaveKind
 import com.macrophage.barspeed.model.VelocityLossRegime
 import com.macrophage.barspeed.model.VoidSetPolicy
 import com.macrophage.barspeed.model.WarmupMarkPolicy
@@ -150,14 +153,19 @@ fun SessionDetailScreen(navController: NavController, sessionId: Long) {
                 Text(parts.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
                 Spacer(Modifier.height(10.dp))
             }
+            // Which export the open picker is for, kept in saved instance
+            // state so it outlives the Activity being destroyed behind the
+            // picker -- the bytes do not (#37). A name, not the enum, because
+            // a String needs no Saver.
+            var pendingKind by rememberSaveable { mutableStateOf<String?>(null) }
+            val onPicked: (Uri?) -> Unit = { uri ->
+                viewModel.savePendingTo(uri, pendingKind?.let { SaveKind.valueOf(it) })
+                pendingKind = null
+            }
             val saveJsonLauncher =
-                rememberLauncherForActivityResult(
-                    ActivityResultContracts.CreateDocument("application/json"),
-                ) { uri -> viewModel.savePendingTo(uri) }
+                rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json"), onPicked)
             val saveZipLauncher =
-                rememberLauncherForActivityResult(
-                    ActivityResultContracts.CreateDocument("application/zip"),
-                ) { uri -> viewModel.savePendingTo(uri) }
+                rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip"), onPicked)
 
             SectionCaption("Share")
             Spacer(Modifier.height(4.dp))
@@ -189,17 +197,32 @@ fun SessionDetailScreen(navController: NavController, sessionId: Long) {
             Spacer(Modifier.height(4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(
-                    onClick = { viewModel.prepareJsonSave(false) { saveJsonLauncher.launch(it) } },
+                    onClick = {
+                        viewModel.prepareJsonSave(false) {
+                            pendingKind = SaveKind.SUMMARY_JSON.name
+                            saveJsonLauncher.launch(it)
+                        }
+                    },
                     enabled = !exporting,
                     modifier = Modifier.weight(1f),
                 ) { Text("JSON") }
                 OutlinedButton(
-                    onClick = { viewModel.prepareJsonSave(true) { saveJsonLauncher.launch(it) } },
+                    onClick = {
+                        viewModel.prepareJsonSave(true) {
+                            pendingKind = SaveKind.DETAILED_JSON.name
+                            saveJsonLauncher.launch(it)
+                        }
+                    },
                     enabled = !exporting,
                     modifier = Modifier.weight(1f),
                 ) { Text("Detailed") }
                 OutlinedButton(
-                    onClick = { viewModel.prepareRawZipSave { saveZipLauncher.launch(it) } },
+                    onClick = {
+                        viewModel.prepareRawZipSave {
+                            pendingKind = SaveKind.RAW_ZIP.name
+                            saveZipLauncher.launch(it)
+                        }
+                    },
                     enabled = !exporting,
                     modifier = Modifier.weight(1f),
                 ) { Text("Raw CSV") }
