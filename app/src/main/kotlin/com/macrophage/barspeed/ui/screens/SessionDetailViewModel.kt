@@ -11,8 +11,10 @@ import androidx.lifecycle.viewModelScope
 import com.macrophage.barspeed.BuildConfig
 import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.data.SetRecordEntity
+import com.macrophage.barspeed.data.guideCalls
 import com.macrophage.barspeed.data.repsSourceOf
 import com.macrophage.barspeed.model.RepsCountChip
+import com.macrophage.barspeed.model.RepsSource
 import com.macrophage.barspeed.model.SaveKind
 import com.macrophage.barspeed.model.SaveOutcome
 import com.macrophage.barspeed.model.SaveToPhonePolicy
@@ -105,9 +107,29 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
      * the export's own derivation over the geometry FROZEN on the row, so the
      * card and the export's `repsSource` name one counter (#325). Null on a
      * timed set, where nothing counted reps.
+     *
+     * [guideCalls] is [guideCallsOf]'s answer for the same row, the input the
+     * export reads off the set's archived rep marks (#336); null until it has
+     * been read, which draws what the row's own columns say.
      */
-    fun countChip(record: SetRecordEntity): String? =
-        RepsCountChip.label(record.repsSourceOf(repository.decodeGeometry(record)?.kind))
+    fun countChip(record: SetRecordEntity, guideCalls: Int?): String? =
+        RepsCountChip.label(record.repsSourceOf(repository.decodeGeometry(record)?.kind, guideCalls))
+
+    /**
+     * How many reps the cadence guide called on [record], read off its
+     * archived rep marks the way the export reads them (#336), or null where
+     * none are stored.
+     *
+     * Read only where the count can move the word: a row whose own columns
+     * already name the metronome. History never read a set's streams before,
+     * and the streams come back whole -- the IMU capture with the marks -- so
+     * every other row is answered without touching them. Off the main thread,
+     * because the marks are gzipped.
+     */
+    suspend fun guideCallsOf(record: SetRecordEntity): Int? {
+        if (record.repsSourceOf(repository.decodeGeometry(record)?.kind, null) != RepsSource.METRONOME) return null
+        return withContext(Dispatchers.IO) { repository.rawStreams(record.id).guideCalls() }
+    }
 
     /**
      * Mark a recorded set as one the lifter did not perform, or take the mark

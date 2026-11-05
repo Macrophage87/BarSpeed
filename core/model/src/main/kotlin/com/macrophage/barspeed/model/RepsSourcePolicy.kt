@@ -119,6 +119,29 @@ object RepsSourcePolicy {
      */
     fun publishedReps(actualReps: Int, timed: Boolean): Int? = if (timed) null else actualReps
 
+    /**
+     * The word for a row whose CADENCE GUIDE's own count is known beside its
+     * recorded one (#336).
+     *
+     * [recordedReps] is the row's `actualReps`. [guideCalls] is how many reps
+     * the guide called while the set was performed -- the length of the set's
+     * archived rep-mark stream, which on a guided set holds one mark per call
+     * the guide counted and nothing else, since a `+1 REP` tap does nothing
+     * there -- or null where no such stream is stored.
+     *
+     * At this commit the two are read by nothing: the answer is [published]'s
+     * own over the first four.
+     */
+    @Suppress("UNUSED_PARAMETER", "UnusedParameter")
+    fun published(
+        liveReps: Int?,
+        repsManual: Boolean,
+        timed: Boolean,
+        guideCounted: Boolean,
+        recordedReps: Int,
+        guideCalls: Int?,
+    ): RepsSource? = published(liveReps, repsManual, timed, guideCounted)
+
     /** The same answer as the published word, for a caller that wants the string. */
     fun publishedWord(liveReps: Int?, repsManual: Boolean, timed: Boolean, guideCounted: Boolean): String? =
         published(liveReps, repsManual, timed, guideCounted)?.wireName
