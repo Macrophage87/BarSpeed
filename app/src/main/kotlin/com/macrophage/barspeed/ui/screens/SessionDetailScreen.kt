@@ -237,14 +237,25 @@ fun SessionDetailScreen(navController: NavController, sessionId: Long) {
             )
             Spacer(Modifier.height(12.dp))
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(sets) { record -> SetCard(record, viewModel, weightUnit) }
+                items(sets) { record ->
+                    // Counted over the session's whole list, which is why it is
+                    // computed here rather than inside the card (#232).
+                    val numberInExercise =
+                        VoidSetPolicy.setNumberInExercise(sets, record, { it.exerciseId }, { it.orderIdx })
+                    SetCard(record, viewModel, weightUnit, numberInExercise)
+                }
             }
         }
     }
 }
 
 @Composable
-private fun SetCard(record: SetRecordEntity, viewModel: SessionDetailViewModel, unit: WeightUnit) {
+private fun SetCard(
+    record: SetRecordEntity,
+    viewModel: SessionDetailViewModel,
+    unit: WeightUnit,
+    numberInExercise: Int,
+) {
     val analysis = viewModel.decodeAnalysis(record)
     // Every target this card draws, decided once in :core:model where a test
     // reaches it (#308). The composables below read its fields and decide
@@ -258,7 +269,7 @@ private fun SetCard(record: SetRecordEntity, viewModel: SessionDetailViewModel, 
             // a set that did not happen is exactly the set whose analysis is
             // most likely to be empty or unreadable -- drawing the mark in
             // there would hide it on the rows it matters most for.
-            VoidRow(record, viewModel)
+            VoidRow(record, viewModel, numberInExercise)
             analysis?.let { a ->
                 val regime = viewModel.velocityLossRegime(record)
                 SetChips(record, a, regime, target, viewModel.countChip(record))
@@ -338,7 +349,7 @@ private fun SetCard(record: SetRecordEntity, viewModel: SessionDetailViewModel, 
  * confirm.
  */
 @Composable
-private fun VoidRow(record: SetRecordEntity, viewModel: SessionDetailViewModel) {
+private fun VoidRow(record: SetRecordEntity, viewModel: SessionDetailViewModel, numberInExercise: Int) {
     var asking by remember { mutableStateOf(false) }
     var reason by remember { mutableStateOf("") }
     // The question before the mark comes off a set carrying the lifter's own
@@ -371,7 +382,7 @@ private fun VoidRow(record: SetRecordEntity, viewModel: SessionDetailViewModel) 
             title = { Text("Not performed?") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(VoidSetPolicy.confirmation(record.exerciseName, record.orderIdx + 1))
+                    Text(VoidSetPolicy.confirmation(record.exerciseName, numberInExercise))
                     OutlinedTextField(
                         value = reason,
                         // Sanitized on every keystroke rather than at save, so
