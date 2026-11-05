@@ -39,8 +39,9 @@ import com.macrophage.barspeed.model.Tempo
  * at the bottom and digit 4 the pause at the top, which is exactly what
  * [Phase.BOTTOM_PAUSE] and [Phase.TOP_PAUSE] are named after; both sides are
  * positional and they agree. Which of those two labels [StreamingSetTracker]
- * emits is a separate question with a separate defect behind it, named in
- * `PhaseTempoTargetTest` and not addressed here.
+ * emits is a separate question; it had a separate defect behind it, chosen
+ * from the start phase alone, and #134 fixed it in the tracker
+ * (`LivePhaseLabelTest`).
  */
 object PhaseTempoTarget {
     fun secondsFor(tempo: Tempo, direction: LiftDirection, phase: Phase): Double? = when (phase) {

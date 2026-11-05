@@ -189,6 +189,15 @@ class StreamingSetTracker(
     /** Ecc-first lifts: a concentric only counts after a qualified eccentric (kills walkout/re-rack bumps). */
     private var eccentricPending = false
 
+    /**
+     * The sign of the last movement run that QUALIFIED -- +1 for a stroke in
+     * the positive direction, -1 for one in the negative -- or 0 before any
+     * has. Which end of the stroke the bar is still at, for [currentPhase]
+     * (#134). A run that did not qualify -- dead-band jitter, a re-rack bump,
+     * an over-cap drift run -- moved the bar nowhere this tracker will name.
+     */
+    private var lastQualifiedRunType = 0
+
     /** Latched false by [noteRunaway]; published as [LiveSetState.countTrusted]. */
     private var countTrusted = true
 
@@ -334,7 +343,10 @@ class StreamingSetTracker(
                     duration >= thresholds.minPhaseS &&
                     runDisplacement >= thresholds.minRomM &&
                     runDisplacement <= thresholds.maxRunDisplacementM
-            if (qualified) onQualifiedRun(runType)
+            if (qualified) {
+                lastQualifiedRunType = runType
+                onQualifiedRun(runType)
+            }
         }
         runType = type
         runStartS = timeS
@@ -368,8 +380,11 @@ class StreamingSetTracker(
         if (runDisplacement > thresholds.maxRunDisplacementM) countTrusted = false
     }
 
+    /** Whether a run of sign [direction] is the drive: the same rule counting and labelling read. */
+    private fun isConcentric(direction: Int): Boolean = (direction == 1) == driveIsPositive
+
     private fun onQualifiedRun(direction: Int) {
-        val concentric = (direction == 1) == driveIsPositive
+        val concentric = isConcentric(direction)
         if (startsWith == StartPhase.ECCENTRIC) {
             // Pair phases: down arms the rep, the following up completes it.
             if (!concentric) {
@@ -420,14 +435,48 @@ class StreamingSetTracker(
         const val ANCHOR_STARVATION_S = 6.0
     }
 
+    /**
+     * The phase [LiveSetState.phase] names (#134).
+     *
+     * A MOVEMENT is named for what the lifter is doing: the drive is
+     * [Phase.CONCENTRIC] whichever way it moves, read through [isConcentric]
+     * -- the rule [onQualifiedRun] counts with -- so on a leg curl or a
+     * pushdown the DOWN stroke is the concentric. This read the stroke's sign
+     * alone and called every upward stroke the concentric.
+     *
+     * A PAUSE is named for where the bar is: still after a stroke in the
+     * NEGATIVE direction it is at the bottom, after one in the positive
+     * direction at the top -- the positional meaning tempo digits 2 and 4
+     * carry. This chose from [startsWith] alone and never consulted which way
+     * the drive goes, so every still period on an eccentric-first lift read
+     * as a top pause, the bottom of a squat included. Before any stroke has
+     * qualified the bar is where the lift starts, which is at the positive end
+     * exactly when the first stroke is a negative one:
+     * `(startsWith == ECCENTRIC) == driveIsPositive`. On a vertical lift that
+     * is `LiftDirection.startsAtTop`; a horizontal lift has no up, and its
+     * positive end is the end the drive moves toward.
+     *
+     * An eccentric-first lift reads [Phase.IDLE] until its first stroke
+     * qualifies. It used to read IDLE until its first REP was counted, which
+     * left the pause at the bottom of rep one named no pause at all; a
+     * concentric-first lift never had that state.
+     *
+     * Display only. Nothing on the batch path reads this label --
+     * `bottomPause_s` and `topPause_s` are [SetAnalyzer]'s, from the
+     * segmenter's own boundaries -- and no rep is counted from it.
+     * `LivePhaseLabelTest` pins all four `startsWith` x `concentricUp` shapes.
+     */
     private fun currentPhase(): Phase = when (runType) {
-        1 -> Phase.CONCENTRIC
-        -1 -> Phase.ECCENTRIC
-        else ->
-            when {
-                repCount == 0 && startsWith == StartPhase.ECCENTRIC -> Phase.IDLE
-                startsWith == StartPhase.ECCENTRIC -> Phase.TOP_PAUSE
-                else -> Phase.BOTTOM_PAUSE
-            }
+        0 -> pausePhase()
+        else -> if (isConcentric(runType)) Phase.CONCENTRIC else Phase.ECCENTRIC
+    }
+
+    private fun pausePhase(): Phase {
+        if (lastQualifiedRunType == 0 && startsWith == StartPhase.ECCENTRIC) return Phase.IDLE
+        val atPositiveEnd = when (lastQualifiedRunType) {
+            0 -> (startsWith == StartPhase.ECCENTRIC) == driveIsPositive
+            else -> lastQualifiedRunType == 1
+        }
+        return if (atPositiveEnd) Phase.TOP_PAUSE else Phase.BOTTOM_PAUSE
     }
 }
