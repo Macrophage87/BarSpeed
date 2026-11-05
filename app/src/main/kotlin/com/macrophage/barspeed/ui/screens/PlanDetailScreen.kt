@@ -129,6 +129,9 @@ fun PlanDetailScreen(navController: NavController, planId: Long) {
     if (confirming) {
         ConfirmSwitchDialog(state.start, viewModel) { confirming = false }
     }
+    if (state.reviewing) {
+        ApproveStagedDialog(state.stagedWarnings, viewModel)
+    }
 }
 
 @Composable
@@ -235,6 +238,53 @@ private fun ConfirmSwitchDialog(start: PlanStartDecision?, viewModel: PlanDetail
         },
     )
 }
+
+/**
+ * MAKE ACTIVE on a staged plan (#58): the plan has not been approved, and its
+ * import warnings may only have been shown in a dialog the lifter dismissed,
+ * so they are named here before APPROVE makes it the active plan.
+ */
+@Composable
+private fun ApproveStagedDialog(warnings: List<String>, viewModel: PlanDetailViewModel) {
+    val raised =
+        when (warnings.size) {
+            0 -> "Its import raised no warnings."
+            1 -> "Its import raised 1 warning:"
+            else -> "Its import raised ${warnings.size} warnings:"
+        }
+    AlertDialog(
+        onDismissRequest = viewModel::dismissReview,
+        title = { Text("Approve this plan?") },
+        text = {
+            Column {
+                Text(
+                    "Approving makes this staged plan the active one. $raised",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                warnings.take(STAGED_WARNINGS_SHOWN).forEach {
+                    Spacer(Modifier.height(4.dp))
+                    Text("⚠ $it", style = MaterialTheme.typography.bodySmall, color = BarColors.Amber)
+                }
+                if (warnings.size > STAGED_WARNINGS_SHOWN) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "+${warnings.size - STAGED_WARNINGS_SHOWN} more",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = BarColors.Sub,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = viewModel::approve) { Text("Approve") }
+        },
+        dismissButton = {
+            TextButton(onClick = viewModel::dismissReview) { Text("Cancel") }
+        },
+    )
+}
+
+private const val STAGED_WARNINGS_SHOWN = 6
 
 @Composable
 private fun SessionHeader(session: PlanSessionDef) {
