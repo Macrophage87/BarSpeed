@@ -23,6 +23,7 @@ import com.macrophage.barspeed.model.HoldEndSource
 import com.macrophage.barspeed.model.HrSessionSummary
 import com.macrophage.barspeed.model.HrSetSummary
 import com.macrophage.barspeed.model.ImuSample
+import com.macrophage.barspeed.model.PhaseTallyExport
 import com.macrophage.barspeed.model.PrepWindow
 import com.macrophage.barspeed.model.RecordedTimeZone
 import com.macrophage.barspeed.model.RepMetricsExport
@@ -427,6 +428,15 @@ class SessionExporter(
                     withinTolerance = it.repsFullyCompliant,
                     of = it.repsEvaluated,
                     scoredPhases = it.phases.filter { p -> p.scored }.map { p -> p.phase },
+                    // The same phases, each with its own two counts (#66 (c),
+                    // 1.26): the ratio above folds them together rep by rep,
+                    // over whatever each rep resolved. Copied from the stored
+                    // analysis, never re-counted, and null rather than empty
+                    // where nothing was scored -- scoredPhases says that.
+                    byPhase =
+                    it.phases.filter { p -> p.scored }
+                        .map { p -> PhaseTallyExport(p.phase, p.repsWithinTolerance, p.repsEvaluated) }
+                        .ifEmpty { null },
                     prescribedEccConRatio = it.prescribedEccConRatio,
                     actualEccConRatio = it.actualEccConRatio,
                     // Frozen with the ratio when the set was analysed (#88);
