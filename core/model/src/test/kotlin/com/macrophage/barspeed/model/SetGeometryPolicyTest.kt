@@ -354,6 +354,42 @@ class SetGeometryPolicyTest {
         assertEquals(GeometrySource.DEFAULT, g.sources.sensorOnStack)
     }
 
+    /**
+     * A row stored by any build up to and including v0.1.59 wrote a seven-key
+     * `sources` object: no `sensorInverted` (#289). It decodes, and decodes to
+     * "not recorded" rather than to [GeometrySource.DEFAULT] -- those builds
+     * set the inversion by a rule on some sets, so a default would be a claim
+     * about where a stored `true` came from that nothing recorded.
+     */
+    @Test
+    fun `a stored seven-key sources object decodes with no inversion source`() {
+        val stored =
+            """
+            {
+              "startsWith": "CONCENTRIC",
+              "concentricUp": false,
+              "horizontal": false,
+              "sensorOnStack": true,
+              "sensorInverted": true,
+              "travelRatio": 1.0,
+              "kind": "DYNAMIC",
+              "bodyweight": false,
+              "sources": {
+                "startsWith": "DECLARED",
+                "concentric": "DECLARED",
+                "plane": "DEFAULT",
+                "kind": "INFERRED",
+                "travelRatio": "DEFAULT",
+                "sensorOnStack": "SEEDED",
+                "bodyweight": "DEFAULT"
+              }
+            }
+            """.trimIndent()
+        val g = json.decodeFromString(ResolvedGeometry.serializer(), stored)
+        assertEquals(true, g.sensorInverted, "decode moved the stored value")
+        assertNull(g.sources.sensorInverted, "a row that never stored the inversion's source was given one")
+    }
+
     // ---- the field-37 shape, as it behaves today (#223) ---------------------
 
     /**
