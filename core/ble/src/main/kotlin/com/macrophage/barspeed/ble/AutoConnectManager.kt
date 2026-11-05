@@ -4,6 +4,8 @@ import android.content.Context
 import com.macrophage.barspeed.model.ConnectionState
 import com.macrophage.barspeed.model.DeviceLinkRole
 import com.macrophage.barspeed.model.DevicePairingPolicy
+import com.macrophage.barspeed.model.ReconnectPolicy
+import com.macrophage.barspeed.model.ReconnectStep
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -456,14 +458,19 @@ class AutoConnectManager(
                     delay(3_000)
                     continue
                 }
-                when (client.connectionState.value) {
-                    is ConnectionState.Connected -> {
+                // Which branch is ReconnectPolicy's, a total function over
+                // ConnectionState with no `else` (#69 item 5): this `when` used
+                // to end in `else ->`, which a future state meaning "stop
+                // trying" would have joined silently. This one is exhaustive
+                // over ReconnectStep, so neither end can absorb a new member.
+                when (ReconnectPolicy.stepFor(client.connectionState.value)) {
+                    ReconnectStep.WAIT_FOR_DROP -> {
                         backoffS = 1L
                         // Wait until the connection drops before doing anything else.
                         client.connectionState.first { it !is ConnectionState.Connected }
                     }
-                    is ConnectionState.Connecting -> delay(2_000)
-                    else -> {
+                    ReconnectStep.WAIT_FOR_CONNECT -> delay(2_000)
+                    ReconnectStep.CONNECT -> {
                         client.connect(address, autoConnect = true)
                         delay(backoffS * 1_000)
                         backoffS = min(backoffS * 2, 30L)
