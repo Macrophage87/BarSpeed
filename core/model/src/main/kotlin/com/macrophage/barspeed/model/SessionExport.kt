@@ -2755,14 +2755,35 @@ data class SessionExport(
          * for a reader that requires both keys on every geometry, which every
          * earlier schema did; such a reader already rejects a 1.26 document on
          * its version string, and this schema accepts a 1.25 document. The
-         * published schema states the condition with an if/then/else on
-         * `kind`. Nothing is renamed or retyped, `DATABASE_VERSION` does NOT
-         * move, and the plan schema is untouched.
+         * published schema states the condition with an if/else on `kind`:
+         * the two words are REQUIRED off a hold or a carry and not forbidden
+         * on one, which is how it still accepts a 1.25 hold. Nothing is renamed
+         * or retyped, `DATABASE_VERSION` does NOT move, and the plan schema is
+         * untouched.
          *
          * PINNED. `SchemaHoldStrokeContractTest` asserts this entry's marker,
          * the condition, both descriptions and the example's hold;
          * `StrokeGeometryTest` pins the split; `SessionExportHoldStrokeTest`
          * and `RawExporterTest` in `:core:data` are the export differentials.
+         *
+         * 1.26 DOCUMENTATION ENTRY (#275, the three set-level means): ADDS NO
+         * KEY, and no key moves. `summary.meanConVel_mps`, `summary.meanRom_m`
+         * and `summary.meanConPower_w` are published, and this entry exists
+         * because no version log ever said when. Read at the tags rather than
+         * assumed: `meanConVel_mps` and `meanRom_m` are in the 1.0 schema of
+         * v0.1.0. `meanConPower_w`, with `peakPower_w`, was added in v0.1.19
+         * still writing 1.0, with no mint and no entry -- and `summary` is
+         * `additionalProperties: false`, so a reader validating against a
+         * schema from v0.1.18 or earlier rejects any 1.0 document that carries
+         * them. A reader that ignores unknown keys reads them, and one that
+         * finds them absent reads a 1.0 document written before v0.1.19. The
+         * issue placed the entry under 1.20; 1.20 neither added nor changed
+         * these keys, so the entry is filed under the open 1.26 instead, as
+         * documentation and never as a mint. What each mean is taken over is
+         * stated on the key itself.
+         *
+         * PINNED. `SchemaSummaryMeansContractTest` asserts this entry's marker
+         * in the published log and that all three keys are declared.
          */
         const val SCHEMA_VERSION = "1.26"
 
