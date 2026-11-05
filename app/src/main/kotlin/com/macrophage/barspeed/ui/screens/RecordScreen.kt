@@ -419,13 +419,17 @@ private fun exitBody(prompt: ExitPrompt, unwritten: UnwrittenClose?): String = w
             "To keep it, tap Keep recording and end the set with the control at the bottom of this screen. " +
             "On a tempo-guided or timed set that is under way that control ends the set as a failure, and " +
             "you can still rate the set while you rest."
-    // No word here may imply the session can be picked up again: nothing reads
-    // an open session row back into this screen, and the next set would open a
-    // second one.
+    // Says the session can be picked up again, and for how long, because as
+    // of #48 it can: coming back to Record asks "Continue this session?" while
+    // SessionResumePolicy.offer would (an open row with sets, its last set
+    // within RESUME_WINDOW_MS). The HRV clause is conditional because a
+    // continued session's close withholds it (SessionResumePolicy.closeRrMs).
     ExitPrompt.SESSION_OPEN ->
         "Every completed set is already saved. Finishing writes the session's end time and its heart-rate " +
-            "and HRV summary. Leaving without finishing leaves the session open, and nothing can finish it " +
-            "later. Either way the rest of the planned sets are dropped."
+            "summary, and its HRV unless it was continued from an earlier visit. Leaving without finishing " +
+            "leaves the session open: coming back to Record within three hours of your last set offers to " +
+            "continue it, and after that it stays open with no end time. Either way the rest of the planned " +
+            "sets are dropped."
     // Now says leaving is safe for the set, because as of this commit it is:
     // the write runs on a scope the pop cannot cancel. That sentence was
     // deliberately absent while the prompt was unreachable and the claim would
