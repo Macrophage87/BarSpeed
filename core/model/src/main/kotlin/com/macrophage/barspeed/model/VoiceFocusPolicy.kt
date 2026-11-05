@@ -20,6 +20,14 @@ data class VoiceFocusState(
 enum class VoiceFocusStep { REQUEST, ABANDON, KEEP }
 
 /**
+ * A focus change the platform reported for the voice's own request (#340),
+ * named apart from `AudioManager`'s integers so the rule can be pinned here.
+ * `VoiceCounter` maps the platform's constants onto these and ignores any
+ * other value.
+ */
+enum class VoiceFocusChange { GAIN, LOSS, LOSS_TRANSIENT, LOSS_TRANSIENT_CAN_DUCK }
+
+/**
  * When the voice holds audio focus, so music ducks under it rather than
  * playing at the same level (#339).
  *
@@ -83,4 +91,37 @@ object VoiceFocusPolicy {
     /** The engine reported utterance [id] done, stopped or failed. */
     fun finished(state: VoiceFocusState, id: String?): VoiceFocusState =
         if (id != null && id == state.speaking) state.copy(speaking = null) else state
+
+    /**
+     * The engine reported utterance [id] STARTED playing (#340).
+     *
+     * Marks the set as having spoken, the same mark [spoke] makes at the
+     * hand-over; at this commit the two agree on every utterance that plays.
+     */
+    fun started(state: VoiceFocusState, id: String?): VoiceFocusState =
+        if (id != null && id == state.speaking && state.inSet) state.copy(spokenThisSet = true) else state
+
+    /**
+     * The lifter switched the audio cues off with a set under way (#340).
+     *
+     * [cadenceSpeaks] is whether a cadence guide is running, which speaks
+     * whatever the toggle says (`GuidedCadenceRunner`'s own KDoc). At this
+     * commit nothing changes: the toggle is read by each caller that speaks,
+     * and the focus held for the set is kept.
+     */
+    @Suppress("UNUSED_PARAMETER", "UnusedParameter")
+    fun cuesSwitchedOff(state: VoiceFocusState, cadenceSpeaks: Boolean): VoiceFocusState = state
+
+    /**
+     * Whether the voice's request is still the platform's to answer for after
+     * [change] arrived -- so whether [step] still owes it an ABANDON (#340).
+     *
+     * At this commit only a permanent [VoiceFocusChange.LOSS] is read, the one
+     * case `VoiceCounter` handled before this function existed; every other
+     * change leaves [held] as it was.
+     */
+    fun heldAfter(held: Boolean, change: VoiceFocusChange): Boolean = when (change) {
+        VoiceFocusChange.LOSS -> false
+        else -> held
+    }
 }
