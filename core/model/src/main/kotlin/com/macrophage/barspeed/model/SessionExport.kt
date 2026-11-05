@@ -2822,6 +2822,26 @@ data class SessionExport(
          * `SchemaExportKeySetContractTest` pins the entry object's keys to
          * [PhaseTallyExport]; `SessionExportTempoByPhaseTest` in `:core:data`
          * is the export differential.
+         *
+         * 1.26 (#296, how the heart-rate means round) MINTS NO KEY
+         * and changes no figure: the set `hr.avgBpm` and the session
+         * `heartRate.avgBpm` gain the descriptions they never had, stating the
+         * rule every build has used. A set's figure is the mean of its trusted
+         * samples TRUNCATED toward zero to a whole beat, never rounded; the
+         * session's is the unweighted mean of those already-truncated figures,
+         * truncated again, and NOT A MEAN OVER SAMPLES. Field-42 (app 0.1.52):
+         * published 99, set figures averaging 99.25, unfloored set means 99.83,
+         * all 1528 in-set samples 100.34; truncation and rounding differed on 9
+         * of 16 sets. KEPT AND DESCRIBED, not redefined: both are frozen when
+         * written, and a new rule would give each key two meanings split by app
+         * version for about one beat. [HrSetSummary.avgBpm] and
+         * [HrSessionSummary.avgBpm] carry the same statement; `HrStreamSummary`
+         * in `:core:hrm` and [SessionHeartRate] are where it is computed.
+         *
+         * PINNED. `SchemaHeartRateMeanContractTest` asserts this entry and both
+         * descriptions; `HrTrustTest > the set's mean is truncated, never
+         * rounded` and `SessionHeartRateTest > the mean is truncated as
+         * endSession truncates it, never rounded` pin the arithmetic.
          */
         const val SCHEMA_VERSION = "1.26"
 
@@ -2979,6 +2999,11 @@ data class SessionExport(
 
 @Serializable
 data class HrSessionSummary(
+    /**
+     * The unweighted mean of the sets' already-truncated [HrSetSummary.avgBpm]
+     * figures, truncated again: NOT a mean over samples (1.26, #296).
+     * [SessionHeartRate] states the rule and what it costs.
+     */
     val avgBpm: Int? = null,
     val maxBpm: Int? = null,
     /**
@@ -4654,6 +4679,11 @@ data class PhaseTallyExport(
 @Serializable
 data class HrSetSummary(
     val endOfSetBpm: Int? = null,
+    /**
+     * The trusted samples' mean TRUNCATED toward zero to a whole beat, never
+     * rounded (1.26, #296): 120 and 121 publish 120. Frozen at set end;
+     * `HrStreamSummary.avgBpm` in `:core:hrm` computes it.
+     */
     val avgBpm: Int? = null,
     val maxBpm: Int? = null,
     /**
