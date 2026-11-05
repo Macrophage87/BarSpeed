@@ -146,6 +146,32 @@ class SessionRepositoryFirstSetTest {
         }
     }
 
+    /**
+     * The capture, as a list that notes at every read whether [probe] was
+     * running a block at that moment (#36). The repository reads a set's IMU
+     * samples in one place, `streamsOf`, which CSV-encodes and gzips them, so
+     * where the list is read is where it is encoded. [RecordingDispatcher]
+     * alone could not say that: it sees that something was dispatched, not
+     * what ran there, so a hop that encoded nothing and an encode on the
+     * caller's thread after it would pass it.
+     */
+    private class WatchedList<T>(
+        private val items: List<T>,
+        private val probe: RecordingDispatcher,
+    ) : List<T> by items {
+        val readsInside = mutableListOf<Boolean>()
+
+        override fun isEmpty(): Boolean {
+            readsInside += probe.inside
+            return items.isEmpty()
+        }
+
+        override fun iterator(): Iterator<T> {
+            readsInside += probe.inside
+            return items.iterator()
+        }
+    }
+
     private val opening =
         SessionOpening(planName = "P", planSessionName = "Lower A", startedAtMs = 500L, timeZone = null)
 
@@ -236,5 +262,31 @@ class SessionRepositoryFirstSetTest {
         val dao = FakeSessionDao().also { it.probe = probe }
         SessionRepository(dao, FakeExerciseDao(), encodeContext = probe).recordFirstSet(opening, 0, completedSet())
         assertEquals(true, dao.encodedBeforeInsert, "the streams were not encoded on the encode context")
+    }
+
+    /**
+     * The encode itself, not only a hop before the insert (#36): every read
+     * of the capture happens while the encode context is running a block.
+     * Pins what the two tests above cannot, a `withContext(encodeContext) {}`
+     * that does nothing followed by the encode on the caller's thread.
+     */
+    @Test
+    fun `a set's capture is read only inside the encode context`() = runTest {
+        val probe = RecordingDispatcher()
+        val imu = WatchedList(completedSet().imuSamples, probe)
+        SessionRepository(FakeSessionDao(), FakeExerciseDao(), encodeContext = probe)
+            .recordSet(41L, 1, completedSet().copy(imuSamples = imu))
+        assertTrue(imu.readsInside.isNotEmpty(), "the capture was never read")
+        assertEquals(listOf(true), imu.readsInside.distinct(), "the capture was read outside the encode context")
+    }
+
+    @Test
+    fun `a first set's capture is read only inside the encode context`() = runTest {
+        val probe = RecordingDispatcher()
+        val imu = WatchedList(completedSet().imuSamples, probe)
+        SessionRepository(FakeSessionDao(), FakeExerciseDao(), encodeContext = probe)
+            .recordFirstSet(opening, 0, completedSet().copy(imuSamples = imu))
+        assertTrue(imu.readsInside.isNotEmpty(), "the capture was never read")
+        assertEquals(listOf(true), imu.readsInside.distinct(), "the capture was read outside the encode context")
     }
 }
