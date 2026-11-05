@@ -131,6 +131,7 @@ import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.TempoAdjustPolicy
 import com.macrophage.barspeed.model.TempoDigit
 import com.macrophage.barspeed.model.TimedSetEndPolicy
+import com.macrophage.barspeed.model.UnwrittenClose
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.record.PlannedSlot
 import com.macrophage.barspeed.record.RecordState
@@ -211,6 +212,9 @@ fun RecordScreen(navController: NavController, viewModel: RecordViewModel = view
             // this pop cannot cancel, so leaving is safe and the session
             // finishes either way; only the label the lifter read differs.
             ExitAction.LEAVE_SESSION_CLOSING,
+            // The session is closed; only the rest window after its last set
+            // is lost by leaving (#333). The same pop, a third promise.
+            ExitAction.LEAVE_FINISHED_SESSION,
             -> {
                 navController.popBackStack()
             }
@@ -226,7 +230,7 @@ fun RecordScreen(navController: NavController, viewModel: RecordViewModel = view
     BackHandler(enabled = prompt != ExitPrompt.NONE, onBack = onBack)
     // A prompt that becomes NONE while the dialog is open closes it, which is
     // the right outcome: NONE is the policy saying nothing is at risk any more.
-    ExitDialog(if (exitOpen) prompt else ExitPrompt.NONE, onExitAction)
+    ExitDialog(if (exitOpen) prompt else ExitPrompt.NONE, state.closeUnwritten, onExitAction)
 
     Scaffold(
         topBar = {
@@ -329,25 +333,27 @@ private fun titleFor(state: RecordState): String = when (state.stage) {
  * else.
  */
 @Composable
-private fun ExitDialog(prompt: ExitPrompt, onAction: (ExitAction) -> Unit) {
+private fun ExitDialog(prompt: ExitPrompt, unwritten: UnwrittenClose?, onAction: (ExitAction) -> Unit) {
     if (prompt == ExitPrompt.NONE) return
     val leaves = prompt.actions.filter { it != ExitAction.STAY }
     val single = leaves.singleOrNull()
     if (single != null) {
         AlertDialog(
             onDismissRequest = { onAction(ExitAction.STAY) },
-            title = { Text(exitTitle(prompt)) },
-            text = { Text(exitBody(prompt), style = MaterialTheme.typography.bodySmall, color = BarColors.Sub) },
+            title = { Text(exitTitle(prompt, unwritten)) },
+            text = {
+                Text(exitBody(prompt, unwritten), style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+            },
             confirmButton = { ExitButton(prompt, single, onAction) },
             dismissButton = { ExitButton(prompt, ExitAction.STAY, onAction) },
         )
     } else {
         AlertDialog(
             onDismissRequest = { onAction(ExitAction.STAY) },
-            title = { Text(exitTitle(prompt)) },
+            title = { Text(exitTitle(prompt, unwritten)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(exitBody(prompt), style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+                    Text(exitBody(prompt, unwritten), style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
                     leaves.forEach { action ->
                         ExitButton(prompt, action, onAction, Modifier.fillMaxWidth())
                     }
@@ -372,17 +378,29 @@ private fun ExitButton(
     }
 }
 
-private fun exitTitle(prompt: ExitPrompt): String = when (prompt) {
+/**
+ * What a failed close is taken to have left unwritten when the state carries
+ * no answer: the larger loss, so the prompt never undersells it. Unreachable
+ * in practice -- `SessionCloser` reports the two together -- and named rather
+ * than left as a `!!`.
+ */
+private val UNKNOWN_UNWRITTEN =
+    UnwrittenClose(sessionRow = true, sessionRating = false, skippedSets = false, finalRest = false)
+
+private fun exitTitle(prompt: ExitPrompt, unwritten: UnwrittenClose?): String = when (prompt) {
     ExitPrompt.NONE -> ""
     ExitPrompt.SET_IN_PROGRESS -> "Discard this set?"
     ExitPrompt.SESSION_OPEN -> "Leave the session?"
     ExitPrompt.SET_SAVING -> "This set is still saving"
     ExitPrompt.SET_UNSAVED -> "This set did not save"
     ExitPrompt.SESSION_CLOSING -> "Finishing this session"
-    ExitPrompt.SESSION_NOT_CLOSED -> "This session did not finish"
+    // Worded by cause, in :core:model (#333).
+    ExitPrompt.SESSION_NOT_CLOSED,
+    ExitPrompt.FINAL_REST_UNSAVED,
+    -> SessionNotClosedCopy.title(unwritten ?: UNKNOWN_UNWRITTEN)
 }
 
-private fun exitBody(prompt: ExitPrompt): String = when (prompt) {
+private fun exitBody(prompt: ExitPrompt, unwritten: UnwrittenClose?): String = when (prompt) {
     ExitPrompt.NONE -> ""
     // Names the save-and-end control that is already on this screen, below the
     // fold: without it the choice reads as "lose the set or stay", which is a
@@ -431,7 +449,9 @@ private fun exitBody(prompt: ExitPrompt): String = when (prompt) {
             "including the end time and the heart-rate and HRV summary. There is nothing left to decide here."
     // The one prompt that must not undersell what is at stake. Its words live
     // in :core:model, where SessionNotClosedCopyTest pins them (#331).
-    ExitPrompt.SESSION_NOT_CLOSED -> SessionNotClosedCopy.EXIT_BODY
+    ExitPrompt.SESSION_NOT_CLOSED,
+    ExitPrompt.FINAL_REST_UNSAVED,
+    -> SessionNotClosedCopy.body(unwritten ?: UNKNOWN_UNWRITTEN)
 }
 
 private fun exitLabel(prompt: ExitPrompt, action: ExitAction): String = when (action) {
@@ -439,6 +459,7 @@ private fun exitLabel(prompt: ExitPrompt, action: ExitAction): String = when (ac
     ExitAction.FINISH_SESSION -> "Finish session"
     ExitAction.LEAVE_SESSION_OPEN -> "Leave without finishing"
     ExitAction.LEAVE_SESSION_CLOSING -> "Leave"
+    ExitAction.LEAVE_FINISHED_SESSION -> "Leave without it"
     // Per prompt, not a two-way test with a fallback. The fallback read "Keep
     // resting" for anything that was not a set in progress, so a new prompt got
     // the rest screen's wording by default -- offered to a lifter standing over
@@ -452,12 +473,13 @@ private fun exitLabel(prompt: ExitPrompt, action: ExitAction): String = when (ac
             ExitPrompt.SET_UNSAVED -> "Keep this set"
             ExitPrompt.SESSION_CLOSING -> "Wait here"
             ExitPrompt.SESSION_NOT_CLOSED -> "Stay and retry"
+            ExitPrompt.FINAL_REST_UNSAVED -> "Stay and retry"
         }
 }
 
 private fun exitColor(action: ExitAction): Color = when (action) {
     ExitAction.DISCARD_SET_AND_LEAVE -> BarColors.Red
-    ExitAction.LEAVE_SESSION_OPEN, ExitAction.LEAVE_SESSION_CLOSING -> BarColors.Sub
+    ExitAction.LEAVE_SESSION_OPEN, ExitAction.LEAVE_SESSION_CLOSING, ExitAction.LEAVE_FINISHED_SESSION -> BarColors.Sub
     else -> Color.Unspecified
 }
 
@@ -3570,7 +3592,7 @@ private fun SessionCloseControls(state: RecordState, viewModel: RecordViewModel)
         SessionRpePanel(viewModel)
     }
     if (RestControl.RETRY_FINISH in controls) {
-        UnclosedSessionNotice(viewModel)
+        UnclosedSessionNotice(state, viewModel)
     }
 }
 
@@ -3667,8 +3689,14 @@ private fun SessionRpePanel(viewModel: RecordViewModel) {
  * would be the wrong one.
  */
 @Composable
-private fun UnclosedSessionNotice(viewModel: RecordViewModel) {
-    Text("THIS SESSION DID NOT FINISH", style = MaterialTheme.typography.titleMedium, color = BarColors.Red)
+private fun UnclosedSessionNotice(state: RecordState, viewModel: RecordViewModel) {
+    // The prompt's own title, worded by cause in :core:model (#333), so the
+    // notice and the dialog cannot disagree about whether the session finished.
+    Text(
+        SessionNotClosedCopy.title(state.closeUnwritten ?: UNKNOWN_UNWRITTEN).uppercase(Locale.ROOT),
+        style = MaterialTheme.typography.titleMedium,
+        color = BarColors.Red,
+    )
     Spacer(Modifier.height(6.dp))
     SectionCaption("Your sets are saved. Part of the session's own record is not")
     Spacer(Modifier.height(10.dp))

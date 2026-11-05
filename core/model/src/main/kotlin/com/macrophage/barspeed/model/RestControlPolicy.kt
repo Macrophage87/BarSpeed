@@ -80,7 +80,25 @@ object RestControlPolicy {
         // close the session would be two ways to launch the same work, from
         // different inputs, and one of them would be the wrong one.
         SessionCloseState.FAILED -> setOf(RestControl.START_NEXT_SET, RestControl.RETRY_FINISH)
+        // The same as FAILED for now. The row this state names is closed, so
+        // a set started from here would be recorded after the session's end
+        // time; that is issue 333's and 49's, fixed with its red.
+        SessionCloseState.REST_UNSAVED -> setOf(RestControl.START_NEXT_SET, RestControl.RETRY_FINISH)
     }
+
+    /**
+     * Where the close stands once the lifter starts another set from the rest
+     * screen (#49).
+     *
+     * START NEXT SET is drawn after a failed close, so a lifter can keep
+     * lifting. What the close froze at the first tap -- the end time, the HRV
+     * over the beats received so far, the rating -- describes the session as
+     * it was then, and a retry replays that copy over a set list that has
+     * since grown.
+     *
+     * Returns [close] unchanged today: the frozen close survives the next set.
+     */
+    fun closeOnNextSet(close: SessionCloseState): SessionCloseState = close
 
     /**
      * The controls to draw while the close is in [close] and the lifter has

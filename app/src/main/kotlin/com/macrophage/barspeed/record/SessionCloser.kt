@@ -7,6 +7,7 @@ import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.RecordingHold
 import com.macrophage.barspeed.model.SessionCloseState
 import com.macrophage.barspeed.model.SkippedSet
+import com.macrophage.barspeed.model.UnwrittenClose
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -114,19 +115,33 @@ class SessionCloser(
      * sequential case, this closes the concurrent one, and neither needs a lock.
      *
      * Not cleared on failure. The way forward from there is [retry], which
-     * replays the frozen close rather than freezing a new one.
+     * replays the frozen close rather than freezing a new one -- or [discard],
+     * when the lifter carries on lifting instead (#49).
      */
     private var asked = false
 
     private var pending: PendingSessionClose? = null
 
     /**
+     * Give up a close that came back failed, so the next finish freezes a new
+     * one (#49). Called only once `RestControlPolicy.closeOnNextSet` has said
+     * the frozen close does not survive the set the lifter is starting; never
+     * while a close is in flight, which draws no control that can reach here.
+     */
+    fun discard() {
+        asked = false
+        pending = null
+    }
+
+    /**
      * Freeze the close's input and run it. Returns false, having done nothing,
      * when a close was already asked for.
      *
-     * [onState] reports where the close has got to. [onClosed] runs once, on the
-     * main thread, when it has landed — including when there was no session row
-     * to write, because a session that recorded nothing still ends.
+     * [onState] reports where the close has got to, and on a failure what it
+     * has not written (#333); the second argument is null on every other
+     * report. [onClosed] runs once, on the main thread, when it has landed —
+     * including when there was no session row to write, because a session that
+     * recorded nothing still ends.
      */
     fun close(
         sessionId: Long?,
@@ -135,7 +150,7 @@ class SessionCloser(
         sessionRpe: Int?,
         restHrSamples: List<HrSample>,
         skippedSets: List<SkippedSet>,
-        onState: (SessionCloseState) -> Unit,
+        onState: (SessionCloseState, UnwrittenClose?) -> Unit,
         onClosed: () -> Unit,
     ): Boolean {
         if (asked) return false
@@ -154,11 +169,16 @@ class SessionCloser(
     }
 
     /** Replay a close that came back failed, from the copy frozen at the first tap. */
-    fun retry(onState: (SessionCloseState) -> Unit, onClosed: () -> Unit) = run(onState, onClosed)
+    fun retry(onState: (SessionCloseState, UnwrittenClose?) -> Unit, onClosed: () -> Unit) = run(onState, onClosed)
 
-    private fun run(onState: (SessionCloseState) -> Unit, onClosed: () -> Unit) {
+    private fun run(onState: (SessionCloseState, UnwrittenClose?) -> Unit, onClosed: () -> Unit) {
         val p = pending ?: return
-        onState(SessionCloseState.IN_FLIGHT)
+        onState(SessionCloseState.IN_FLIGHT, null)
+        // Whether endSession returned before a failure, which is what decides
+        // whether the row is still open (#333). False again on every run: a
+        // retry's endSession refuses a second write and returns, so it reads
+        // true by the time the rest window is reached.
+        var sessionRowLanded = false
         // Taken before the launch and given up in the finally below, so the
         // process keeps foreground-service priority for as long as the close is
         // outstanding. The prompt this window raises offers the lifter a labelled
@@ -169,6 +189,7 @@ class SessionCloser(
             try {
                 p.sessionId?.let {
                     repository.endSession(it, p.endedAtMs, p.hrvRmssdMs, p.sessionRpe, p.skippedSets)
+                    sessionRowLanded = true
                     // AFTER the close and never before it, and the ordering is
                     // the whole of the reasoning (#109). This is a second,
                     // non-atomic write onto a row that is already durable --
@@ -186,7 +207,14 @@ class SessionCloser(
                     // which named outcome it reached, and every branch already
                     // writes or refuses safely without that distinction
                     // reaching here. No caller reads it today.
-                    repository.recordFinalRestWindow(it, p.restHrSamples)
+                    //
+                    // Not called at all with no samples (#333). Its only
+                    // outcome then is NO_SAMPLES, which writes nothing, so
+                    // skipping it writes the same bytes and leaves out two
+                    // reads that could only fail a close with nothing left
+                    // to write. It also means REST_UNSAVED always names a
+                    // window that exists.
+                    if (p.restHrSamples.isNotEmpty()) repository.recordFinalRestWindow(it, p.restHrSamples)
                 }
                 pending = null
                 onClosed()
@@ -200,7 +228,14 @@ class SessionCloser(
                 // FINISHED and the lifter would be left on a rest screen with no
                 // account of why. The failure becomes a state the screen shows,
                 // with the frozen close still behind it.
-                onState(SessionCloseState.FAILED)
+                val unwritten =
+                    UnwrittenClose.of(
+                        sessionRowLanded = sessionRowLanded,
+                        rated = p.sessionRpe != null,
+                        skipped = p.skippedSets.isNotEmpty(),
+                        restCaptured = p.restHrSamples.isNotEmpty(),
+                    )
+                onState(unwritten.state, unwritten)
             } finally {
                 // Both terminal branches, which is why it is a finally and not a
                 // line at the end of the try. A failed close still ends the
