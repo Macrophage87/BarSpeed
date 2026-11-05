@@ -4162,7 +4162,19 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * Read at the moment the set starts and not again, because that is the
      * only moment it is true: the lifter can label a device or forget one
      * mid-session, and a set already recording must be stored as the thing it
-     * was armed as. Null between sets.
+     * was armed as.
+     *
+     * NOT CLEARED BETWEEN SETS (#171). Both fields are assigned at every
+     * [beginSet] and nothing resets them, so from the end of one set to the
+     * start of the next they still hold the set just ended. This KDoc said
+     * "Null between sets." through three review rounds of #156 and it was
+     * never true. What keeps a stale value from deciding anything is that
+     * [endSet] cancels both collectors before anything else, and
+     * [onSample], [onSecondarySample] and [liveFeedNow] -- the readers
+     * besides `endSet`'s own `captureAt` -- run only from those collectors.
+     * [armedSensors] IS null on an ordinary one-sensor set, because
+     * [SensorCapturePolicy.recorded] returns null there; that null is the
+     * set's answer, not the between-sets state.
      */
     private var armedSensors: RecordedSensors? = null
     private var armedSecondaryRole: SensorRole? = null
@@ -4180,8 +4192,13 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * screen's selection says at that instant rather than what this set was
      * armed as.
      *
-     * Null between sets, and null is what makes [applyLiveFallback] a no-op on
-     * a frame that somehow arrives outside a set.
+     * Null only before the session's first set. Like [armedSensors] it is
+     * assigned at every [beginSet] and never reset, so between sets it holds
+     * the set just ended (#171: this KDoc said "Null between sets" and
+     * credited that null with making [applyLiveFallback] a no-op outside a
+     * set; neither was true). What actually keeps a frame from reaching
+     * [applyLiveFallback] between sets is [endSet] cancelling both collectors,
+     * which are the only callers of [liveFeedNow].
      */
     private var liveDirection: LiftDirection? = null
     private var hrJob: Job? = null
