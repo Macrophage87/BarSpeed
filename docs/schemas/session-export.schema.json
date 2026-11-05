@@ -950,12 +950,12 @@
         "peakPower_w": {
           "type": "number",
           "minimum": 0,
-          "description": "Peak instantaneous power during this rep's concentric, watts."
+          "description": "Peak instantaneous power during this rep's concentric, watts. ABSENT, not zero, where the set publishes no power at all (#116): no load was declared or it was 0, geometry.concentric is down, or geometry.sensorInverted is true. Each of those is a declaration under which the product m(g + a)v the figure is computed as would not be the lifter's output -- a drive that moves down makes it negative, and an inversion multiplies the stack's mass by motion opposite to the stack's. A stack mount that moves with the drive, and any travelRatio, still publish it: power is conserved across an ideal pulley, so it is the lifter's output measured at the stack, understated by unmeasured pulley friction."
         },
         "meanConPower_w": {
           "type": "number",
           "minimum": 0,
-          "description": "Average power over the concentric phase of this rep, watts."
+          "description": "Average power over the concentric phase of this rep, watts. ABSENT, not zero, where the set publishes no power at all (#116): no load was declared or it was 0, geometry.concentric is down, or geometry.sensorInverted is true. Each of those is a declaration under which the product m(g + a)v the figure is computed as would not be the lifter's output -- a drive that moves down makes it negative, and an inversion multiplies the stack's mass by motion opposite to the stack's. A stack mount that moves with the drive, and any travelRatio, still publish it: power is conserved across an ideal pulley, so it is the lifter's output measured at the stack, understated by unmeasured pulley friction."
         },
         "artefactSamples": {
           "type": "integer",

@@ -710,15 +710,47 @@ object SetAnalyzer {
         val meanEcc = if (span.hasEccentric) eccRange.map { v[it] * sign }.average() else null
         val peakEcc = if (span.hasEccentric) eccRange.minOf { v[it] * sign } else null
         val rom = RepSegmenter.displacement(series, span.conStartIdx, span.conEndIdx)
-        // Bar power P = m(g + a)v over the drive. Only defensible when the drive
-        // lifts the load against gravity — a cammed machine whose drive goes
-        // down carries no such relationship, so leave power unreported there.
+        // Bar power P = m(g + a)v over the drive, with m the declared load and
+        // a, v the series' motion divided back to the frame that load is in
+        // (below). The gate decides WHETHER that product is published, and it
+        // is kept as it stands -- the owner's ruling on issue #116. Each clause
+        // was re-examined against the frame handling #26 corrected, and each
+        // excludes a figure this formula would get WRONG, not one it would get
+        // right; PowerGateTest pins all three.
         //
-        // The second clause excludes SIGN-INVERTED setups, not cable ones. An
-        // earlier comment here said it kept power off cable machines; it does
-        // not, and a low pulley with sensorInverted = false has always passed
-        // it. Whether a stack-mounted setup should publish power at all is
-        // issue 116; on the conservation argument below it now can.
+        // - `loadKg > 0`: no declared mass, no product. Absent stays absent;
+        //   a 0 here would be a figure for a load nobody named.
+        // - `concentricUp`: the formula is the work done raising m against g,
+        //   so it needs the drive to move the series UP. Where the drive moves
+        //   down the series' drive velocity is negative, so m(g + a)v is
+        //   negative wherever g + a is positive: a product with no reading as
+        //   the lifter's output.
+        //   That holds on a stack-mounted pushdown, pulldown or leg curl too.
+        //   There the stack DOES rise on the drive, and by #26's conservation
+        //   argument m(g + a_stack)v_stack would be the lifter's output -- but
+        //   this series is mapped into the lifter's frame by `sensorToLifter`,
+        //   so a and v are the handle's, moving opposite to the stack. Reading
+        //   power there needs the product taken in the stack's own frame, which
+        //   is a different formula and a published-figure change, not a
+        //   narrower gate; it is not made here.
+        // - `!sensorInverted`: the load moves OPPOSITE to the series. With the
+        //   drive up, that is a load being LOWERED as the lifter drives -- an
+        //   assisted machine's counterweight is the shape -- so m(g + a)v
+        //   multiplies the mass of one body by the motion of another, the
+        //   pair #26 exists to stop. #26 does not repair it: it divides a and
+        //   v back by travelRatio, which is positive, so the inversion
+        //   `sensorToLifter` applied is not undone and the product still reads
+        //   the handle's direction against the stack's mass.
+        //
+        // What the gate does NOT exclude, stated so it is not mistaken for
+        // coverage: a stack mount that moves WITH the drive (sensorOnStack and
+        // not inverted -- a low pulley) and any travelRatio both pass, and on
+        // the conservation argument below both publish the lifter's output
+        // measured at the stack. Nor does it read the PLANE: a horizontal
+        // declaration with a drive-up flag passes, and the product is then
+        // m(g + a)v over horizontal motion, which equals the stack's power
+        // through a 1:1 cable and is not otherwise derived. Pulley friction
+        // is unmeasured and left as the known understatement stated below.
         val effectiveLoad = loadKg?.takeIf { it > 0 && direction.concentricUp && !direction.sensorInverted }
         // The series was mapped into the LIFTER's frame at analyze(), scaling
         // both velocity and acceleration by travelRatio. loadKg was not: it is
