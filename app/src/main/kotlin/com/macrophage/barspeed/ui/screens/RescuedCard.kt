@@ -141,6 +141,7 @@ internal fun rescuedTapEffect(tap: RescuedTap, item: RescuedDatabase): RescuedTa
  * [held] is what the recording holds hold now, as for [rescuedCardButtons].
  * Reserved for round 2 review of #112 (A's N3); not read yet.
  */
+@Suppress("UNUSED_PARAMETER")
 internal fun rescuedRestoreNote(
     restore: RestoreVerdict?,
     compiledVersion: Int,
