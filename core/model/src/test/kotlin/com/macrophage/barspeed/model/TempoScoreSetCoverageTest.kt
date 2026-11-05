@@ -13,8 +13,10 @@ import kotlin.test.assertNull
  * scored phase. A rep that resolved none is dropped before anything is
  * compared, so a coverage count taken over that denominator can never see
  * it. `RepAnalysis.conS` is never null, so a rep resolves no scored phase
- * only when the concentric is not scored at all -- an "X" up stroke, which
- * leaves the eccentric as the only scored phase. That is the set built here.
+ * only when the concentric is not scored at all -- an "X" up stroke on a
+ * lift whose concentric is the up stroke, which leaves the eccentric as the
+ * only scored phase. (On a concentric-down lift the "X" up stroke is the
+ * eccentric, and the concentric is still scored.) That is the set built here.
  *
  * RED WHEN WRITTEN, except the two guards named in their KDoc: on a set of
  * eight whose eccentric four reps resolved, the chip read "Tempo 4/4 ✓" in

@@ -134,7 +134,7 @@ object TempoScoreLabel {
     }
 
     /**
-     * The sentence for phases measured on some graded reps and not others,
+     * The sentence for phases measured on some of the set's reps and not others,
      * or null when there are none: each phase's count and its gap, the gap in
      * [PhaseCoverage]'s words.
      */
