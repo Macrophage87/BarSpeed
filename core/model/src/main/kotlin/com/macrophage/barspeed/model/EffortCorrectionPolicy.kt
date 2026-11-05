@@ -86,21 +86,32 @@ object EffortCorrectionPolicy {
      * and nothing on screen to give it one. The differential is in the commit
      * after this.
      */
-    @Suppress("UNUSED_PARAMETER", "UnusedParameter")
     fun lineText(ratedDescription: String?, failed: Boolean, tappedFailed: Boolean): String = when {
         ratedDescription != null && failed -> "$ratedDescription · short of target"
         ratedDescription != null -> ratedDescription
-        failed -> FAILED
+        failed && tappedFailed -> FAILED
+        failed -> SHORT_OF_TARGET
         else -> NOT_RATED
     }
 
-    /** The line's wording for a set carrying only the derived shortfall. */
+    /**
+     * The line's wording for an unrated failure the LIFTER called -- the
+     * word on the tile they tapped.
+     *
+     * It was the wording for every unrated failure, tapped or derived alike:
+     * #139's caution while the state could not tell the two apart. Since #140
+     * it can, and the owner's default for 0.2.0 keeps this word for the
+     * lifter's own statement only (#169 item 2).
+     */
     const val FAILED = "Failed"
 
     /**
-     * The wording the line will give a derive-only failure (#169 item 2), so
-     * the app's own judgement and the lifter's word stop reading alike. Not
-     * yet returned by [lineText].
+     * The line's wording for an unrated failure the APP derived from a short
+     * count or hold, with no tap from the lifter (#169 item 2).
+     *
+     * A verdict, not a quotation: printed as "Failed" it read as the lifter's
+     * own word on a set they never called, which is the same reason
+     * [selection] lights no tile for it.
      */
     const val SHORT_OF_TARGET = "Short of target"
 
