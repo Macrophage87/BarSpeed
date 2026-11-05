@@ -167,16 +167,16 @@ object RepsSourcePolicy {
      * through from one it was never asked about; null on every set no guide
      * counted, on a timed set, and where no marks are stored.
      *
-     * At this commit it publishes nothing; the next commits pin and write it.
+     * Keyed on the four-input word, before the correction, so a set the
+     * guide counted carries its count whether or not the lifter overruled it.
      */
-    @Suppress("UNUSED_PARAMETER", "UnusedParameter", "FunctionOnlyReturningConstant")
     fun publishedGuideReps(
         liveReps: Int?,
         repsManual: Boolean,
         timed: Boolean,
         guideCounted: Boolean,
         guideCalls: Int?,
-    ): Int? = null
+    ): Int? = guideCalls.takeIf { published(liveReps, repsManual, timed, guideCounted) == RepsSource.METRONOME }
 
     /** The same answer as the published word, for a caller that wants the string. */
     fun publishedWord(liveReps: Int?, repsManual: Boolean, timed: Boolean, guideCounted: Boolean): String? =
