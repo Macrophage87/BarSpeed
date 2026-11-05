@@ -111,8 +111,12 @@ import kotlin.test.assertEquals
  * the third. But live displacement comes from an uncorrected series and batch
  * from a retroactively corrected one, and the live-to-batch scale ratio spans
  * 0.30x to 1.65x across the sets we most trust, so the verdict is unreliable
- * for MARGINAL reps in both directions. It is not pinned as a metric anywhere
- * and it should not be. It is used here only to separate artefacts that sit at
+ * for MARGINAL reps in both directions. It is not pinned as a METRIC anywhere
+ * and it should not be: nothing is calibrated against it. Its value on the
+ * four leg-curl captures IS pinned, as a drift detector and nothing more, in
+ * `LiveBatchDisplacementRatioTest` (#115), which is also where the 0.30x-1.65x
+ * spread quoted above would have to be re-derived; that spread is UNPINNED
+ * here. It is used here only to separate artefacts that sit at
  * least 4.99x from their set median -- the multiple asserted in `every counted
  * rep the bound removes is far outside its own set (pre-fix)` -- which no
  * reference error of 1.65x can explain away. The upper end of that spread was
