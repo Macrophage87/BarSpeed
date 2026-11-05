@@ -4559,10 +4559,10 @@ data class TempoComplianceExport(
     /**
      * Reps within tolerance on every scored phase THAT REP RESOLVED, out of
      * [of], the reps that resolved at least one (every rep, on a set
-     * analysed before v0.1.36). Pauses are reported but never scored (on a
-     * set analysed by v0.1.31 or later). A phase the sensor did not measure
-     * is not counted against the lifter (on a set analysed by v0.1.36 or
-     * later) and does not appear in [scoredPhases], so read that field to
+     * analysed before v0.1.36). Pauses are reported but
+     * never scored (on a set analysed by v0.1.31 or later). A phase the
+     * sensor did not measure is not counted against the lifter (on a set
+     * analysed by v0.1.36 or later) and does not appear in [scoredPhases], so read that field to
      * know what this ratio covers: on a slow concentric-first lift it is
      * often the drive alone. `of: 0` means nothing was gradeable.
      *
