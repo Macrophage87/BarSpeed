@@ -444,16 +444,34 @@ data class PlanFile(
      * decides how the set is measured. Saying so is the point — a plan that
      * declares a hold and prescribes reps is going to be counted in reps, and
      * whoever wrote it should know that before the lifter is under the bar.
+     *
+     * The kind checked is [PlanExerciseDef.effectiveKind], not the declaration
+     * alone (#68): a built-in or guessed kind that contradicts the shape is
+     * the same disagreement with nobody having written it, and it still
+     * decides whether the set is guided, whether the peak-velocity readout
+     * shows and what plate maths it gets. Each source says what its author
+     * can do about it -- correct a guess, override a built-in -- in words.
      */
     private fun kindVsShape(si: Int, ei: Int, exercise: PlanExerciseDef): String? {
-        val declared = exercise.kindOverride ?: return null
-        val timedKind = declared == ExerciseKind.HOLD || declared == ExerciseKind.CARRY
+        val kind = exercise.effectiveKind
+        val timedKind = kind == ExerciseKind.HOLD || kind == ExerciseKind.CARRY
         val mismatched = exercise.sets.firstOrNull { it.isTimed != timedKind } ?: return null
         val prescribed = if (mismatched.isTimed) "duration_s" else "reps"
         val measured = if (mismatched.isTimed) "on the clock" else "on reps"
-        return "sessions[$si].exercises[$ei]: this plan declares \"kind\": \"${exercise.kind}\" " +
-            "but prescribes $prescribed - the set is measured $measured either way. " +
-            "Kind sets the movement type, not the timing."
+        val where = "sessions[$si].exercises[$ei]: "
+        val either = " - the set is measured $measured either way."
+        val named = kind.name.lowercase()
+        return when {
+            exercise.kindOverride != null ->
+                "${where}this plan declares \"kind\": \"${exercise.kind}\" but prescribes $prescribed$either " +
+                    "Kind sets the movement type, not the timing."
+            ExerciseDef.seedById(exercise.exercise) != null ->
+                "$where${exercise.exercise} is a built-in $named exercise, but the plan prescribes $prescribed" +
+                    "$either Declare \"kind\" if the plan means a different movement."
+            else ->
+                "${where}no \"kind\" is declared and the app guessed $named for ${exercise.exercise} from the " +
+                    "id, but the plan prescribes $prescribed$either Declare \"kind\" if the guess is wrong."
+        }
     }
 
     /**
