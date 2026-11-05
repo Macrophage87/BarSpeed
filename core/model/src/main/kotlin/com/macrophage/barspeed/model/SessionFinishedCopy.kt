@@ -18,12 +18,12 @@ object SessionFinishedCopy {
     const val SAVED = "Session saved."
 
     /**
-     * The headline, by whether a row was written.
-     *
-     * Both branches say [SAVED] today, written out as two branches so the
-     * case that is false is visible: a session that recorded nothing is told
-     * it was saved, while the button that would open it is hidden because
-     * there is nothing to open.
+     * The headline over a session that wrote no row: nothing was recorded, so
+     * there is nothing saved to speak of, and the View session button beneath
+     * it is hidden for the same reason.
      */
-    fun headline(sessionWritten: Boolean): String = if (sessionWritten) SAVED else SAVED
+    const val NOT_SAVED = "Nothing was recorded, so no session was saved."
+
+    /** The headline, by whether a row was written. */
+    fun headline(sessionWritten: Boolean): String = if (sessionWritten) SAVED else NOT_SAVED
 }
