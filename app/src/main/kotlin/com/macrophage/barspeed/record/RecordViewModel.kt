@@ -3284,8 +3284,13 @@ data class RecordState(
      * outstanding at once in principle, and the record exit gate answers them
      * with separate parameters so that pair stays representable.
      *
-     * Nothing sets this to anything but NONE yet; the writer arrives with the
-     * commit that moves the close off `viewModelScope`.
+     * Written by [SessionCloser] through `onSessionCloseState` -- IN_FLIGHT
+     * when a close starts, FAILED when it comes back failed -- and put back
+     * to NONE by `onSessionClosed` when it lands. So every branch
+     * `RecordExitPolicy` and [RestControlPolicy] take on it is live. This
+     * paragraph used to say nothing set it to anything but NONE yet; that went
+     * false when the close moved to `appScope` and is corrected rather than
+     * deleted (#69).
      */
     val sessionClose: SessionCloseState = SessionCloseState.NONE,
     /**
