@@ -26,6 +26,7 @@ import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.PhaseTallyExport
 import com.macrophage.barspeed.model.PrepWindow
 import com.macrophage.barspeed.model.RecordedTimeZone
+import com.macrophage.barspeed.model.RepMarkAlignment
 import com.macrophage.barspeed.model.RepMetricsExport
 import com.macrophage.barspeed.model.RepsSource
 import com.macrophage.barspeed.model.RepsSourcePolicy
@@ -310,14 +311,19 @@ class SessionExporter(
         // least of what this document carries and a stream that will not
         // parse is not worth failing an export over, the same shape the HRM
         // decode below uses.
-        val repMarks =
-            if (includeRepDetail) {
-                streams.firstOrNull { it.kind == RawStreamEntity.KIND_REPS }
-                    ?.let { stream -> runCatching { RepMarkCsv.decode(Gzip.decompress(stream.csvGzip)) }.getOrNull() }
-                    ?.takeIf { it.isNotEmpty() }
-            } else {
-                null
-            }
+        //
+        // Decoded in BOTH modes since #246, and published only in the detailed
+        // one: on a guided set the marks are what `repMetricsComplete` is
+        // judged against, and that flag is published in the summary too. The
+        // stream is a column of integers, so the extra inflate is small.
+        val storedMarks =
+            streams.firstOrNull { it.kind == RawStreamEntity.KIND_REPS }
+                ?.let { stream -> runCatching { RepMarkCsv.decode(Gzip.decompress(stream.csvGzip)) }.getOrNull() }
+                .orEmpty()
+        val repMarks = storedMarks.takeIf { includeRepDetail && it.isNotEmpty() }
+        // Whose marks they are decides whether they are a grid; see
+        // repMetricsComplete below.
+        val guideCounted = record.repsSourceOf(geometry?.kind) == RepsSource.METRONOME
         // Issue #83 reaches ALREADY-RECORDED sets here, not only new ones.
         // endOfSetBpm, avgBpm and maxBpm are frozen columns written when the
         // set was recorded; gating only the record path would leave every set
@@ -527,11 +533,14 @@ class SessionExporter(
             // sensor segmenter is a separate opinion. Say so when they disagree
             // rather than letting a short per-rep array look like the whole set.
             //
-            // COUNT EQUALITY AND NOTHING MORE (#246): errors that cancel publish
-            // true. Nothing stronger is computed here -- the stored reps carry
-            // no clock, and matching detections to counted reps in time would
-            // need the segmenter re-run over the stored raw stream, which the
-            // export does not do -- and the published description says so.
+            // COUNT EQUALITY was all this compared until export 1.26, so errors
+            // that cancel published true (#246). On a METRONOME set whose reps
+            // carry the instant their drive began, equal counts are now also
+            // judged against the guide's own marks: RepMarkAlignment is the
+            // rule and says what it cannot catch. Only the guide's marks are a
+            // grid -- a tap follows its rep by a lag nothing bounds -- so every
+            // other set, and every set analysed before the instant was stored,
+            // stays at count equality, as the published description says.
             //
             // Gated on the reps, never on the export mode. The three figures
             // this qualifies -- velocityLoss_pct, tempoCompliance and summary --
@@ -539,7 +548,13 @@ class SessionExporter(
             // this same list, so a caveat keyed on whether per-rep detail was
             // requested leaves the summary-only reader holding the numbers with
             // the warning removed.
-            repMetricsComplete = if (reps.isNotEmpty()) reps.size == record.actualReps else null,
+            repMetricsComplete =
+            RepMarkAlignment.repMetricsComplete(
+                detections = reps.size,
+                recordedReps = record.actualReps,
+                cadenceMarks = storedMarks.takeIf { guideCounted }.orEmpty(),
+                driveStartsMs = reps.map { it.driveStartedAtMs },
+            ),
             // The input the tempo verdict above was reached from. Published
             // because tempoCompliance is not checkable without it: the digits
             // are positional, so which stroke is the eccentric follows from the
