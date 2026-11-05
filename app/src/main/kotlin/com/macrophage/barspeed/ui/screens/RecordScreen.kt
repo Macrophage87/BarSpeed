@@ -2496,7 +2496,7 @@ private fun SensorCountedSetStage(state: RecordState, viewModel: RecordViewModel
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.Bottom) {
             Text(
-                LiveCountReadout.velocityLabel(state.live.velocityMps, state.liveCountWithheld),
+                LiveCountReadout.velocityLabel(state.live.velocityMps, state.liveTrackerDropped),
                 style = MaterialTheme.typography.displayMedium,
                 color = velocityColor(state.live.phase),
             )
@@ -3026,12 +3026,14 @@ private fun TempoRing(state: RecordState, slot: PlannedSlot?) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             // The words are LivePhaseCaption's, in :core:dsp, where they are
             // pinned against the lift's drive direction, the #95
-            // withdrawal and the #280 withheld count; null draws no caption.
+            // withdrawal and the #280 withhold; null draws no caption. The
+            // tracker-dropped latch and not liveCountWithheld, which a +1 REP
+            // tap clears while `live` stays the empty state.
             LivePhaseCaption.of(
                 phase,
                 state.currentExercise.liftDirection(),
                 labelWithdrawn = state.live.phaseLabelWithdrawn,
-                countWithheld = state.liveCountWithheld,
+                countWithheld = state.liveTrackerDropped,
             )?.let {
                 Text(
                     it.uppercase(),

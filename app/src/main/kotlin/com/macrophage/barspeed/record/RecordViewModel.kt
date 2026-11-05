@@ -2365,6 +2365,7 @@ private fun inSetState(
     // Cleared with the count it qualifies. A set that gave up its count must
     // not start the NEXT one with a blank ring (#280).
     liveCountWithheld = false,
+    liveTrackerDropped = false,
     guidedSet = guidedSet,
     guidedLabel = "",
     guidedCountdown = 0,
@@ -3265,6 +3266,22 @@ data class RecordState(
      * over the whole set -- which the rest screen shows as it always did.
      */
     val liveCountWithheld: Boolean = false,
+    /**
+     * True once #280's fallback has DROPPED THE TRACKER for the rest of this
+     * set: the second job [liveCountWithheld] used to do alone.
+     *
+     * The two part at the lifter's `+1 REP` tap. [saySensorCount] clears
+     * [liveCountWithheld], because the ring may then draw the number the
+     * lifter stated. It does not bring the tracker back: `live` stays the
+     * empty `LiveSetState` the withhold published, so its velocity is the
+     * reset 0.0 and its phase the reset IDLE. Read off the count's flag, the
+     * velocity line drew `+0.00 m/s` again and the tempo ring "Ready" for the
+     * rest of the set, after one tap. The figures read from `live` -- the
+     * velocity line and the ring's caption -- read this instead.
+     *
+     * Set with [liveCountWithheld] and cleared only at the start of a set.
+     */
+    val liveTrackerDropped: Boolean = false,
     /** Active guided-cadence set: the app calls the tempo and counts the reps. */
     val guidedSet: Boolean = false,
     val guidedLabel: String = "",
@@ -4805,7 +4822,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             }
             LiveFallback.Withhold -> {
                 tracker = null
-                stateFlow.value = stateFlow.value.copy(liveCountWithheld = true, live = LiveSetState())
+                stateFlow.value = stateFlow.value
+                    .copy(liveCountWithheld = true, liveTrackerDropped = true, live = LiveSetState())
                 if (sensorVoiceRuns && stateFlow.value.audioCues) speakCue(LiveFallbackPolicy.WITHHELD_CUE)
             }
         }
@@ -4846,7 +4864,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // gone, so the SENSOR cannot reach this function again for the rest of
         // the set; a number arriving here after a withhold can only be the
         // lifter's own `+1 REP` tap, and the ring may draw a figure the lifter
-        // stated (#280).
+        // stated (#280). [RecordState.liveTrackerDropped] stays set: the
+        // tracker is still gone, and the figures read from `live` with it.
         stateFlow.value = stateFlow.value.copy(sensorReps = shown, liveCountWithheld = false)
         if (stateFlow.value.audioCues) milestones.announceRep(shown)
     }

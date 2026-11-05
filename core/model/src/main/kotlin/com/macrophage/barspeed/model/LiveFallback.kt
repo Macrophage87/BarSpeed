@@ -227,11 +227,13 @@ object LiveFallbackPolicy {
  * function added here without this number moving is a function nobody checked
  * the flag on.
  *
- * ## One flag, read by all five
+ * ## One argument, fed two flags
  *
  * A single `withheld` argument, so the number, the velocity, the arc, the
  * cadence line and the next-rep caption cannot disagree about whether there
- * is a count.
+ * is a count. The screen feeds the velocity line a different flag from the
+ * other four once the lifter taps `+1 REP` after a withhold: see
+ * [velocityLabel].
  * `RepCountPolicy.displayedCount` stays the one place the NUMBER comes from --
  * these functions format it and never re-derive it -- which is #252's rule: the
  * ring and the voice read one figure.
@@ -262,8 +264,12 @@ object LiveCountReadout {
      * the count, the arc, the cadence line and the next-rep caption that
      * already say nothing.
      *
-     * It reads the same `withheld` flag as the other four, so the five figures
-     * on that screen cannot disagree about whether a measurement exists.
+     * The screen passes `RecordState.liveTrackerDropped` here, not the count's
+     * `liveCountWithheld` the other four read. The two agree until the
+     * lifter's `+1 REP` tap, which clears the count's flag so the ring can
+     * draw the number the lifter stated; the tracker is still gone, and with
+     * the count's flag this line drew `+0.00 m/s` again for the rest of the
+     * set.
      */
     fun velocityLabel(velocityMps: Double, withheld: Boolean = false): String = if (withheld) {
         NO_COUNT

@@ -69,10 +69,12 @@ object LivePhaseCaption {
     /**
      * The caption for [phase] on a lift moving as [direction], with
      * [labelWithdrawn] the tracker's [LiveSetState.phaseLabelWithdrawn] and
-     * [countWithheld] the screen's `liveCountWithheld`: true once #280's
-     * fallback has given up the live count for the rest of the set, which
-     * drops the tracker and leaves [phase] at the [Phase.IDLE] of an empty
-     * [LiveSetState].
+     * [countWithheld] true once #280's fallback has given up the live count
+     * for this set, which drops the tracker and leaves [phase] at the
+     * [Phase.IDLE] of an empty [LiveSetState] for the rest of it. The screen
+     * passes `RecordState.liveTrackerDropped`, which only the next set clears,
+     * and not `liveCountWithheld`, which the lifter's `+1 REP` tap clears
+     * while the tracker stays gone.
      */
     fun of(phase: Phase, direction: LiftDirection, labelWithdrawn: Boolean, countWithheld: Boolean): String? {
         if (labelWithdrawn || countWithheld) return null
