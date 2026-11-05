@@ -215,10 +215,30 @@ object HoldEndPolicy {
      * walking-carry capture shows how footstrikes read. The owner was told
      * this recommendation and did not object.
      *
-     * NOT CLOSED BY THIS: a carry the lifter TAPPED is still offered the
+     * The same holds for the two timed kinds that are neither, and that is
+     * now pinned rather than incidental (#315 item 1). A plan may prescribe
+     * `duration_s` on a DYNAMIC or EXPLOSIVE exercise -- `Plan.kindVsShape`
+     * warns and the set runs on the clock -- and such a set the clock ended
+     * is not offered the release either, so it records its target under
+     * [HoldEndSource.CLOCK]. `HoldEndOtherTimedKindsTest` holds it, which is
+     * what kills the mutant `kind != CARRY`; the export's `duration_s` and
+     * `durationEndedBy` say it in words.
+     *
+     * DECIDED, NOT FIXED: a carry the lifter TAPPED is still offered the
      * release (#259), and the same footstrike could shorten it by up to
-     * [MAX_TRIM_S] seconds. That is the tap-end path, older than #311, and it
-     * is raised rather than folded in here.
+     * [MAX_TRIM_S] seconds (#315 item 2). It is left offered, with this
+     * reason, because both answers are guesses until a walking carry is
+     * captured: the release can read a footstrike as a let-go and shorten the
+     * set, and withholding it keeps the walk back to the phone inside the
+     * figure, which is what the release was added to remove (#259). Choosing
+     * between them changes which of the two the export's `duration_s` and
+     * `durationEndedBy` mean on a tapped carry, which is a statement in the
+     * export contract under a number this change does not mint.
+     * `HoldEndCarryGuardTest > a carry the lifter tapped is still offered the
+     * release` pins today's answer. `[Field]`: the next farmer's walk
+     * recorded with a unit armed and ended by a tap, compare the export's
+     * `duration_s` against a stopwatch from pick-up to set-down; a sensor end
+     * more than 2 s short of the stopwatch is a footstrike read as a release.
      */
     fun releaseConsulted(kind: ExerciseKind, autoEnded: Boolean): Boolean = !autoEnded || kind == ExerciseKind.HOLD
 
