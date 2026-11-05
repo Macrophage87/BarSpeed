@@ -55,20 +55,19 @@ internal data class RescuedCardButtons(
      */
     val discardEnabled: Boolean,
     /**
-     * RESTORE is drawn and tappable (issue #112). Not offered yet at this
-     * commit: [rescuedCardButtons] takes the verdict and does not act on it,
-     * so the card is unchanged until the launch-time half is wired.
+     * RESTORE is drawn (issue #112): only when `DatabaseRestore.verdict` says
+     * [RestoreVerdict.Restorable]. Every other verdict draws no button and,
+     * through [rescuedRestoreNote], says why.
      */
-    val showRestore: Boolean = false,
+    val showRestore: Boolean,
     /** RESTORE is tappable. False while busy, and whenever it is not drawn. */
-    val restoreEnabled: Boolean = false,
+    val restoreEnabled: Boolean,
 )
 
 /**
  * [restore] is `DatabaseRestore.verdict` for [item], or null when none was
  * computed.
  */
-@Suppress("UnusedParameter")
 internal fun rescuedCardButtons(
     item: RescuedDatabase,
     busy: Set<File>,
@@ -79,6 +78,8 @@ internal fun rescuedCardButtons(
         showSend = item.completeness != RescueCompleteness.NOTHING,
         sendEnabled = allowed,
         discardEnabled = allowed,
+        showRestore = restore is RestoreVerdict.Restorable,
+        restoreEnabled = restore is RestoreVerdict.Restorable && allowed,
     )
 }
 

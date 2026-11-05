@@ -782,9 +782,18 @@ abstract class AppDatabase : RoomDatabase() {
          */
         fun build(context: Context): AppDatabase {
             val databaseFile = context.getDatabasePath(DATABASE_NAME)
+            val rescueRoot = File(context.filesDir, DatabaseRescue.RESCUE_DIR)
+            // Issue #112: a restore the lifter asked for is carried out here,
+            // before the rescue and before Room, for the rescue's own reason --
+            // nothing may hold the file while it moves. See DatabaseRestore.
+            val restore = restoreFor(databaseFile, rescueRoot)
+            val restored = restore.prepare()
+            check(restored !is RestoreOutcome.Stuck || restore.safeToOpen()) {
+                "a restore could go neither forward nor back and left a sidecar with no database beside it: $restored"
+            }
             DatabaseRescue.rescue(
                 databaseFile = databaseFile,
-                rescueRoot = File(context.filesDir, DatabaseRescue.RESCUE_DIR),
+                rescueRoot = rescueRoot,
                 compiledVersion = DATABASE_VERSION,
             )
             return Room.databaseBuilder(context, AppDatabase::class.java, DATABASE_NAME)
@@ -792,7 +801,28 @@ abstract class AppDatabase : RoomDatabase() {
                 // is on, and a copy of the array per open is a cost with no
                 // reader. The list is still the single statement of the chain.
                 .apply { MIGRATIONS.forEach { addMigrations(it) } }
+                .addCallback(
+                    object : RoomDatabase.Callback() {
+                        // After migrations and Room's own validation: the one
+                        // point that proves a restored database opens. A
+                        // restore never verified here is undone next launch.
+                        override fun onOpen(db: SupportSQLiteDatabase) = restore.markOpened()
+                    },
+                )
                 .build()
         }
+
+        /**
+         * The restore for this build: its version and the migration chain it
+         * can run, read off [MIGRATIONS] itself so the two cannot disagree.
+         * Issue #112. Public so the Home card asks the same object that the
+         * launch path will act on.
+         */
+        fun restoreFor(databaseFile: File, rescueRoot: File): DatabaseRestore = DatabaseRestore(
+            databaseFile = databaseFile,
+            rescueRoot = rescueRoot,
+            compiledVersion = DATABASE_VERSION,
+            migrationEdges = MIGRATIONS.map { it.startVersion to it.endVersion },
+        )
     }
 }

@@ -40,12 +40,14 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.macrophage.barspeed.CrashReport
+import com.macrophage.barspeed.data.DATABASE_VERSION
 import com.macrophage.barspeed.data.InterruptedSetSummary
 import com.macrophage.barspeed.data.OrphanedSet
 import com.macrophage.barspeed.data.RescuedDatabase
 import com.macrophage.barspeed.model.ArmedDelivery
 import com.macrophage.barspeed.model.ByteSize
 import com.macrophage.barspeed.model.ConnectionState
+import com.macrophage.barspeed.model.RestoreVerdict
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.PermissionBanner
@@ -73,6 +75,7 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
     val interrupted by viewModel.interrupted.collectAsState()
     val rescued by viewModel.rescued.collectAsState()
     val busyRescues by viewModel.busyRescues.collectAsState()
+    val restoreVerdicts by viewModel.restoreVerdicts.collectAsState()
     val busyInterrupted by viewModel.busyInterrupted.collectAsState()
     val busyCrashReports by viewModel.busyCrashReports.collectAsState()
     val crashReports by viewModel.crashReports.collectAsState()
@@ -126,7 +129,14 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
             PermissionBanner()
             // Above InterruptedSetNotice: a rescued database can be an entire
             // training history, where an interrupted capture is one set.
-            RescuedDatabaseNotice(rescued, busyRescues, viewModel::shareRescued, viewModel::discardRescued)
+            RescuedDatabaseNotice(
+                rescued,
+                busyRescues,
+                restoreVerdicts,
+                viewModel::shareRescued,
+                viewModel::discardRescued,
+                viewModel::restoreRescued,
+            )
             InterruptedSetNotice(
                 interrupted,
                 busyInterrupted,
@@ -526,12 +536,15 @@ private fun CrashReportNotice(
 private fun RescuedDatabaseNotice(
     rescued: List<RescuedDatabase>,
     busy: Set<File>,
+    restoreVerdicts: Map<File, RestoreVerdict>,
     onShare: (RescuedDatabase) -> Unit,
     onDiscard: (RescuedDatabase) -> Unit,
+    onRestore: (RescuedDatabase) -> Unit,
 ) {
     if (rescued.isEmpty()) return
     val clock = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
     var confirmDiscard by remember { mutableStateOf<RescuedDatabase?>(null) }
+    var confirmRestore by remember { mutableStateOf<RescuedDatabase?>(null) }
 
     // Every tap goes through rescuedTapEffect (RescuedCard.kt), where the
     // routing is pinned; this only carries out what it returns.
@@ -540,10 +553,31 @@ private fun RescuedDatabaseNotice(
             is RescuedTapEffect.Share -> onShare(effect.item)
             is RescuedTapEffect.ConfirmDiscard -> confirmDiscard = effect.item
             is RescuedTapEffect.Discard -> onDiscard(effect.item)
-            // Issue #112: no RESTORE button is drawn yet, so neither is reachable.
-            is RescuedTapEffect.ConfirmRestore, is RescuedTapEffect.Restore -> Unit
+            is RescuedTapEffect.ConfirmRestore -> confirmRestore = effect.item
+            is RescuedTapEffect.Restore -> onRestore(effect.item)
         }
     }
+    // Re-read at the dialog: a verdict that stopped being Restorable while it
+    // was open hides the dialog rather than confirming a stale answer.
+    confirmRestore?.let { item -> (restoreVerdicts[item.directory] as? RestoreVerdict.Restorable)?.let { item to it } }
+        ?.let { (item, verdict) ->
+            AlertDialog(
+                onDismissRequest = { confirmRestore = null },
+                title = { Text("Restore this rescued database?") },
+                text = { Text(rescuedRestoreWarning(item, verdict.version, DATABASE_VERSION)) },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            onTap(rescuedTapEffect(RescuedTap.CONFIRM_RESTORE, item))
+                            confirmRestore = null
+                        },
+                    ) { Text("Restore", color = BarColors.Volt) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { confirmRestore = null }) { Text("Cancel") }
+                },
+            )
+        }
     confirmDiscard?.let { item ->
         AlertDialog(
             onDismissRequest = { confirmDiscard = null },
@@ -564,7 +598,8 @@ private fun RescuedDatabaseNotice(
     }
     Column(modifier = Modifier.fillMaxWidth()) {
         for (item in rescued) {
-            val buttons = rescuedCardButtons(item, busy)
+            val restore = restoreVerdicts[item.directory]
+            val buttons = rescuedCardButtons(item, busy, restore)
             Card(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                 Column(Modifier.padding(14.dp)) {
                     Text(
@@ -583,7 +618,21 @@ private fun RescuedDatabaseNotice(
                     )
                     Spacer(Modifier.height(6.dp))
                     SectionCaption("Kept on this phone. Nothing deletes it but you")
+                    rescuedRestoreNote(restore, DATABASE_VERSION)?.let { note ->
+                        Spacer(Modifier.height(4.dp))
+                        Text(note, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+                    }
                     Spacer(Modifier.height(6.dp))
+                    // Its own row: three buttons in one would not fit a narrow
+                    // phone, and this is the one that changes the live database.
+                    if (buttons.showRestore) {
+                        TextButton(
+                            onClick = { onTap(rescuedTapEffect(RescuedTap.RESTORE, item)) },
+                            enabled = buttons.restoreEnabled,
+                        ) {
+                            Text("RESTORE IT IN PLACE", color = BarColors.Volt)
+                        }
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (buttons.showSend) {
                             TextButton(
