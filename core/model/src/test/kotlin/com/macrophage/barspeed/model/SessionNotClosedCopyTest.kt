@@ -7,15 +7,39 @@ import kotlin.test.assertTrue
 
 /**
  * The words of the prompt raised when Back is pressed after a finish came back
- * failed (#331).
+ * failed (#331, #333).
  *
  * Nothing here renders the dialog. What is pinned is the text `RecordScreen`
  * hands to it and the label it draws on the retry control, both read from
  * [SessionNotClosedCopy]; that the screen reads them and not a literal of its
  * own was checked by reading `RecordScreen`, and by nothing else.
+ *
+ * Until #333 the body was one constant for both of a failed close's causes,
+ * and so named "the end time and the rest recorded after your last set, or
+ * only that rest" whatever had failed, and never the rating or the skipped
+ * sets the close also carries. The prompt is now worded from
+ * [UnwrittenClose], what the close says it did not write.
  */
 class SessionNotClosedCopyTest {
-    private val body = SessionNotClosedCopy.EXIT_BODY
+    /** `endSession` did not land, and the close carried everything it can carry. */
+    private val everything =
+        UnwrittenClose.of(sessionRowLanded = false, rated = true, skipped = true, restCaptured = true)
+
+    /** `endSession` did not land, and the close carried nothing beyond the row itself. */
+    private val rowOnly =
+        UnwrittenClose.of(sessionRowLanded = false, rated = false, skipped = false, restCaptured = false)
+
+    /** `endSession` landed; only the rest window after it did not. */
+    private val restOnly =
+        UnwrittenClose.of(sessionRowLanded = true, rated = true, skipped = true, restCaptured = true)
+
+    /** Every shape `SessionCloser` can report: the row write failing, or only the rest after it. */
+    private val reachable =
+        listOf(true, false).flatMap { rated ->
+            listOf(true, false).flatMap { skipped ->
+                listOf(true, false).map { rest -> UnwrittenClose.of(false, rated, skipped, rest) }
+            }
+        } + restOnly
 
     /**
      * The prompt points at the retry instead of offering it, so the control it
@@ -25,10 +49,10 @@ class SessionNotClosedCopyTest {
      */
     @Test
     fun `the body names the retry control by the label the rest screen draws`() {
-        assertTrue(
-            body.contains(SessionNotClosedCopy.RETRY_LABEL),
-            "the body names a retry control the rest screen does not draw: $body",
-        )
+        reachable.forEach { u ->
+            val body = SessionNotClosedCopy.body(u)
+            assertTrue(body.contains(SessionNotClosedCopy.RETRY_LABEL), "$u names no retry control: $body")
+        }
     }
 
     /**
@@ -37,10 +61,10 @@ class SessionNotClosedCopyTest {
      */
     @Test
     fun `the body says every set is already saved`() {
-        assertTrue(
-            body.contains("Every set is already saved either way"),
-            "the body stopped saying the sets are safe: $body",
-        )
+        reachable.forEach { u ->
+            val body = SessionNotClosedCopy.body(u)
+            assertTrue(body.contains("every set", ignoreCase = true), "$u stopped saying the sets are safe: $body")
+        }
     }
 
     /**
@@ -50,41 +74,10 @@ class SessionNotClosedCopyTest {
      */
     @Test
     fun `the body says leaving loses whatever has not been written`() {
-        assertTrue(
-            body.contains("Whatever has not been written is held only here, and leaving now loses it."),
-            "the body stopped saying what leaving costs: $body",
-        )
-    }
-
-    /**
-     * #331's proposed copy, checked clause by clause against the code, with
-     * three clauses corrected where they were false against it:
-     *
-     *  - "the end time and the rest recorded after your last set" is false
-     *    when `endSession` landed and only `recordFinalRestWindow` failed
-     *    after it: both report FAILED, and in that case the end time IS
-     *    written. Hence "or only that rest", the second cause the old text
-     *    carried with its own "or".
-     *  - "the session's heart-rate and HRV figures are rebuilt" is false in
-     *    the same case, where the close wrote them and nothing is rebuilt,
-     *    and false for the HRV wherever fewer than ten successive
-     *    differences survive in the stored streams, where
-     *    `SessionHrv.rmssdMs` returns null.
-     *  - "The end time and the final rest are held only here" is false in
-     *    the same case for the end time. The old text's last sentence says
-     *    what is true in both cases, and it stays.
-     */
-    @Test
-    fun `the body is the 331 copy, corrected where it was false against the code`() {
-        assertEquals(
-            "Part of this session was not written: the end time and the rest recorded after your last set, " +
-                "or only that rest. Tapping FINISH SESSION AGAIN on this screen can still write them, after " +
-                "freeing some space on the phone if that is what stopped it. Every set is already saved " +
-                "either way, and any of the session's heart-rate and HRV figures the finish did not write " +
-                "are rebuilt from those sets if you leave, the HRV only where they hold enough usable " +
-                "heartbeats. Whatever has not been written is held only here, and leaving now loses it.",
-            body,
-        )
+        reachable.forEach { u ->
+            val body = SessionNotClosedCopy.body(u)
+            assertTrue(body.contains("leaving now loses"), "$u stopped saying what leaving costs: $body")
+        }
     }
 
     /**
@@ -95,32 +88,77 @@ class SessionNotClosedCopyTest {
      */
     @Test
     fun `the body does not say leaving loses the heart-rate and HRV summary`() {
-        assertFalse(body.contains("HRV summary"), "the body still says the summary is lost: $body")
-    }
-
-    /**
-     * FAILED has two causes (`SessionCloser`): `endSession` not landing, or the
-     * final rest window's write not landing after it did. A body that names
-     * only the first tells a lifter in the second that the end time is lost.
-     */
-    @Test
-    fun `the body names the case where only the final rest was not written`() {
-        assertTrue(
-            body.contains("or only that rest"),
-            "the body names only one of the two ways a finish fails: $body",
-        )
+        reachable.forEach { u ->
+            val body = SessionNotClosedCopy.body(u)
+            assertFalse(body.contains("HRV summary"), "$u still says the summary is lost: $body")
+        }
     }
 
     /**
      * `SessionHrv.rmssdMs` returns null, never 0, where fewer than ten
-     * successive differences survive, so the rebuilt HRV is conditional and
-     * the body must not promise it unconditionally.
+     * successive differences survive, so where the HRV is rebuilt at all the
+     * body must not promise it unconditionally.
      */
     @Test
     fun `the body does not promise a rebuilt HRV unconditionally`() {
-        assertTrue(
-            body.contains("the HRV only where they hold enough usable heartbeats"),
-            "the body promises an HRV the stored streams may not support: $body",
-        )
+        reachable.filter { it.sessionRow }.forEach { u ->
+            val body = SessionNotClosedCopy.body(u)
+            assertTrue(
+                body.contains("the HRV only where they hold enough usable heartbeats"),
+                "$u promises an HRV the stored streams may not support: $body",
+            )
+        }
+    }
+
+    // ---- by cause, issue #333 -----------------------------------------------
+
+    /**
+     * THE DEFECT (#333). Where `endSession` landed, the end time, the summary,
+     * the rating and the skipped sets are stored and the row is closed. Titling
+     * that "This session did not finish" is false.
+     */
+    @Test
+    fun `a close whose session write landed is not titled as unfinished`() {
+        assertEquals("The last rest did not save", SessionNotClosedCopy.title(restOnly))
+        assertEquals(SessionNotClosedCopy.NOT_FINISHED_TITLE, SessionNotClosedCopy.title(everything))
+    }
+
+    /**
+     * Where `endSession` did not land, the body lists what it was carrying:
+     * the end time always, and the rating, the skipped sets and the heart rate
+     * after the last set where the close held them.
+     */
+    @Test
+    fun `a close that failed at its session write lists everything it carried`() {
+        val body = SessionNotClosedCopy.body(everything)
+        assertTrue("the end time" in body, body)
+        assertTrue("your rating of the session" in body, body)
+        assertTrue("the sets you skipped" in body, body)
+        assertTrue("the heart rate recorded after your last set" in body, body)
+    }
+
+    /** Nothing that was never there is named as lost. */
+    @Test
+    fun `a close that carried no rating, no skips and no rest names none of them`() {
+        val body = SessionNotClosedCopy.body(rowOnly)
+        assertTrue("the end time" in body, body)
+        assertFalse("rating" in body, body)
+        assertFalse("skipped" in body, body)
+        assertFalse("after your last set" in body, body)
+    }
+
+    /**
+     * Where only the rest failed, the body says the session is finished, and
+     * names neither the end time nor anything else `endSession` stored as at
+     * risk.
+     */
+    @Test
+    fun `a close that failed only at the final rest says the session is finished`() {
+        val body = SessionNotClosedCopy.body(restOnly)
+        assertTrue("The session is finished" in body, body)
+        assertTrue("the heart rate recorded after your last set" in body, body)
+        assertFalse("end time" in body, body)
+        assertFalse("rating" in body, body)
+        assertFalse("skipped" in body, body)
     }
 }

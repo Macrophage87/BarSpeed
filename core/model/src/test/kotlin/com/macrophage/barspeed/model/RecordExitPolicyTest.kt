@@ -415,4 +415,18 @@ class RecordExitPolicyTest {
             }
         }
     }
+
+    /**
+     * Where only the final rest window failed, `endSession` has landed and the
+     * row is closed (#333). "Leave without finishing" would be false: there
+     * is nothing left open to leave, only the rest to lose. The prompt offers
+     * leaving the finished session without that rest, or staying to retry it.
+     */
+    @Test
+    fun `a session whose last rest did not save is not offered as one to leave open`() {
+        assertEquals(
+            listOf(ExitAction.LEAVE_FINISHED_SESSION, ExitAction.STAY),
+            ExitPrompt.FINAL_REST_UNSAVED.actions,
+        )
+    }
 }
