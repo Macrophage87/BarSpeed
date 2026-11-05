@@ -140,6 +140,25 @@ class TempoComplianceTest {
         assertEquals(emptyList(), analysis.verdicts, "no verdict explains the set-level ratio")
     }
 
+    /**
+     * RED at the commit that writes it (#66 (a)). A phase no rep resolved has
+     * no worst deviation, as it has no mean: `actualMeanS` was made nullable
+     * for exactly this, and `worstDeviationS` beside it still stored `0.0`,
+     * which the first consumer not guarded on `repsEvaluated > 0` would read
+     * as a phase timed exactly on target. Case B resolves no eccentric and no
+     * pause; its concentric, which every rep resolved, keeps a number, so the
+     * test cannot pass by the field being null everywhere.
+     */
+    @Test
+    fun `a phase nothing measured has no worst deviation`() {
+        val c = assertNotNull(caseB().tempoCompliance)
+        listOf("eccentric", "bottomPause", "topPause").forEach {
+            assertNull(phase(c, it).actualMeanS, "$it was measured, so the fixture is wrong")
+            assertNull(phase(c, it).worstDeviationS, "$it, which nothing measured, has a worst deviation")
+        }
+        assertNotNull(phase(c, "concentric").worstDeviationS, "the measured drive lost its worst deviation")
+    }
+
     @Test
     fun `scoredPhases is the reachable proxy for what the exporter publishes`() {
         // Exporters.kt evaluates exactly this expression to fill the export's
