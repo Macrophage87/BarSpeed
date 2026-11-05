@@ -119,8 +119,14 @@ data class ExerciseDef(
                 ExerciseDef("plank", "Plank", kind = ExerciseKind.HOLD),
                 ExerciseDef("side_plank", "Side Plank", kind = ExerciseKind.HOLD),
                 ExerciseDef("dead_hang", "Dead Hang", kind = ExerciseKind.HOLD),
-                ExerciseDef("farmers_walk", "Farmer's Walk", kind = ExerciseKind.CARRY),
-                ExerciseDef("suitcase_carry", "Suitcase Carry", kind = ExerciseKind.CARRY),
+                // The load travels with the walker (#63). A carry's plane is
+                // read by its published geometry, the import gate's inversion
+                // line, the tempo digit roles and the live tracker's axis.
+                // Neither shape of carry reaches the rep segmenter
+                // (RepAnalysisPolicy), so the bar-power figure, whose gate has
+                // no plane clause, is never computed on this axis.
+                ExerciseDef("farmers_walk", "Farmer's Walk", kind = ExerciseKind.CARRY, horizontal = true),
+                ExerciseDef("suitcase_carry", "Suitcase Carry", kind = ExerciseKind.CARRY, horizontal = true),
                 ExerciseDef("snatch", "Snatch", StartPhase.CONCENTRIC, ExerciseKind.EXPLOSIVE),
                 ExerciseDef("power_snatch", "Power Snatch", StartPhase.CONCENTRIC, ExerciseKind.EXPLOSIVE),
                 ExerciseDef("clean", "Clean", StartPhase.CONCENTRIC, ExerciseKind.EXPLOSIVE),
