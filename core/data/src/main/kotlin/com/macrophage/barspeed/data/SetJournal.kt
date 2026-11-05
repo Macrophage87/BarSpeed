@@ -39,11 +39,22 @@ import java.util.zip.ZipOutputStream
  * samples with no sensor is the correct outcome of a manually counted set.
  * Nothing else in the directory can tell those two apart.
  *
- * [secondaryImuConnected] is that same fact for the second link, and it is
- * here for that same reading. A role is armed from pairing and labelling
- * alone -- `SensorCapturePolicy.roster` consults no `ConnectionState` -- so
- * [sensorRoles] cannot supply it, and an absent or empty `imu-b.csv` would
- * otherwise be indistinguishable from a second unit that was never connected.
+ * [secondaryImuConnected] is whether the second link was connected at that
+ * same moment, and it is recorded ONLY ON A SET ARMED FOR TWO: the writer
+ * stores `roster.secondary != null && imuConnectedB`, so a one-sensor set
+ * stores false even when the second link is up. The gate was written in
+ * #156's third round, when the second link was held warm on sets armed for
+ * one, so that the interrupted-set card would not speak of a second sensor a
+ * set never captured. Since #198 the second link is pointed at the same
+ * roster's `secondaryAddress` the set arms from, so held and armed coincide
+ * and the gate is what keeps them coinciding. Either way false means "not
+ * armed for two, or armed and not connected", and [sensorRoles] is what tells
+ * those apart: it
+ * is non-empty exactly when a role was armed. A role is armed from pairing
+ * and labelling alone -- `SensorCapturePolicy.roster` consults no
+ * `ConnectionState` -- so [sensorRoles] cannot supply the connection, and an
+ * absent or empty `imu-b.csv` would otherwise be indistinguishable from a
+ * second unit that was never connected (#171).
  *
  * [sessionId] is nullable and the null is load-bearing. No session row exists
  * until the first set of a session has been durably written, so a journal
@@ -113,10 +124,11 @@ data class SetJournalHeader(
     val armedRole: SensorRole? = null,
     /**
      * Whether the SECOND link was connected at the moment the set began, as
-     * the caller observed it (#156).
+     * the caller observed it, on a set armed for two (#156); see the class
+     * KDoc for the gate.
      *
-     * False on every one-sensor set and on every header written before this
-     * field existed. Defaulted for [sensorRoles]'s reason and one sharper
+     * False on every one-sensor set, whatever the second link was doing, and
+     * on every header written before this field existed. Defaulted for [sensorRoles]'s reason and one sharper
      * one: `SetJournalStore`'s reader decodes inside
      * `runCatching { }.getOrNull() ?: return null`, so a field an older
      * header cannot supply does not surface as an error -- the whole

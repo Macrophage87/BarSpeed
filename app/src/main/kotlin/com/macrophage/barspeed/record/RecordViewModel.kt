@@ -1602,10 +1602,11 @@ private fun openJournal(
         armedRole = roster.analysed,
         // The second link's state at that same moment, for the reading
         // `imuConnected` is here for -- but only on a set actually armed for
-        // two. The link is kept warm whenever two units are labelled, so an
-        // ungated write would record it on a count-1 set that never opened
-        // `imu-b.csv`, and the interrupted-set card would then report a second
-        // stream missing that nothing ever asked for.
+        // two. Written when the link was held warm on sets armed for one
+        // (#156); since #198 the link follows this same roster's
+        // `secondaryAddress`, so the gate keeps the header from ever
+        // recording a second stream a set was not armed to open `imu-b.csv`
+        // for, and the interrupted-set card from reporting it missing.
         secondaryImuConnected = roster.secondary != null && s.imuConnectedB,
     ),
 )
