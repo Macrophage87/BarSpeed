@@ -20,10 +20,18 @@ enum class GeometrySource {
     /** A plan declared this value explicitly. */
     DECLARED,
 
-    /** No declaration; the value came from an [ExerciseDef.SEED] entry. */
+    /**
+     * No declaration; the value came from an [ExerciseDef.SEED] entry -- or,
+     * for `sensorInverted` (1.26, #289), from the definition the set ran under.
+     */
     SEEDED,
 
-    /** No declaration and no seed; the value was guessed from the exercise id. */
+    /**
+     * No declaration and no seed; the value was guessed from the exercise id
+     * -- except for `sensorInverted`, where it means the app's stack rule
+     * ([SetGeometryPolicy.stackInversion], rule 3) set it from the resolved
+     * mount, drive and plane, reading no words in the id.
+     */
     INFERRED,
 
     /**
@@ -37,10 +45,10 @@ enum class GeometrySource {
 }
 
 /**
- * Provenance for the seven geometry values whose resolution has more than one
- * possible source. [GeometrySourceExport]'s KDoc, in `SessionExport.kt`, is
- * the one statement of which values carry a source and why -- read it there,
- * not here.
+ * Provenance for the eight geometry values whose resolution has more than one
+ * possible source (`sensorInverted` the eighth, since 1.26, #289).
+ * [GeometrySourceExport]'s KDoc, in `SessionExport.kt`, is the one statement
+ * of which values carry a source and why -- read it there, not here.
  *
  * `sensorOnStack` defaults to [GeometrySource.DEFAULT] rather than being
  * required, and that default is load-bearing rather than decorative: this

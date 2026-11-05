@@ -122,4 +122,25 @@ class InversionSourceTest {
         assertEquals(true, g.sensorInverted)
         assertEquals(GeometrySource.SEEDED, g.sources.sensorInverted)
     }
+
+    /**
+     * Rule 2 asks for a plan (L1 review round 1, A-F4). With none, [SetGeometryPolicy.resolve]
+     * applies no rule and the set ran on the definition as given, so an inverted
+     * definition on the rule's own shape -- stack mount, drive down, vertical --
+     * is still `seeded`. Hand-built: no shipped definition is inverted.
+     */
+    @Test
+    fun `an inverted definition on the rule's shape with no plan is seeded`() {
+        val inverted = ExerciseDef(
+            "triceps_pushdown",
+            "Triceps Pushdown",
+            concentricUp = false,
+            sensorInverted = true,
+            sensorOnStack = true,
+        )
+        val ruled =
+            SetGeometryPolicy.stackInversion(null, false, onStack = true, concentricUp = false, horizontal = false)
+        assertEquals(true, ruled, "the fixture is not on the stack rule's shape")
+        assertEquals(GeometrySource.SEEDED, SetGeometryPolicy.describe(inverted, null).sources.sensorInverted)
+    }
 }

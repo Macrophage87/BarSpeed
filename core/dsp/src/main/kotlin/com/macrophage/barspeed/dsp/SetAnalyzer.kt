@@ -138,7 +138,9 @@ data class PhaseComplianceResult(
     val actualMeanS: Double?,
     /**
      * The signed deviation from [prescribedS] furthest from zero among the
-     * reps that resolved this phase, or null when none did (#66 (a)). A zero
+     * reps that resolved this phase, or null when none did (#66 (a)). Taken
+     * from 0 when [prescribedS] is null, so for an unprescribed phase this is
+     * the longest actual. A zero
      * here would read as a phase timed exactly on target. A row stored
      * before this was nullable carries 0.0 for such a phase; where that row
      * also stores a null [actualMeanS], the null marks the phase as

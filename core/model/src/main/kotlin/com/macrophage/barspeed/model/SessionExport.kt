@@ -2792,9 +2792,16 @@ data class SessionExport(
          * drift.
          *
          * Under 1.26 and not a mint: 1.26 is unreleased, minted on this branch
-         * for #289 above. RETROACTIVE: both counts were stored per phase with
-         * the set's analysis, so an older set re-exported gains the key. ABSENT
-         * when no phase was scored. ADDITIVE for a reader that ignores unknown
+         * for #289 above. RETROACTIVE: both counts were stored per phase
+         * with the set's analysis, so an older set re-exported gains the
+         * key. Listed only for a movement phase with a nonzero count,
+         * whatever the stored grade flagged: a grade stored before v0.1.36
+         * can flag an unresolved phase (v0.1.31 to v0.1.35) or a pause
+         * (before v0.1.31, which stored no flag) as scored, and publishing
+         * either would break the key's own `of` minimum and phase enum. On
+         * a set analysed before v0.1.31 a phase's `of` is every rep of the
+         * set, as that build graded it. ABSENT when no phase was scored, or
+         * none qualifies. ADDITIVE for a reader that ignores unknown
          * keys; `tempoCompliance` is `additionalProperties: false`, so a reader
          * validating against an earlier schema rejects it, as it already
          * rejects a 1.26 document on its version string. Nothing is renamed or
@@ -4550,8 +4557,9 @@ data class TempoComplianceExport(
     @SerialName("tolerance_s") val toleranceS: Double,
     /**
      * Reps within tolerance on every scored phase THAT REP RESOLVED, out of
-     * [of], the reps that resolved at least one. Pauses are reported but
-     * never scored. A phase the sensor did not measure is not counted against
+     * [of], the reps that resolved at least one (every rep, on a set
+     * analysed before v0.1.36). Pauses are reported but never scored. A
+     * phase the sensor did not measure is not counted against
      * the lifter and does not appear in [scoredPhases], so read that field to
      * know what this ratio covers: on a slow concentric-first lift it is
      * often the drive alone. `of: 0` means nothing was gradeable.
@@ -4560,15 +4568,20 @@ data class TempoComplianceExport(
     val of: Int,
     /**
      * Which phases were scored — the movement digits only, and only those
-     * actually measured. Always written, including empty: the exporter drops
+     * actually measured, on a set analysed by v0.1.36 or later. A set keeps
+     * the flags of the build that analysed it: v0.1.31 to v0.1.35 could
+     * list a prescribed phase no rep resolved, and earlier builds list
+     * every phase. Always written, including empty: the exporter drops
      * defaults, and an absent key reads as "not stated" when it means
      * "nothing was graded".
      */
     @EncodeDefault(EncodeDefault.Mode.ALWAYS) val scoredPhases: List<String> = emptyList(),
     /**
-     * The set-level ratio taken apart by phase (1.26, #66 (c)): one entry per
-     * phase in [scoredPhases], in the same order, each counting the reps that
-     * RESOLVED that phase ([PhaseTallyExport.of]) and how many of those were
+     * The set-level ratio taken apart by phase (1.26, #66 (c)): one entry
+     * per movement phase in [scoredPhases] that some rep resolved, in the
+     * same order (every phase in it, on a set analysed by v0.1.36 or
+     * later), each counting the reps that RESOLVED that phase
+     * ([PhaseTallyExport.of]) and how many of those were
      * within tolerance on it. [withinTolerance]/[of] folds the phases
      * together, rep by rep, over whatever each rep resolved, so "7 of 14"
      * can be seven reps graded on the drive alone beside two eccentrics that
@@ -4576,10 +4589,15 @@ data class TempoComplianceExport(
      * says so.
      *
      * Copied out of the stored analysis, where each phase's two counts were
-     * frozen when the set was analysed, so it is published for every set that
-     * publishes [scoredPhases]. Null, and so absent, when no phase was scored:
-     * an empty [scoredPhases] already says that, and an empty list here would
-     * say it twice. Which phases graded a GIVEN rep is not repeated per rep:
+     * frozen when the set was analysed, so it is published for every set
+     * whose stored grade has such a phase. The phases are chosen by the
+     * exporter (`TempoComplianceResult.tallyPhases` in `:core:dsp`), not by
+     * the stored `scored` flag alone, because a grade stored before v0.1.36
+     * can flag a pause or an unresolved phase as scored. Null, and so
+     * absent, when no phase was scored or none qualifies: an empty
+     * [scoredPhases] already says the first, and an empty list here would
+     * say it twice. Which phases graded a GIVEN rep is not repeated per
+     * rep:
      * a rep was graded on a scored phase exactly when its own `repMetrics`
      * row carries that phase's duration (`ecc_s`, `con_s`).
      */
@@ -4604,8 +4622,10 @@ data class TempoComplianceExport(
  * One scored phase's share of a set's tempo grade (1.26, #66 (c)). [of] is the
  * reps that resolved [phase]; a rep the sensor did not resolve it on is not in
  * [of] and is not held against the lifter, so [of] can be smaller than the
- * set's own `of`. Never published with [of] 0: a phase nothing resolved is
- * not scored and has no entry.
+ * set's own `of`. Never published with [of] 0, and never for a pause: a phase
+ * nothing resolved has no entry, even where a grade stored before v0.1.36
+ * flags it scored. On a set analysed before v0.1.31, [of] is every rep of
+ * the set, as that build graded it.
  */
 @Serializable
 data class PhaseTallyExport(
