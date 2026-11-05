@@ -3,6 +3,7 @@ package com.macrophage.barspeed.data
 import com.macrophage.barspeed.dsp.ImuCsv
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.hrm.HrTrust
+import com.macrophage.barspeed.model.CustomExerciseRepair
 import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.FinalRestWindowDecision
 import com.macrophage.barspeed.model.FinalRestWindowPolicy
@@ -1078,25 +1079,15 @@ class SessionRepository(
                 sensorOnStack = ExerciseDef.ridesStack(custom.id),
             )
         } else {
-            ExerciseDef(
-                id,
-                id.replace('_', ' ').replaceFirstChar { it.uppercase() },
-                ExerciseDef.inferStartPhase(id),
-                kind = ExerciseDef.inferKind(id),
-                isCustom = true,
-                sensorOnStack = ExerciseDef.ridesStack(id),
-            )
+            ExerciseDef.inferred(id)
         }
     }
 
     suspend fun ensureExerciseExists(id: String) {
         if (ExerciseDef.seedById(id) == null && exerciseDao.byId(id) == null) {
+            val row = CustomExerciseRepair.inferredRow(id)
             exerciseDao.insert(
-                CustomExerciseEntity(
-                    id = id,
-                    displayName = id.replace('_', ' ').replaceFirstChar { it.uppercase() },
-                    startsWith = ExerciseDef.inferStartPhase(id).name,
-                ),
+                CustomExerciseEntity(id = id, displayName = row.displayName, startsWith = row.startsWith),
             )
         }
     }
