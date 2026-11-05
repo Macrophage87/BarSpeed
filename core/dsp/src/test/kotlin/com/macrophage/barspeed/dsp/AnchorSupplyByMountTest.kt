@@ -406,6 +406,47 @@ class AnchorSupplyByMountTest {
         assertNull(squat.velocityLossPct, "back squat velocity loss reported to the lifter: withheld from #306")
     }
 
+    /**
+     * ISSUE #234: the two bench velocity losses stay withheld, and EITHER of
+     * #306's clause families withholds them on its own.
+     *
+     * The test above pins that set05 and set06 publish no `velocityLoss_pct`.
+     * What it cannot say is which rule does it, and the answer is both, each
+     * independently: every rep of both sets is unbounded (`romBounded` false),
+     * AND on both sets the LAST rep -- the one `VelocityLoss.of` requires
+     * among the eligible pair -- carries an out-of-range sample inside its own
+     * span: set05's per-rep artefact counts are 0, 1, 1, 0, 1 and set06's
+     * 1, 1, 1, 1, 0, 1, with none in any guard band. A
+     * mutation deleting EITHER clause leaves the test above green, so a later
+     * change to one of them could republish 26.0% or 24.0% with only the other
+     * holding the line, and nothing would say so.
+     *
+     * So each family is pinned alone, with the other masked. The bound alone
+     * is #234's own rule -- "the figure should not be published from reps
+     * whose ROM the same analysis cannot defend" -- and it is the one that
+     * reaches this issue's mechanism; that the artefact clause ALSO reaches
+     * these two sets is a property of these two sets, not of the rule. With
+     * both masked the figures come back exactly as #234 quoted them.
+     */
+    @Test
+    fun `issue 234's bench velocity losses are withheld by the bound alone and by the artefact clauses alone`() {
+        fun boundOnly(reps: List<RepAnalysis>) = reps.map { it.copy(artefactSamples = 0, guardArtefactSamples = 0) }
+        fun artefactOnly(reps: List<RepAnalysis>) = reps.map { it.copy(romBounded = true) }
+        fun neither(reps: List<RepAnalysis>) = artefactOnly(boundOnly(reps))
+
+        listOf(
+            Triple("field-bench-3010-6rep-s37-set05", 47.627, 26.0),
+            Triple("field-bench-3010-6rep-s37-set06", 49.895, 24.0),
+        ).forEach { (fixture, kg, quoted) ->
+            val reps = batchAnalysis(fixture, StartPhase.ECCENTRIC, kg).reps
+            assertTrue(reps.all { it.romBounded == false }, "$fixture: every rep unbounded")
+            assertEquals(VelocityLoss.NoEligiblePair, VelocityLoss.of(reps), "$fixture: as published")
+            assertEquals(VelocityLoss.NoEligiblePair, VelocityLoss.of(boundOnly(reps)), "$fixture: the bound alone")
+            assertEquals(VelocityLoss.NoEligiblePair, VelocityLoss.of(artefactOnly(reps)), "$fixture: artefacts alone")
+            assertEquals(VelocityLoss.Measured(quoted), VelocityLoss.of(neither(reps)), "$fixture: neither clause")
+        }
+    }
+
     /** Anchor coverage this file requires bar-mounted work to clear, per cent. */
     private val barCoverageFloorPct = 20.0
 
