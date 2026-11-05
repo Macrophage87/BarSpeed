@@ -375,16 +375,21 @@ class SessionRepository(
      * Store the FIRST set of a session, opening the session row it hangs off
      * (#48).
      *
-     * Two writes, as the record screen makes them today: [startSession]'s
-     * row, then [recordSet]'s set. When the set's insert fails and the lifter
-     * then discards the set, the row stays behind with no set under it, and
-     * Home draws a 0-set session card for a workout that recorded nothing. A
-     * retry reuses the row, because the screen has already read its id back;
-     * nothing reclaims it if the lifter never retries.
+     * One transactional DAO call, [SessionDao.insertSessionWithFirstSet]: the
+     * row, the set under it and the set's streams land together or not at
+     * all. As two writes -- the row, then the set -- a set insert that failed
+     * left the row behind with no set under it, and Home drew a 0-set session
+     * card for a workout that recorded nothing. Whether the database commits
+     * them together is Room's `@Transaction`, which no test here can observe.
+     *
+     * The row and the streams are built on [encodeContext] first, as
+     * [recordSet]'s are.
      */
     suspend fun recordFirstSet(opening: SessionOpening, orderIdx: Int, set: CompletedSet): RecordedFirstSet {
-        val sessionId = sessionDao.insertSession(sessionEntityOf(opening))
-        return RecordedFirstSet(sessionId, recordSet(sessionId, orderIdx, set))
+        // The set row's sessionId is a placeholder; the DAO stamps the real one.
+        val (row, streams) = withContext(encodeContext) { setRowOf(0L, orderIdx, set) to streamsOf(set) }
+        val (sessionId, setId) = sessionDao.insertSessionWithFirstSet(sessionEntityOf(opening), row, streams)
+        return RecordedFirstSet(sessionId, setId)
     }
 
     /**

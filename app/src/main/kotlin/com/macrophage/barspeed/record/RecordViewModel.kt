@@ -11,6 +11,7 @@ import com.macrophage.barspeed.ble.AutoConnectManager
 import com.macrophage.barspeed.ble.DeviceRegistry
 import com.macrophage.barspeed.ble.DeviceRole
 import com.macrophage.barspeed.data.CompletedSet
+import com.macrophage.barspeed.data.SessionOpening
 import com.macrophage.barspeed.data.SessionRepository
 import com.macrophage.barspeed.data.SetJournal
 import com.macrophage.barspeed.data.SetJournalHeader
@@ -1058,7 +1059,7 @@ internal fun RecordState.soleSilenceOver(sinceMs: Long, nowMs: Long): ArmedDeliv
  * The frozen set-write, in the shape the repository stores.
  *
  * A free function taking what it needs, rather than the inline construction
- * this replaces and for the same reason [openSession] is one: it keeps a
+ * this replaces and for the same reason [sessionOpeningOf] is one: it keeps a
  * thirty-line argument list out of [RecordViewModel].
  * Nothing else about it moved: every argument is the same expression over the
  * same three inputs, all of them already frozen.
@@ -1168,7 +1169,7 @@ private fun completedSetOf(p: PendingSetWrite, analysis: SetAnalysis, written: C
 )
 
 /**
- * Open the session row the first set of a session hangs off.
+ * What the session row the first set of a session hangs off is opened with.
  *
  * A free function taking what it needs, rather than a method, so that the one
  * platform call it makes is visible in isolation and so that the argument list
@@ -1194,20 +1195,39 @@ private fun completedSetOf(p: PendingSetWrite, analysis: SetAnalysis, written: C
  * zone read at export time would be the zone the phone is in then, which is a
  * different fact wearing the same name.
  */
-private suspend fun openSession(repository: SessionRepository, p: PendingSetWrite): Long {
-    return repository.startSession(
-        planName = p.planName,
-        planSessionName = p.planSessionName,
-        startedAtMs = p.startedAtMs,
-        timeZone = RecordedTimeZone.resolve(ZoneId.systemDefault().id, p.startedAtMs),
-    )
+private fun sessionOpeningOf(p: PendingSetWrite) = SessionOpening(
+    planName = p.planName,
+    planSessionName = p.planSessionName,
+    startedAtMs = p.startedAtMs,
+    timeZone = RecordedTimeZone.resolve(ZoneId.systemDefault().id, p.startedAtMs),
+)
+
+/**
+ * Store [set], and on the first set of a session open the session row with it
+ * (#48). Returns the set's id.
+ *
+ * [RecordState.sessionId] is read here and written here, and written only once
+ * the first set has landed. It used to be written the moment the row was
+ * opened, one write BEFORE the set's own, so a set insert that then failed
+ * left the screen holding the id of a row with no set under it.
+ */
+private suspend fun recordPendingSet(
+    repository: SessionRepository,
+    state: MutableStateFlow<RecordState>,
+    p: PendingSetWrite,
+    set: CompletedSet,
+): Long {
+    state.value.sessionId?.let { return repository.recordSet(it, p.orderIdx, set) }
+    val recorded = repository.recordFirstSet(sessionOpeningOf(p), p.orderIdx, set)
+    state.value = state.value.copy(sessionId = recorded.sessionId)
+    return recorded.setId
 }
 
 /**
  * Apply one tap of the prep control: work out which exercise it changes and what
  * the new value is, clamped, then write it.
  *
- * A free function taking what it needs, for the reason [openSession] gives.
+ * A free function taking what it needs, for the reason [sessionOpeningOf] gives.
  * The behaviour is unchanged by the move.
  *
  * Written to the settings store and read back through its flow rather than
@@ -1300,7 +1320,7 @@ private fun CoroutineScope.mirrorPrepOverrides(settings: SettingsStore, state: M
  * in this repository can exercise [RecordViewModel], and this has not been
  * watched happen on a device.
  *
- * A free function for [openSession]'s reason.
+ * A free function for [sessionOpeningOf]'s reason.
  */
 private fun CoroutineScope.mirrorSensorSettings(
     settings: SettingsStore,
@@ -1462,7 +1482,7 @@ private data class ArmedLiveness(
  * Mirror all three links' connection state onto the screen state.
  *
  * One free function rather than three collectors in `init`, and free for
- * [openSession]'s reason. The behaviour is unchanged by the move -- three
+ * [sessionOpeningOf]'s reason. The behaviour is unchanged by the move -- three
  * independent collectors, each copying one link's state onto its own fields.
  *
  * `imuConnected`, `imuConnecting` and `imuState` still mean THE ARMED SENSOR
@@ -1537,7 +1557,7 @@ private fun CoroutineScope.mirrorLinkStates(autoConnect: AutoConnectManager, sta
 /**
  * Open the durable capture for a set that is about to begin.
  *
- * A free function taking what it needs, for the reason [openSession] gives.
+ * A free function taking what it needs, for the reason [sessionOpeningOf] gives.
  *
  * Everything here is read at the moment the set starts, because that is the
  * only moment some of it is true. [RecordState.imuConnected] in particular is
@@ -1745,7 +1765,7 @@ private fun previewCancelledState(s: RecordState): RecordState =
 
 /**
  * The state opening a plan session leaves behind. Free function for
- * [openSession]'s reason.
+ * [sessionOpeningOf]'s reason.
  */
 private fun planSessionState(s: RecordState, planSession: PlanSessionDef, queue: List<PlannedSlot>): RecordState =
     s.copy(
@@ -2244,7 +2264,7 @@ internal fun skippedState(s: RecordState): RecordState? {
  * The state SWITCH EXERCISE leaves behind.
  *
  * A free function taking what it needs, rather than a method, for the reason
- * [openSession] gives.
+ * [sessionOpeningOf] gives.
  *
  * [fixed] is non-empty because jumpToExercise returns before reaching here when
  * the chosen exercise has no sets left, so there is always a planned next set.
@@ -2411,7 +2431,7 @@ private fun recordedTimedEnd(
  * What `endSet` says and writes as this set ends, or null for nothing:
  * `SetEnd.terminalCall`'s decision over this state's own facts.
  *
- * Free function for [openSession]'s reason. [clockEnded] is whether the
+ * Free function for [sessionOpeningOf]'s reason. [clockEnded] is whether the
  * timed set's own clock ended it, and the timed voice's gate is the one the
  * tick loop asks before it speaks a countdown word, `LeadInPolicy.speaks` over
  * the set's [prepCase] and the audio setting -- one predicate, so a set whose
@@ -2429,7 +2449,7 @@ private fun RecordState.endingCall(clockEnded: Boolean, prepCase: PrepCase, spok
 /**
  * Which instant the rest after this set runs from.
  *
- * Free function for [openSession]'s reason, and asked ONCE at the freeze because
+ * Free function for [sessionOpeningOf]'s reason, and asked ONCE at the freeze because
  * two readers take it: the countdown the lifter watches and the heart-rate window
  * the archive publishes as the next set's `rest_before_hrm`. Computing it twice
  * is how those two come to disagree, which is the defect #178 measured at
@@ -2459,7 +2479,7 @@ private data class TimedEnd(val seconds: Int, val endedBy: HoldEndSource, val re
 
 /**
  * The rest-screen state the set just written leaves behind. Free function for
- * [openSession]'s reason.
+ * [sessionOpeningOf]'s reason.
  *
  * queue[queueIndex + 1] has not been through startNextSet's bake yet, so its
  * loadKg is still the plan's declaration. That is the field to seed from, not
@@ -2709,7 +2729,7 @@ private fun restingState(
 
 /**
  * The state one tap of a tempo stepper leaves behind. Free function for
- * [openSession]'s reason.
+ * [sessionOpeningOf]'s reason.
  *
  * The tempo the tapped digit belongs to is read from [RecordState.statedTempo]
  * falling back to the upcoming slot's own declaration -- the same expression
@@ -2742,7 +2762,7 @@ private fun tempoAdjustedState(s: RecordState, position: Int, value: String): Re
 
 /**
  * The state starting an ad-hoc session leaves behind. Free function for
- * [openSession]'s reason, and because the added argument would push the call
+ * [sessionOpeningOf]'s reason, and because the added argument would push the call
  * past 120 characters: the wrap costs five code lines against the size limit
  * where moving the whole expression out costs none.
  *
@@ -2764,7 +2784,7 @@ private fun adHocSessionState(s: RecordState): RecordState = s.copy(
 
 /**
  * The state tapping through to the next planned set leaves behind, with any
- * in-rest edits applied. Free function for [openSession]'s reason.
+ * in-rest edits applied. Free function for [sessionOpeningOf]'s reason.
  *
  * [RecordState.statedTempo] travels with [RecordState.statedLoadKg] through
  * both branches and for the same reasons, one field over.
@@ -5423,15 +5443,6 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     else -> SetAnalysis(emptyList(), 0.0, null, null, listOf("No sensor data recorded."))
                 }
             }
-        // A session row created here and then left behind by a failed insert
-        // stays open with endedAtMs null. A retry reclaims it, because sessionId
-        // is read back from state; nothing reclaims it if the lifter never
-        // retries. Named in the commit body rather than covered by the word
-        // atomic: the transaction spans the set and its streams, not this.
-        val sessionId =
-            stateFlow.value.sessionId
-                ?: openSession(sessionRepository, p).also { stateFlow.value = stateFlow.value.copy(sessionId = it) }
-
         sessionRepository.ensureExerciseExists(p.exercise.id)
 
         // Stopped early = failed. Judged only where the count is trustworthy:
@@ -5479,11 +5490,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // an update, so there is no second statement left to fail after the row
         // has landed.
         val setId =
-            writtenSetId ?: sessionRepository.recordSet(
-                sessionId = sessionId,
-                orderIdx = p.orderIdx,
-                set = completedSetOf(p, analysis, written),
-            ).also { writtenSetId = it }
+            writtenSetId ?: recordPendingSet(sessionRepository, stateFlow, p, completedSetOf(p, analysis, written))
+                .also { writtenSetId = it }
         ratings.attachTo(setId)
         // The row and every stream belonging to it are in one transactional
         // call above, so reaching here is the first moment the capture is
