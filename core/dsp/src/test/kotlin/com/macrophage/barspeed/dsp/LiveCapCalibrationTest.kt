@@ -1,10 +1,12 @@
 package com.macrophage.barspeed.dsp
 
 import com.macrophage.barspeed.model.ImuSample
+import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.StartPhase
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * What an upper displacement bound on the LIVE path would remove, what it would
@@ -307,6 +309,29 @@ class LiveCapCalibrationTest {
         assertEquals(22, overCap.size, "over-cap live runs across the corpus")
         assertEquals(11, overCap.count { it.durationS > bound }, "of those, ones that outlast the bound")
         assertEquals(51.14, overCap.maxOf { it.durationS }, 5e-2, "the longest, on field-reardeltfly-s32-set06")
+    }
+
+    @Test
+    fun `no movement label outlasts the phase label bound on any capture`() {
+        // The behaviour #95 asks for, on the published state itself rather
+        // than the model: while [LiveSetState.phase] names a movement, the run
+        // it names has lasted no longer than the bound. Before #95 the label
+        // was held for the whole of every run however long it lasted, 51.16 s
+        // on field-reardeltfly-s32-set06 and 24.29 s on
+        // field-bench-rotating-6rep.
+        val c = DspConfig()
+        val bound = StreamingSetTracker.MAX_LABELLED_RUN_S
+        corpus.forEach { (file, d, _) ->
+            val tracker = StreamingSetTracker.forLift(d, c)
+            var longest = 0.0
+            load(file).forEach { sample ->
+                val state = tracker.feed(sample)
+                if (state.phase == Phase.ECCENTRIC || state.phase == Phase.CONCENTRIC) {
+                    longest = maxOf(longest, state.currentPhaseElapsedS)
+                }
+            }
+            assertTrue(longest <= bound, "$file: a movement label held for $longest s, past the $bound s bound")
+        }
     }
 
     @Test
