@@ -175,13 +175,18 @@ object LiveCounterPolicy {
      * ## [startsWith]
      *
      * The phase the set's geometry declares first, `LiftDirection.startsWith`
-     * in `:core:dsp`. Both phases run [LiveCounter.CYCLE] today; it is a
-     * parameter so the row that splits them is one line of this `when`.
+     * in `:core:dsp`. A concentric-first set -- the deadlift off the floor,
+     * the press, the row -- runs [LiveCounter.CYCLE], which every paragraph
+     * above is about. An eccentric-first one -- the squat, the bench press,
+     * the Romanian deadlift -- runs [LiveCounter.LOCKOUT] since the owner's
+     * 2026-11-06 session, where the full-cycle rule called his walk-out as
+     * rep 1, every squat a rep late and the last on the rack, and dropped
+     * two of five reps on the empty bar.
      */
     fun counterFor(counter: RepCounter, startsWith: StartPhase): LiveCounter? = when (counter) {
         RepCounter.SENSOR -> when (startsWith) {
             StartPhase.CONCENTRIC -> LiveCounter.CYCLE
-            StartPhase.ECCENTRIC -> LiveCounter.CYCLE
+            StartPhase.ECCENTRIC -> LiveCounter.LOCKOUT
         }
         RepCounter.MANUAL, RepCounter.METRONOME, RepCounter.NOBODY -> null
     }

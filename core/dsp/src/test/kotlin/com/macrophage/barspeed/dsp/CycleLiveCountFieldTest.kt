@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.dsp
 
 import com.macrophage.barspeed.model.RepCounter
+import com.macrophage.barspeed.model.StartPhase
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -54,8 +55,8 @@ class CycleLiveCountFieldTest {
     private fun r2(x: Double) = Math.round(x * 100) / 100.0
 
     @Test
-    fun `a sensor-counted set arms the full-cycle counter`() {
-        val counter = LiveRepCounters.forCounted(RepCounter.SENSOR, LiftDirection())
+    fun `a sensor-counted concentric-first set arms the full-cycle counter`() {
+        val counter = LiveRepCounters.forCounted(RepCounter.SENSOR, LiftDirection(startsWith = StartPhase.CONCENTRIC))
         assertTrue(counter is CycleRepCounter, "a sensor-counted set arms ${counter?.javaClass?.simpleName}")
     }
 
