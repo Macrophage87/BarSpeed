@@ -159,28 +159,52 @@ class DatabaseRestoreTest {
     }
 
     /**
-     * The restored database turns out corrupt: it is set aside, the framework
-     * creates an empty one at the path, and THAT opens. The open must not
-     * confirm the restore; the next launch undoes it and the database from
-     * before the restore comes back. Nothing is lost: the corrupt restored
-     * database is in its own rescue. UX review 2026-11-06, data-layer F2.
+     * The hazard behind the guard, pinned: a corruption set-aside cut off
+     * after the log moved, while the restore is still UNVERIFIED. The next
+     * launch's undo puts the database from before the restore back, with the
+     * restored database's log stranded in the set-aside's folder; the rescue
+     * that launch then tries to finish from its marker meets the database
+     * from before the restore's own log, finds that name taken, and is
+     * Failed -- on which `AppDatabase.build` refuses to open, on every
+     * launch. This is why `SetAsideOnCorruption` moves nothing while
+     * [DatabaseRestore.journalPresent] is true. Review of 95acd6a,
+     * data-layer F2.
      */
     @Test
-    fun `an open after the restored database was set aside as corrupt does not confirm the restore`() {
+    fun `a set-aside cut off during an unverified restore would stop every launch, so a restore blocks it`() {
         standardSetup()
         restore().request(item("db-1000"))
         assertEquals(RestoreOutcome.Swapped, restore().prepare())
-        assertIs<RescueOutcome.Rescued>(DatabaseRescue.setAside(live, rescueRoot, now = { 7_000L }))
-        database(liveDir, 20, "empty", wal = false)
+        assertTrue(restore().journalPresent(), "the guard does not see the unconfirmed restore")
 
-        assertFalse(restore().markOpened(setAsideForCorruption = true))
-        assertTrue(File(rescueRoot, DatabaseRestore.JOURNAL).exists(), "the empty open confirmed the restore")
+        val failMain: (File, File) -> Boolean = { source, dest ->
+            source.name != DATABASE_NAME && source.renameTo(dest)
+        }
+        assertIs<RescueOutcome.Failed>(DatabaseRescue.setAside(live, rescueRoot, move = failMain, now = { 7_000L }))
+        assertEquals(RestoreOutcome.Undone, restore().prepare())
+
+        assertIs<RescueOutcome.Failed>(DatabaseRescue.rescue(live, rescueRoot, 20), "the hazard did not reproduce")
+        assertIs<RescueOutcome.Failed>(DatabaseRescue.rescue(live, rescueRoot, 20), "a second launch got past it")
+    }
+
+    /**
+     * What the guard leaves instead: the corrupt restored database stays at
+     * the path, the open throws, and the next launch's undo restores both
+     * databases whole -- the one from before the restore at the path, the
+     * restored one back in its rescue -- and the confirmed open after it
+     * leaves no journal for the guard to see.
+     */
+    @Test
+    fun `a corrupt restore left in place is undone whole and the guard then stands down`() {
+        val before = standardSetup()
+        restore().request(item("db-1000"))
+        assertEquals(RestoreOutcome.Swapped, restore().prepare())
+        assertTrue(restore().journalPresent())
 
         assertEquals(RestoreOutcome.Undone, restore().prepare())
-        assertEquals("live", mainTag(live), "the database from before the restore did not come back")
-        assertEquals("wal of live", File(liveDir, "$DATABASE_NAME-wal").readText())
-        assertEquals("old", mainTag(File(rescueRoot, "db-7000/$DATABASE_NAME")), "the restored database was lost")
-        assertEquals("wal of old", File(rescueRoot, "db-7000/$DATABASE_NAME-wal").readText())
+        assertOriginal(before)
+        assertFalse(File(rescueRoot, DatabaseRescue.PENDING).exists(), "a rescue was started over the undo")
+        assertFalse(restore().journalPresent(), "the guard would refuse every later corruption set-aside")
     }
 
     /** Room creates a -shm (and may a -wal) when it opens; an undo carries those with the restored set. */

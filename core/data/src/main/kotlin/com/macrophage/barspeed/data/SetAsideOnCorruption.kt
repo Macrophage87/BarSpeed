@@ -4,7 +4,6 @@ import android.util.Log
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import java.io.File
-import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Room's open-helper callback with ONE change: a database SQLite reports as
@@ -23,9 +22,16 @@ import java.util.concurrent.atomic.AtomicBoolean
  * the files are still on disk; an unfinished move is completed by the next
  * launch's [DatabaseRescue.rescue] from its marker.
  *
- * [setAside] is set once a database has been moved, so the open that follows
- * -- of the EMPTY database the framework creates in its place -- does not
- * confirm a restore that was in progress ([DatabaseRestore.markOpened]).
+ * NOTHING MOVES WHILE A RESTORE IS UNDER WAY. When [restoreInProgress] says
+ * a restore journal is on disk, this closes the database and THROWS without
+ * moving anything: the journal records where every file of both databases
+ * belongs, and the next launch's undo puts them back by those names --
+ * the corrupt restored database into its own rescue, the one from before it
+ * back at the path. A set-aside in between would move the same files into a
+ * third directory, and one cut off partway would leave the undo refusing a
+ * taken destination on every launch. Review of 95acd6a. This replaces a flag
+ * that stopped the empty replacement's open from confirming the restore;
+ * with nothing moved there is no empty replacement to open.
  *
  * Compile- and lint-gated only: nothing in this repository can make SQLite
  * report corruption, and whether the framework calls this on every route a
@@ -34,7 +40,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 internal class SetAsideOnCorruption(
     private val delegate: SupportSQLiteOpenHelper.Callback,
     private val rescueRoot: File,
-    private val setAside: AtomicBoolean,
+    private val restoreInProgress: () -> Boolean,
 ) : SupportSQLiteOpenHelper.Callback(delegate.version) {
     override fun onConfigure(db: SupportSQLiteDatabase) = delegate.onConfigure(db)
 
@@ -60,11 +66,13 @@ internal class SetAsideOnCorruption(
         }
         // An in-memory database has no file to keep.
         if (path == null || path == ":memory:") return
+        check(!restoreInProgress()) {
+            "corrupt while a restore is under way; left in place for the next launch to undo the restore"
+        }
         val outcome = DatabaseRescue.setAside(File(path), rescueRoot)
         check(outcome is RescueOutcome.Rescued) {
             "a corrupt database could not be moved aside, and was not deleted: $outcome"
         }
-        setAside.set(true)
     }
 
     private companion object {

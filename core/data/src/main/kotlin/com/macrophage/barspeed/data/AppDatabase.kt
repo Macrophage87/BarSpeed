@@ -10,7 +10,6 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import java.io.File
-import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * The schema version this build knows, in one place.
@@ -861,9 +860,6 @@ abstract class AppDatabase : RoomDatabase() {
             check(rescued !is RescueOutcome.Failed) {
                 "a newer database could not be moved aside, or a rescue could not be finished: $rescued"
             }
-            // Set when a corrupt database has been moved aside in this process,
-            // so the empty one opened in its place confirms no restore.
-            val setAsideForCorruption = AtomicBoolean(false)
             return Room.databaseBuilder(context, AppDatabase::class.java, DATABASE_NAME)
                 // One at a time rather than a spread: detekt's `SpreadOperator`
                 // is on, and a copy of the array per open is a cost with no
@@ -877,7 +873,7 @@ abstract class AppDatabase : RoomDatabase() {
                         SupportSQLiteOpenHelper.Configuration(
                             config.context,
                             config.name,
-                            SetAsideOnCorruption(config.callback, rescueRoot, setAsideForCorruption),
+                            SetAsideOnCorruption(config.callback, rescueRoot, restore::journalPresent),
                             config.useNoBackupDirectory,
                             config.allowDataLossOnRecovery,
                         ),
@@ -890,7 +886,7 @@ abstract class AppDatabase : RoomDatabase() {
                         // restore never verified here is undone next launch.
                         override fun onOpen(db: SupportSQLiteDatabase) {
                             checkpoint(db)
-                            if (!restore.markOpened(setAsideForCorruption = setAsideForCorruption.get())) {
+                            if (!restore.markOpened()) {
                                 Log.w(TAG, "a restored database opened but its journal stayed; next launch undoes it")
                             }
                         }

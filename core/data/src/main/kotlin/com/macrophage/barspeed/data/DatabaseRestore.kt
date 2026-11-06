@@ -214,22 +214,26 @@ class DatabaseRestore(
      * since go back with the restored database into its rescue -- but the
      * rescue is marked as undone, and the lifter sees the restore reversed
      * with no reason given. Round 1 review, A6.
-     *
-     * [setAsideForCorruption] is true when SQLite reported the database
-     * corrupt in this process and it was moved into a rescue
-     * (`SetAsideOnCorruption`). What opened then is the EMPTY database the
-     * framework created in its place, and that proves nothing about the
-     * restored one, so an UNVERIFIED journal is left standing and this
-     * returns false: the next launch undoes the restore and the database
-     * that was in place before it comes back. Without this, the empty open
-     * would confirm the restore and History would stay empty, with the
-     * database from before the restore left as a rescue. UX review
-     * 2026-11-06, data-layer F2.
      */
-    fun markOpened(setAsideForCorruption: Boolean = false): Boolean = runCatching {
-        val unverified = readJournal()?.phase == RestorePhase.UNVERIFIED
-        !unverified || (!setAsideForCorruption && journalFile.delete())
+    fun markOpened(): Boolean = runCatching {
+        readJournal()?.phase != RestorePhase.UNVERIFIED || journalFile.delete()
     }.getOrDefault(false)
+
+    /**
+     * Whether a restore journal is on disk, in any phase, readable or not:
+     * files are mid-swap or the swap is not yet confirmed by an open.
+     *
+     * `SetAsideOnCorruption` asks this before moving a corrupt database, and
+     * refuses to move it while this is true. The journal names where every
+     * file of both databases belongs, and the next launch's undo moves them
+     * by those names; a set-aside moving the same files into a third
+     * directory -- worst of all one cut off partway -- leaves that undo
+     * refusing a destination that is already taken on every launch, or
+     * finding nothing to put back. Left in place instead, the undo restores
+     * both databases, the corrupt one into its own rescue. Review of 95acd6a,
+     * data-layer F2.
+     */
+    fun journalPresent(): Boolean = journalFile.exists()
 
     private fun begin(): RestoreOutcome {
         val name = pendingRequest()
