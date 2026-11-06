@@ -65,6 +65,64 @@ class SchemaRecoveredContractTest {
         }
     }
 
+    private fun logEntry(): String = schema.getValue("properties").jsonObject.getValue("schemaVersion").jsonObject
+        .getValue("description").jsonPrimitive.content
+        .substringAfter("1.26 (#100, recovered set)")
+        .substringBefore("Under 1.26 and not a mint")
+
+    private val guide: String =
+        checkNotNull(
+            javaClass.getResourceAsStream("/kotlin/com/macrophage/barspeed/ui/screens/GuideScreen.kt"),
+        ) { "GuideScreen.kt is not on the test classpath - see the include filter in core/model/build.gradle.kts" }
+            .readBytes().decodeToString()
+
+    /**
+     * Whose count a recovered set's reps are (#100 review round 1, Lens A B1
+     * and Lens B B2). The declarations said "the segmenter's" on every
+     * recovered set, which is false wherever the lifter or the guide counted
+     * it: those reps are the journaled tally, stated.
+     */
+    @Test
+    fun `both declarations and the log say whose count a recovered set's reps are`() {
+        val texts =
+            listOf(
+                "session-export" to declaration(schema).getValue("description").jsonPrimitive.content,
+                "raw-meta" to declaration(raw).getValue("description").jsonPrimitive.content,
+                "the 1.26 log entry" to logEntry(),
+            )
+        for ((name, text) in texts) {
+            assertTrue("the lifter's or the guide's journaled count" in text, "$name does not name the tally")
+            assertTrue("segmenter's" in text, "$name does not name the sensor-counted case")
+        }
+    }
+
+    /**
+     * A recovered set carries no silence word, and both declarations say so
+     * (#100 review round 1, Lens A B2): the published `sensors` contract
+     * reads an absent block as one sensor whose stream the analysis could
+     * run on, which a recovered marks-only set is not.
+     */
+    @Test
+    fun `both declarations say a recovered set carries no silence word`() {
+        for ((name, document) in listOf("session-export" to schema, "raw-meta" to raw)) {
+            val description = declaration(document).getValue("description").jsonPrimitive.content
+            assertTrue("no silence word" in description, "$name does not say a recovered set has no silence word")
+            assertTrue("does not mean the stream was analysable" in description, "$name leaves the absence unread")
+        }
+    }
+
+    /**
+     * The reader the app hands its export is told what a recovered set is
+     * (#100 review round 1, Lens B B3), and the two sentences a recovered
+     * set would make false are qualified: an absent `workingReps` and an
+     * absent `sensors` block.
+     */
+    @Test
+    fun `the analysis prompt explains a recovered set`() {
+        assertTrue("- \"recovered\": true" in guide, "the prompt has no recovered bullet")
+        assertEquals(2, Regex("""except on a set carrying "recovered": true""").findAll(guide).count())
+    }
+
     private companion object {
         const val KEY = "recovered"
     }
