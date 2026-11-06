@@ -8,8 +8,8 @@ import com.macrophage.barspeed.model.RepCounter
  * What a live rep counter is, from the caller's side: one published sample in, a
  * [RepCall] out.
  *
- * Three implementations -- [LiveRepCaller], [DriveImpulseCounter] and
- * [CycleRepCounter]. The interface exists so `:app` can hold a counter without
+ * Four implementations -- [LiveRepCaller], [DriveImpulseCounter],
+ * [CycleRepCounter] and [LockoutRepCounter]. The interface exists so `:app` can hold a counter without
  * knowing which one it holds; WHICH one is `LiveCounterPolicy`'s decision, in
  * `:core:model` where a test runs on it.
  */
@@ -36,6 +36,7 @@ object LiveRepCounters {
         LiveCounter.SEGMENTER -> LiveRepCaller(direction, config)
         LiveCounter.DRIVE_IMPULSE -> DriveImpulseCounter(direction, config)
         LiveCounter.CYCLE -> CycleRepCounter(direction, config)
+        LiveCounter.LOCKOUT -> LockoutRepCounter(direction, config)
     }
 
     /**
@@ -48,5 +49,5 @@ object LiveRepCounters {
      * function instead of an `if` beside a `when`.
      */
     fun forCounted(counter: RepCounter, direction: LiftDirection, config: DspConfig = DspConfig()): LiveRepCounter? =
-        LiveCounterPolicy.counterFor(counter)?.let { of(it, direction, config) }
+        LiveCounterPolicy.counterFor(counter, direction.startsWith)?.let { of(it, direction, config) }
 }

@@ -52,7 +52,7 @@ class LiveCounterPolicyTest {
     fun `a sensor-counted set runs the cycle counter and no other set runs one`() {
         assertEquals(
             listOf(LiveCounter.CYCLE, null, null, null),
-            RepCounter.entries.map { LiveCounterPolicy.counterFor(it) },
+            RepCounter.entries.map { LiveCounterPolicy.counterFor(it, StartPhase.CONCENTRIC) },
             "the live detector for SENSOR, MANUAL, METRONOME, NOBODY in that order",
         )
     }
@@ -80,7 +80,7 @@ class LiveCounterPolicyTest {
         assertEquals(RepCounter.SENSOR, counter, "who counts a straight-reps set with a sensor on")
         assertEquals(
             LiveCounter.CYCLE,
-            LiveCounterPolicy.counterFor(counter),
+            LiveCounterPolicy.counterFor(counter, StartPhase.CONCENTRIC),
             "and which detector that counter runs",
         )
     }
@@ -101,7 +101,9 @@ class LiveCounterPolicyTest {
             imuConnected = true,
         )
         assertEquals(RepCounter.METRONOME, counter, "who counts a tempo'd set")
-        assertNull(LiveCounterPolicy.counterFor(counter), "the live detector a tempo'd set feeds")
+        for (start in StartPhase.entries) {
+            assertNull(LiveCounterPolicy.counterFor(counter, start), "the live detector a tempo'd $start set feeds")
+        }
     }
 
     /**
@@ -143,7 +145,8 @@ class LiveCounterPolicyTest {
                     for (imuConnected in listOf(false, true)) {
                         val prep = LeadInPolicy.prepCase(hasTempo, isTimed, kind)
                         val counter = CountingPolicy.counterFor(hasTempo, isTimed, kind, imuConnected)
-                        if (prep != PrepCase.NONE && LiveCounterPolicy.counterFor(counter) != null) {
+                        val armed = StartPhase.entries.any { LiveCounterPolicy.counterFor(counter, it) != null }
+                        if (prep != PrepCase.NONE && armed) {
                             both += "tempo=$hasTempo timed=$isTimed $kind imu=$imuConnected: $prep, $counter"
                         }
                     }
@@ -166,6 +169,7 @@ class LiveCounterPolicyTest {
                     kind = ExerciseKind.DYNAMIC,
                     imuConnected = true,
                 ),
+                StartPhase.CONCENTRIC,
             ),
             "a straight-reps dynamic set with a sensor arms a live counter",
         )
