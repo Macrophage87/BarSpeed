@@ -37,7 +37,7 @@ class PlanImportLenientTextTest {
 
     @Test
     fun `a leading byte-order mark is ignored`() {
-        assertAccepted("﻿" + bare)
+        assertAccepted("\uFEFF" + bare)
     }
 
     @Test
@@ -52,7 +52,7 @@ class PlanImportLenientTextTest {
 
     @Test
     fun `whitespace, CRLF line ends and a BOM round a fence are all ignored`() {
-        assertAccepted("﻿\r\n  ```json\r\n$bare\r\n```  \r\n")
+        assertAccepted("\uFEFF\r\n  ```json\r\n$bare\r\n```  \r\n")
     }
 
     @Test
@@ -63,7 +63,7 @@ class PlanImportLenientTextTest {
         val withExtra = bare.replace("\"planName\":\"P\"", "\"planName\":\"P\",\"coachNote\":\"x\"")
         val bareWarnings = PlanImport.parse(withExtra).warnings
         assertTrue(bareWarnings.isNotEmpty())
-        assertEquals(bareWarnings, PlanImport.parse("﻿```json\n$withExtra\n```").warnings)
+        assertEquals(bareWarnings, PlanImport.parse("\uFEFF```json\n$withExtra\n```").warnings)
     }
 
     @Test

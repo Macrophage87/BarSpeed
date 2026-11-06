@@ -53,7 +53,7 @@ class SaveToPhonePolicyTest {
 
     /**
      * THE DEFECT (#37's second path). Two pickers stacked by a quick second
-     * tap: JSON, then Raw CSV. Each build replaced the one set of held bytes,
+     * tap: JSON, then Raw zip. Each build replaced the one set of held bytes,
      * so the first picker to return wrote the zip into the .json document,
      * and the second found nothing held and refused, deleting its file. Bytes
      * held for another export are not this picker's: it builds its own.

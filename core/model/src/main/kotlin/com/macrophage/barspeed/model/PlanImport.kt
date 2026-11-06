@@ -54,7 +54,7 @@ object PlanImport {
      * text is a different rule from peeling off a known wrapper.
      */
     internal fun unwrap(text: String): String {
-        var body = text.removePrefix("﻿").trim()
+        var body = text.removePrefix("\uFEFF").trim()
         if (body.startsWith(FENCE) && body.endsWith(FENCE) && body.length >= 2 * FENCE.length) {
             val firstLineEnd = body.indexOf('\n')
             val info = if (firstLineEnd < 0) "" else body.substring(FENCE.length, firstLineEnd).trim()
