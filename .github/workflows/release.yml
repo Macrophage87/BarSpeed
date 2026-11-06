@@ -24,7 +24,8 @@ jobs:
       # ${{ }} text inside a run block: a dispatch input is free text.
       RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
     # Secrets live on the one step that uses each of them, never in job-level
-    # env, so no other step (third-party actions, Gradle plugins) can read them.
+    # env. The decoded keystore file is deleted right after the signed build,
+    # before any third-party action runs, and again at job end whatever failed.
     steps:
       - uses: actions/checkout@v7
 
@@ -61,11 +62,19 @@ jobs:
       - name: Unit tests and minified release build
         run: ./gradlew test :app:assembleRelease --stacktrace
 
-      - name: Decode signing keystore (if configured)
-        if: ${{ steps.secrets.outputs.has_keystore == 'true' }}
+      # A release without the keystore would be unsigned and fail later at the
+      # copy step with a confusing message; say why here instead.
+      - name: Decode signing keystore
         env:
+          HAS_KEYSTORE: ${{ steps.secrets.outputs.has_keystore }}
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-        run: echo "$KEYSTORE_BASE64" | base64 -d > app/release.keystore
+        run: |
+          set -euo pipefail
+          if [ "$HAS_KEYSTORE" != "true" ]; then
+            echo "::error::KEYSTORE_BASE64 secret is not set -- a release must be signed" >&2
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > app/release.keystore
 
       # Google Play takes only an Android App Bundle, never an APK. The same
       # signing config signs both, so the .aab is signed with the key the APK
@@ -79,6 +88,12 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: ./gradlew :app:assembleRelease :app:bundleRelease --stacktrace
+
+      # The signed outputs exist now; the key file is not needed again, so it
+      # is gone before action-gh-release and upload-google-play run.
+      - name: Delete the decoded keystore
+        if: always()
+        run: rm -f app/release.keystore
 
       # Gradle always writes app-release.apk, so every download collides in the
       # Downloads folder and none of them says which app or which version it is.
@@ -112,6 +127,9 @@ jobs:
         uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           tag_name: ${{ env.RELEASE_TAG }}
+          # A dispatch creates the tag here; without this GitHub would put it on
+          # main's HEAD at this moment, not on the commit that was built.
+          target_commitish: ${{ github.sha }}
           files: |
             release-artifacts/BarSpeed-*.apk
             release-artifacts/BarSpeed-*.aab
@@ -138,7 +156,8 @@ jobs:
           status: completed
           releaseName: ${{ env.RELEASE_TAG }}
 
-      # The decoded upload key must not outlive the job, whatever failed above.
-      - name: Delete the decoded keystore
+      # Belt and braces: the decoded upload key must not outlive the job,
+      # whatever failed above.
+      - name: Delete the decoded keystore at job end
         if: always()
         run: rm -f app/release.keystore
