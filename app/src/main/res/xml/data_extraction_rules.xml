@@ -9,6 +9,8 @@
       file      datastore/devices.preferences_pb         core/ble DeviceRegistry, preferencesDataStore("devices")
       file      inflight/                                LiftingApp, SetJournalStore
       file      rescued/                                 core/data DatabaseRescue.RESCUE_DIR
+                rescued/rescue.pending                   DatabaseRescue.PENDING
+                rescued/restore.request, restore.journal DatabaseRestore.REQUEST, JOURNAL
       file      crashes/                                 core/model CrashLogPolicy.DIR
       root      cache/                                   share exports (cache/exports)
 
@@ -42,12 +44,23 @@
                      up as an interrupted set on the new one;
           crashes/   diagnostics about the old install;
           cache/     share exports, rebuilt on demand.
-        rescued/ does transfer: a rescued database may be the only copy of
-        history a failed migration set aside.
+          rescued/ bookkeeping (DatabaseRescue.PENDING, DatabaseRestore.REQUEST
+                     and JOURNAL, and their .tmp siblings): a restore request
+                     or a half-done rescue from the old phone would start a
+                     database swap on the new one that nobody asked for there.
+        The rescued/db-* copies themselves do transfer, with restore.failed:
+        a rescued database may be the only copy of history a failed
+        migration set aside, and the Home card still offers it.
     -->
     <device-transfer>
         <exclude domain="file" path="inflight/" />
         <exclude domain="file" path="crashes/" />
+        <exclude domain="file" path="rescued/rescue.pending" />
+        <exclude domain="file" path="rescued/rescue.pending.tmp" />
+        <exclude domain="file" path="rescued/restore.request" />
+        <exclude domain="file" path="rescued/restore.request.tmp" />
+        <exclude domain="file" path="rescued/restore.journal" />
+        <exclude domain="file" path="rescued/restore.journal.tmp" />
         <exclude domain="root" path="cache/" />
     </device-transfer>
 </data-extraction-rules>
