@@ -129,9 +129,12 @@ blend of two mountings.
   collectors before it reads the clock, so its last sample is never later
   than the tap -- and that covers a tap-ended guided set (`Stopped`). An
   unguided rep set carries no word that bounds it: with the voice on it records
-  only `Rep N` / `Last rep` milestones (no planned count, as on every
-  sensor-counted set, or a lifter who stops short of it), with the voice
-  off nothing; or, at a reached planned count, `Done` as the rep-count
+  the `Rep N` / `Last rep` milestones (no planned count, as on every
+  sensor-counted set, or a lifter who stops short of it), and on a
+  sensor-counted set also the tempo digits where a tempo was prescribed
+  with no cadence to play it, and `No count` where the live count was
+  withheld (#280); none of these bounds the set. With the voice off it
+  records nothing; or, at a reached planned count, `Done` as the rep-count
   milestone (#285), which is not a call to stop lifting and opens no
   closing window, though the lifter's extra reps past it are samples past
   a cue `calledOver` counts as terminal. A clock-ended timed set (`Time`)
