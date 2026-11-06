@@ -360,8 +360,13 @@ private fun HistoryHeader(
         }
     }
     if (progress != null) {
-        val fraction = if (progress.total > 0) progress.done.toFloat() / progress.total else 0f
-        LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
+        if (progress.total > 0) {
+            val fraction = progress.done.toFloat() / progress.total
+            LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
+        } else {
+            // The session count is not known yet: indeterminate, not a bar at 0.
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
         Text(
             if (progress.total > 0) "Exporting ${progress.done} of ${progress.total} sessions" else "Exporting",
             style = MaterialTheme.typography.bodySmall,

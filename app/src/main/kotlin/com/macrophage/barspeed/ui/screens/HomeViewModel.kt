@@ -30,6 +30,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -890,6 +891,15 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      * must not take the app down mid-export. CancellationException is
      * rethrown.
      *
+     * NOTHING INCOMPLETE IS LEFT WHERE THE APP CAN HELP IT. If every
+     * session fails, the empty archive is deleted and the line says nothing
+     * was saved. If the export is cancelled (the lifter leaves Home and the
+     * ViewModel is cleared), `use` closes the archive into a well-formed but
+     * incomplete zip, so it is deleted under NonCancellable before the
+     * cancellation propagates. Process death mid-export runs none of this
+     * and can still leave a truncated file at [uri]; nothing here can
+     * prevent that.
+     *
      * Null [uri] is the picker cancelled. A second call while one runs is
      * ignored; the screen also disables the action.
      *
@@ -933,20 +943,34 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                             }
                         }
                     }
-                    ExportNaming.allSessionsSummary(exported, failed)
+                    if (exported == 0) {
+                        deleteArchive(app, uri)
+                        "Export failed: no session could be built. Nothing was saved."
+                    } else {
+                        ExportNaming.allSessionsSummary(exported, failed)
+                    }
                 } catch (e: CancellationException) {
+                    // ZipOutputStream.use has already closed the archive, so
+                    // what is on disk is a well-formed zip missing the rest:
+                    // remove it rather than leave it to pass for complete.
+                    withContext(NonCancellable) { deleteArchive(app, uri) }
                     throw e
                 } catch (e: Throwable) {
                     AppLog.w(TAG, "export all failed; removing the partial archive", e)
-                    withContext(Dispatchers.IO) {
-                        runCatching { DocumentsContract.deleteDocument(app.contentResolver, uri) }
-                    }
+                    deleteArchive(app, uri)
                     "Export failed: ${e.message ?: e.javaClass.simpleName}. Nothing was saved."
                 } finally {
                     exportAllFlow.value = null
                 }
             exportAllMessageFlow.value = message
             Toast.makeText(app, message, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    /** Delete the picked document; a provider that refuses leaves it, and nothing more can be done here. */
+    private suspend fun deleteArchive(app: Application, uri: Uri) {
+        withContext(Dispatchers.IO) {
+            runCatching { DocumentsContract.deleteDocument(app.contentResolver, uri) }
         }
     }
 
