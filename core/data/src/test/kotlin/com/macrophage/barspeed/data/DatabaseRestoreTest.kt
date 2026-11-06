@@ -158,6 +158,31 @@ class DatabaseRestoreTest {
         )
     }
 
+    /**
+     * The restored database turns out corrupt: it is set aside, the framework
+     * creates an empty one at the path, and THAT opens. The open must not
+     * confirm the restore; the next launch undoes it and the database from
+     * before the restore comes back. Nothing is lost: the corrupt restored
+     * database is in its own rescue. UX review 2026-11-06, data-layer F2.
+     */
+    @Test
+    fun `an open after the restored database was set aside as corrupt does not confirm the restore`() {
+        standardSetup()
+        restore().request(item("db-1000"))
+        assertEquals(RestoreOutcome.Swapped, restore().prepare())
+        assertIs<RescueOutcome.Rescued>(DatabaseRescue.setAside(live, rescueRoot, now = { 7_000L }))
+        database(liveDir, 20, "empty", wal = false)
+
+        assertFalse(restore().markOpened(setAsideForCorruption = true))
+        assertTrue(File(rescueRoot, DatabaseRestore.JOURNAL).exists(), "the empty open confirmed the restore")
+
+        assertEquals(RestoreOutcome.Undone, restore().prepare())
+        assertEquals("live", mainTag(live), "the database from before the restore did not come back")
+        assertEquals("wal of live", File(liveDir, "$DATABASE_NAME-wal").readText())
+        assertEquals("old", mainTag(File(rescueRoot, "db-7000/$DATABASE_NAME")), "the restored database was lost")
+        assertEquals("wal of old", File(rescueRoot, "db-7000/$DATABASE_NAME-wal").readText())
+    }
+
     /** Room creates a -shm (and may a -wal) when it opens; an undo carries those with the restored set. */
     @Test
     fun `an undo carries files the open created back with the restored database`() {

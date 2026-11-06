@@ -214,9 +214,21 @@ class DatabaseRestore(
      * since go back with the restored database into its rescue -- but the
      * rescue is marked as undone, and the lifter sees the restore reversed
      * with no reason given. Round 1 review, A6.
+     *
+     * [setAsideForCorruption] is true when SQLite reported the database
+     * corrupt in this process and it was moved into a rescue
+     * (`SetAsideOnCorruption`). What opened then is the EMPTY database the
+     * framework created in its place, and that proves nothing about the
+     * restored one, so an UNVERIFIED journal is left standing and this
+     * returns false: the next launch undoes the restore and the database
+     * that was in place before it comes back. Without this, the empty open
+     * would confirm the restore and History would stay empty, with the
+     * database from before the restore left as a rescue. UX review
+     * 2026-11-06, data-layer F2.
      */
-    fun markOpened(): Boolean = runCatching {
-        readJournal()?.phase != RestorePhase.UNVERIFIED || journalFile.delete()
+    fun markOpened(setAsideForCorruption: Boolean = false): Boolean = runCatching {
+        val unverified = readJournal()?.phase == RestorePhase.UNVERIFIED
+        !unverified || (!setAsideForCorruption && journalFile.delete())
     }.getOrDefault(false)
 
     private fun begin(): RestoreOutcome {

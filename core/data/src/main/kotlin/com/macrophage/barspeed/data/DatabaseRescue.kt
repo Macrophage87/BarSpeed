@@ -284,15 +284,69 @@ object DatabaseRescue {
         if (DatabaseDowngradePolicy.decide(stored, compiledVersion) == DatabaseOpenAction.OPEN) {
             return RescueOutcome.NotNeeded
         }
-        val target = File(rescueRoot, "$DIR_PREFIX${System.currentTimeMillis()}")
+        startInto(databaseFile, File(rescueRoot, "$DIR_PREFIX${System.currentTimeMillis()}"), marker, move, deleteMarker)
+    }.getOrElse { RescueOutcome.Failed(it::class.simpleName ?: "unknown") }
+
+    /**
+     * Move a database SQLite has reported CORRUPT into a rescue directory of
+     * its own, whatever its version. UX review 2026-11-06, data-layer F2.
+     *
+     * The framework's own answer to corruption is to DELETE the database and
+     * its sidecars, after which Room creates an empty one: History opens
+     * empty, with no card and no copy anywhere. This is called in its place
+     * (see `SetAsideOnCorruption`), so the damaged file lands where every
+     * other rescue does, under the same `db-<ms>` name, and the rescued card
+     * offers to send it or throw it away. A damaged page can still leave
+     * most of a history readable by a tool off the phone; a deleted file
+     * leaves nothing.
+     *
+     * The same machinery as [rescue], deliberately: [PENDING] is written
+     * before the first move and removed after the last, sidecars move before
+     * the main file, and a taken destination is refused. So a set-aside the
+     * process dies in is finished by the next launch's [rescue] into the
+     * same directory, with no version read.
+     *
+     * [RescueOutcome.Failed] when a rescue is already under way (its marker
+     * is there) -- that one is the launch's to finish, not this call's -- and
+     * on any failure to create, record or move. The caller must then refuse
+     * to go on rather than fall back to deleting. [now] names the directory
+     * and is a parameter only so a test can; a name already taken steps on a
+     * millisecond rather than merging two databases into one directory.
+     */
+    fun setAside(
+        databaseFile: File,
+        rescueRoot: File,
+        move: (source: File, dest: File) -> Boolean = File::renameTo,
+        deleteMarker: (File) -> Boolean = File::delete,
+        now: () -> Long = System::currentTimeMillis,
+    ): RescueOutcome = runCatching {
+        val marker = File(rescueRoot, PENDING)
+        if (marker.exists()) return RescueOutcome.Failed("a rescue is already under way")
+        var stamp = now()
+        while (File(rescueRoot, "$DIR_PREFIX$stamp").exists()) stamp++
+        startInto(databaseFile, File(rescueRoot, "$DIR_PREFIX$stamp"), marker, move, deleteMarker)
+    }.getOrElse { RescueOutcome.Failed(it::class.simpleName ?: "unknown") }
+
+    /**
+     * Create [target], record it in [marker], then move the database into
+     * it. The shared second half of [rescue] and [setAside]; throws only
+     * what [writeSynced] throws, and both callers catch.
+     */
+    private fun startInto(
+        databaseFile: File,
+        target: File,
+        marker: File,
+        move: (source: File, dest: File) -> Boolean,
+        deleteMarker: (File) -> Boolean,
+    ): RescueOutcome {
         if (!target.mkdirs() && !target.isDirectory) {
             return RescueOutcome.Failed("could not create ${target.path}")
         }
         val temp = File(marker.path + ".tmp")
         writeSynced(temp, target.name)
         if (!temp.renameTo(marker)) return RescueOutcome.Failed("could not record the rescue")
-        moveInto(databaseFile, target, marker, move, deleteMarker)
-    }.getOrElse { RescueOutcome.Failed(it::class.simpleName ?: "unknown") }
+        return moveInto(databaseFile, target, marker, move, deleteMarker)
+    }
 
     /**
      * [text] into [file], forced to the storage device before this returns.

@@ -628,6 +628,82 @@ class DatabaseRescueTest {
         }
     }
 
+    // ---- data-layer F2: a corrupt database is set aside, never deleted ------
+
+    /**
+     * SQLite's own answer to corruption deletes the files. [DatabaseRescue.setAside]
+     * moves them, at the CURRENT version -- no version decides anything here --
+     * into a `db-<ms>` directory the rescued card lists as complete.
+     * UX review 2026-11-06, data-layer F2.
+     */
+    @Test
+    fun `a corrupt database at the compiled version is set aside whole, not deleted`() {
+        val file = db(20)
+        val bytes = file.readBytes().toList()
+        File(file.path + "-wal").writeText("wal")
+        File(file.path + "-shm").writeText("shm")
+
+        val dir = assertIsRescued(DatabaseRescue.setAside(file, rescueRoot(), now = { 7_000L }))
+
+        assertEquals(File(rescueRoot(), "db-7000"), dir)
+        assertEquals(bytes, File(dir, file.name).readBytes().toList(), "the database's bytes changed")
+        assertEquals("wal", File(dir, file.name + "-wal").readText())
+        assertEquals("shm", File(dir, file.name + "-shm").readText())
+        assertTrue(!file.exists() && !File(file.path + "-wal").exists(), "a file was left at the path")
+        assertTrue(!File(rescueRoot(), DatabaseRescue.PENDING).exists(), "the marker was left")
+        val listed = RescuedDatabaseStore(rescueRoot()).rescued().single()
+        assertEquals(RescueCompleteness.COMPLETE, listed.completeness)
+        assertEquals(7_000L, listed.rescuedAtMs)
+    }
+
+    /** A name already taken steps on rather than merging two databases into one directory. */
+    @Test
+    fun `a set-aside never moves into a rescue that is already there`() {
+        val taken = File(rescueRoot(), "db-7000").apply { mkdirs() }
+        File(taken, "accelerometer_lifting.db").writeText("an earlier rescue")
+        val file = db(20)
+
+        val dir = assertIsRescued(DatabaseRescue.setAside(file, rescueRoot(), now = { 7_000L }))
+
+        assertEquals(File(rescueRoot(), "db-7001"), dir)
+        assertEquals("an earlier rescue", File(taken, "accelerometer_lifting.db").readText())
+    }
+
+    /**
+     * A set-aside cut off after the log moved is finished by the next
+     * launch's ordinary rescue, into the same directory, although the main
+     * file left behind is at the compiled version and would otherwise open.
+     */
+    @Test
+    fun `a set-aside cut off partway is finished by the next launch, not opened`() {
+        val file = db(20)
+        File(file.path + "-wal").writeText("wal")
+        val failMain: (File, File) -> Boolean = { source, dest -> source.name != file.name && source.renameTo(dest) }
+
+        val first = DatabaseRescue.setAside(file, rescueRoot(), move = failMain, now = { 7_000L })
+        assertTrue(first is RescueOutcome.Failed, "expected Failed, got " + first)
+        assertTrue(file.exists(), "the main file moved although its move failed")
+
+        val dir = assertIsRescued(DatabaseRescue.rescue(file, rescueRoot(), 20))
+        assertEquals(File(rescueRoot(), "db-7000"), dir)
+        assertTrue(File(dir, file.name).isFile && File(dir, file.name + "-wal").isFile, "the set was split")
+        assertTrue(!file.exists(), "the half-moved database was left for Room to open")
+    }
+
+    /** A rescue already under way is the launch's to finish; a set-aside moves nothing over it. */
+    @Test
+    fun `a set-aside with a rescue under way moves nothing`() {
+        File(rescueRoot(), "db-1000").mkdirs()
+        File(rescueRoot(), DatabaseRescue.PENDING).writeText("db-1000")
+        val file = db(20)
+
+        val outcome = DatabaseRescue.setAside(file, rescueRoot(), now = { 7_000L })
+
+        assertTrue(outcome is RescueOutcome.Failed, "expected Failed, got " + outcome)
+        assertTrue(file.exists(), "the database moved")
+        assertTrue(!File(rescueRoot(), "db-7000").exists(), "a second rescue directory was started")
+    }
+
     private fun opens(file: File): Boolean = runCatching { file.inputStream().use { it.read() } }.isSuccess
 
     /**
