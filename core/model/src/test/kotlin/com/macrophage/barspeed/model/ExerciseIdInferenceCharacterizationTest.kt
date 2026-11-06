@@ -43,7 +43,11 @@ class ExerciseIdInferenceCharacterizationTest {
             Row("dumbbell_walking_lunge", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
             Row("snatch_grip_deadlift", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
             Row("clean_grip_deadlift", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
-            Row("snatch_grip_rdl", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            // An RDL starts standing and lowers first, as the seed's
+            // romanian_deadlift says; "snatch" named the grip and used to win
+            // the start phase too. Moved to ECCENTRIC by the RDL veto (core-
+            // model review 2026-11-06, F1).
+            Row("snatch_grip_rdl", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
 
             // --- Olympic variants. These are the reason the slow-lift veto
             // does NOT contain "squat", though issue #24's fix section says it
@@ -67,7 +71,7 @@ class ExerciseIdInferenceCharacterizationTest {
             Row("snatch_pull", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC),
             Row("clean_and_jerk", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC),
             Row("power_clean_from_blocks", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC),
-            Row("romanian_deadlift_snatch_grip", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("romanian_deadlift_snatch_grip", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
             Row("deadlift_snatch_grip", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
 
             // --- every seed id, which resolves by lookup before inference ever runs ---
@@ -76,7 +80,10 @@ class ExerciseIdInferenceCharacterizationTest {
             Row("bench_press", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
             Row("overhead_press", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
             Row("deadlift", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
-            Row("romanian_deadlift", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            // The inference now agrees with the seed (ECCENTRIC); it used to
+            // say CONCENTRIC through "deadlift", which PlanExerciseDef.startsAtTop
+            // reads for a seeded id with a declared drive (F1).
+            Row("romanian_deadlift", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
             Row("barbell_row", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
             Row("hip_thrust", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
             Row("plank", ExerciseKind.HOLD, StartPhase.ECCENTRIC),
@@ -200,8 +207,11 @@ class ExerciseIdInferenceCharacterizationTest {
             // muscle snatch and muscle clean are concentric already through
             // their Olympic word, and an upright row through "row". ---
             Row("push_up", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
-            Row("sit_up", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
-            Row("step_up", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            // sit_up and step_up MOVE to CONCENTRIC through the exact-id
+            // table, not through "up": a sit-up starts lying down and a step-up
+            // starts standing on the floor, and both begin with the drive (F1).
+            Row("sit_up", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("step_up", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
             Row("turkish_get_up", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
             Row("muscle_snatch", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC),
             Row("muscle_clean", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC),
@@ -237,7 +247,9 @@ class ExerciseIdInferenceCharacterizationTest {
             Row("leg_curl", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
             Row("seated_leg_curl", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
             Row("calf_raise", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
-            Row("leg_extension", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            // MOVED (F1): the stack rests at the bottom with the knees bent, and
+            // the first movement is the extension. In robocoach's real plan.
+            Row("leg_extension", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
             Row("cossack_squat", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
             Row("rear_foot_elevated_split_squat", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
             Row("shoulder_press", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
@@ -246,6 +258,58 @@ class ExerciseIdInferenceCharacterizationTest {
             Row("band_pull_apart", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
             Row("bodyweight_squat", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
             Row("dumbbell_bench_press", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+
+            // --- core-model review 2026-11-06, F1: the exact-id start table.
+            // Each of these lifts was checked against where it begins, not
+            // against a word in its id. All of them MOVE.
+            //
+            // Drive first: the lifter starts where the load is at rest (seated,
+            // lying, standing on the floor, stack down, dumbbells at the
+            // shoulders) and the first movement is the concentric one. ---
+            Row("glute_bridge", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("hip_abduction", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("pec_deck", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("tricep_kickback", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("triceps_kickback", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("seated_dumbbell_press", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("arnold_press", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+
+            // --- lowering first, which the substring hints got backwards: an
+            // overhead squat and an overhead extension start with the load
+            // overhead and lower it ("overhead" is a hint for the press); a
+            // Nordic curl starts kneeling upright and lowers, a Jefferson curl
+            // starts standing and rolls down ("curl" is a hint for the arm
+            // curl). ---
+            Row("overhead_squat", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("overhead_triceps_extension", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("overhead_tricep_extension", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("nordic_curl", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("jefferson_curl", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+
+            // --- every RDL spelling agrees with the seed's romanian_deadlift:
+            // the bar is unracked or picked up once, and each rep lowers
+            // first. A veto on the whole "romanian"/"rdl"/"stiff_leg" token,
+            // ahead of "deadlift" and the Olympic words. rdl and dumbbell_rdl
+            // were already right (no hint matched); they are pinned so the veto
+            // is seen not to move them. ---
+            Row("rdl", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("dumbbell_rdl", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("dumbbell_romanian_deadlift", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("single_leg_romanian_deadlift", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("stiff_leg_deadlift", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("stiff_legged_deadlift", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+
+            // --- neighbours the table and the veto must NOT move: a
+            // straight-arm pulldown is a "stiff" arm, not a stiff leg; the
+            // seated overhead press and dumbbell shoulder press keep their
+            // drive-first answer through their hints; a conventional deadlift
+            // and a deficit deadlift still start on the floor. ---
+            Row("stiff_arm_pulldown", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("seated_overhead_press", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("dumbbell_shoulder_press", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("deficit_deadlift", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("sumo_deadlift", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("hamstring_curl", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
         )
 
     @Test
@@ -256,6 +320,19 @@ class ExerciseIdInferenceCharacterizationTest {
     @Test
     fun `inferStartPhase over the id sweep`() {
         sweep.forEach { assertEquals(it.start, ExerciseDef.inferStartPhase(it.id), it.id) }
+    }
+
+    /**
+     * The inference agrees with every seed's own start phase, so an id that
+     * reaches [ExerciseDef.inferStartPhase] despite being seeded --
+     * `PlanExerciseDef.startsAtTop` reads it for any id -- gets the seed's
+     * answer. `romanian_deadlift` was the one that disagreed (F1).
+     */
+    @Test
+    fun `the start inference agrees with every seed's start phase`() {
+        ExerciseDef.SEED.forEach { seed ->
+            assertEquals(seed.startsWith, ExerciseDef.inferStartPhase(seed.id), seed.id)
+        }
     }
 
     @Test

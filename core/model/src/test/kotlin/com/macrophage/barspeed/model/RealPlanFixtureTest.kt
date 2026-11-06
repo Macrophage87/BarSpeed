@@ -78,6 +78,32 @@ class RealPlanFixtureTest {
     }
 
     /**
+     * core-model review 2026-11-06, F1. This plan's `leg_extension` omits
+     * `start`, so the app guesses. A leg extension's stack rests at the
+     * bottom and the first move is the extension, so the guess must be "starts
+     * at the bottom" -- it used to be the top, which opened the countdown on
+     * "Down". The seeded RDL beside it starts at the top, and the plan-side
+     * reading agrees with the seed.
+     */
+    @Test
+    fun `the guessed start is the bottom for the leg extension and the top for the RDL`() {
+        val text =
+            checkNotNull(javaClass.getResourceAsStream("/real-plan-lower-body.json")) {
+                "fixture missing"
+            }.bufferedReader().readText()
+        val plan = Json { ignoreUnknownKeys = true }.decodeFromString(PlanFile.serializer(), text)
+        val exercises = plan.sessions.single().exercises
+
+        val legExtension = exercises.single { it.exercise == "leg_extension" }
+        assertEquals(null, legExtension.start, "premise: the plan does not declare it")
+        assertEquals(StartPhase.CONCENTRIC, ExerciseDef.resolvedById("leg_extension").startsWith)
+        assertEquals(false, legExtension.startsAtTop, "a leg extension starts with the stack down")
+
+        val rdl = exercises.single { it.exercise == "romanian_deadlift" }
+        assertEquals(true, rdl.startsAtTop, "an RDL starts standing and lowers first")
+    }
+
+    /**
      * The same real plan against the DRIVE direction (#263).
      *
      * It carries a `seated_leg_curl` and a `leg_extension` -- two ids off the

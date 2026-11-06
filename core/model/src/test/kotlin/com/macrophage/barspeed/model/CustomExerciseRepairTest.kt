@@ -18,6 +18,48 @@ class CustomExerciseRepairTest {
         )
     }
 
+    /**
+     * core-model review 2026-11-06, F1: the exact-id start table reaches rows
+     * already stored. Every install that ran robocoach's lower-body plan holds
+     * a `leg_extension` row written ECCENTRIC; the repair needs nothing
+     * registered, because it compares against [ExerciseDef.inferStartPhase],
+     * which is where the table is read.
+     */
+    @Test
+    fun `a leg extension stored eccentric-first is repaired and read concentric-first`() {
+        val stale = StoredExerciseRow(ExerciseDef.inferredDisplayName("leg_extension"), StartPhase.ECCENTRIC.name)
+        assertEquals(
+            StoredExerciseRow(ExerciseDef.inferredDisplayName("leg_extension"), StartPhase.CONCENTRIC.name),
+            CustomExerciseRepair.repaired("leg_extension", stale),
+        )
+        assertEquals(StartPhase.CONCENTRIC, CustomExerciseRepair.definition("leg_extension", stale).startsWith)
+    }
+
+    /** The same, both ways, for the rest of the table and the RDL veto. */
+    @Test
+    fun `every start the table moved is repaired from the stale stored value`() {
+        val moved =
+            mapOf(
+                "step_up" to StartPhase.CONCENTRIC,
+                "glute_bridge" to StartPhase.CONCENTRIC,
+                "sit_up" to StartPhase.CONCENTRIC,
+                "pec_deck" to StartPhase.CONCENTRIC,
+                "hip_abduction" to StartPhase.CONCENTRIC,
+                "arnold_press" to StartPhase.CONCENTRIC,
+                "overhead_squat" to StartPhase.ECCENTRIC,
+                "overhead_triceps_extension" to StartPhase.ECCENTRIC,
+                "nordic_curl" to StartPhase.ECCENTRIC,
+                "dumbbell_romanian_deadlift" to StartPhase.ECCENTRIC,
+                "snatch_grip_rdl" to StartPhase.ECCENTRIC,
+            )
+        for ((id, now) in moved) {
+            val was = if (now == StartPhase.CONCENTRIC) StartPhase.ECCENTRIC else StartPhase.CONCENTRIC
+            val stale = StoredExerciseRow(ExerciseDef.inferredDisplayName(id), was.name)
+            assertEquals(now.name, CustomExerciseRepair.repaired(id, stale)?.startsWith, id)
+            assertEquals(now, CustomExerciseRepair.definition(id, stale).startsWith, id)
+        }
+    }
+
     @Test
     fun `a row that says what the app infers today is left alone`() {
         for (id in listOf("cable_fly", "tricep_pushdown", "seated_leg_curl", "pallof_hold")) {
