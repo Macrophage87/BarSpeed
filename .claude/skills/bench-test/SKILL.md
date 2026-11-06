@@ -70,7 +70,9 @@ the defect being checked for.
 - **Navigate by screenshot, never by blind taps**: `adb exec-out screencap -p > step.png`,
   view the PNG, `adb shell input tap X Y`, screenshot again. Name evidence `stepN-desc.png`.
 - **Release APKs**: `gh release download vX.Y.Z -R Macrophage87/BarSpeed -p '*.apk'` — every
-  release from v0.1.1 on is signed with the same key, so cross-version `adb install -r` works;
+  GitHub release APK from v0.1.1 on is signed with the same key, so cross-version
+  `adb install -r` works between them (a Play-delivered build carries Play's own key and
+  will not install over one, or the reverse);
   v0.1.0's asset is `app-release-unsigned.apk` and will not install at all. Debug APKs from CI
   are signed with a per-runner debug key and share the release `applicationId`, so installing
   one over a release APK is refused outright, not installed alongside.

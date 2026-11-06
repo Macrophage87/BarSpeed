@@ -1,6 +1,6 @@
 ---
 name: release-cut
-description: Cut and publish a BarSpeed release — the fresh suite measurement, the two-line version commit with its house-format body, the land-freeze, the Release dispatch, and byte-level artifact verification. The cut body is permanent prose; this ritual keeps it true.
+description: Cut and publish a BarSpeed release — the fresh suite measurement, the two-line version commit with its house-format body, the tag push at the cut SHA (dispatch as fallback), the Play upload, and byte-level artifact verification. The cut body is permanent prose; this ritual keeps it true.
 ---
 
 # /release-cut <version>
@@ -39,19 +39,37 @@ One file, two lines, no source, no schema, no test — and say so in the body. H
   9 through v0.1.41 and moved to 10 at v0.1.42 — the rollback paragraph is re-derived at every
   cut, never carried forward.
 
-## 3. Gate the cut on its own SHA, then land with a freeze
+## 3. Gate the cut on its own SHA, land it, then tag that SHA
 
-CI green on the cut's exact SHA (`/land` checklist applies). Then the freeze:
-**nothing may land on `main` between the cut landing and the Release run completing** —
-`release.yml`'s release step (release.yml:58-64) passes `tag_name` with no `target_commitish`,
-so GitHub creates the tag from `main`'s HEAD at the moment that step runs — the end of the
-build, not the dispatch. v0.1.5 is the proof: v0.1.5 and v0.1.6 both resolve to 56448cb, "Bump
-version to 0.1.6", which landed while the run was in flight. Check nothing else is in flight
-(`gh run list --workflow release.yml`), then:
+CI green on the cut's exact SHA (`/land` checklist applies). Land it, then push the tag at the
+landed SHA. A tag push builds exactly that commit, so nothing else needs to wait:
 
 ```
-gh workflow run Release -f tag=vX.Y.Z --repo Macrophage87/BarSpeed
+git tag vX.Y.Z <full 40-char cut SHA>
+git push origin vX.Y.Z
 ```
+
+Fallback, only when the git proxy refuses the tag push:
+`gh workflow run Release -f tag=vX.Y.Z --repo Macrophage87/BarSpeed`. That path creates the tag
+from `main`'s HEAD at the end of the build (no `target_commitish`), so **nothing may land on
+`main` until that run completes**: v0.1.5 and v0.1.6 both resolve to 56448cb because something
+landed mid-run. Check nothing else is in flight (`gh run list --workflow release.yml`) first.
+
+## 3a. Play
+
+- **versionCode must increase.** Play rejects a bundle whose `versionCode` it has seen. A re-run
+  after a successful Play upload fails at the upload step; the fix is a new cut, not a re-run.
+- **The first upload is manual.** Play's API cannot create the app, so the first bundle for
+  `com.macrophage.barspeed` goes up by hand in Play Console. If live-state does not record that
+  it has happened, ask the owner once and record the answer there.
+- **Without the secret the upload is skipped silently.** The step is skipped, not failed, while
+  `PLAY_SERVICE_ACCOUNT_JSON` is unset, so a green run does not mean "on Play". In §4, read the
+  job log and say whether "Upload bundle to Play internal testing" ran or was skipped.
+- **Play installs carry a different key.** Play App Signing re-signs with a fresh
+  Google-generated key, not the upload key the GitHub APK is signed with. A Play build cannot
+  update a sideloaded APK, or the reverse; switching means uninstalling, which deletes every
+  session on the phone. Before the owner's first Play install, or any channel switch, tell him
+  in one line to run Export all sessions and keep the zips off the phone, or stay on one channel.
 
 ## 4. Verify the artifact in the bytes — "the build said so" is not verification
 
