@@ -59,7 +59,7 @@ class ResumeAndCancelTest {
      */
     @Test
     fun `cancel in the lead-in puts the rest screen back with the slot not consumed`() {
-        val rest = resting().copy(statedLoadKg = 115.0, restRemainingS = 90)
+        val rest = resting().copy(statedLoadKg = 115.0, restRemainingS = 90, restStartedAtMs = 1_000L)
         val started = assertNotNull(startedNextSetState(rest))
         assertEquals(1, started.queueIndex)
         val inSet = started.copy(stage = Stage.IN_SET, leadInRunning = true, setElapsedS = 4)
@@ -71,6 +71,9 @@ class ResumeAndCancelTest {
         assertEquals(rest.queue, out.queue)
         assertEquals(115.0, out.statedLoadKg)
         assertEquals(86, out.restRemainingS)
+        // The countdown must count on from 86, not from the original rest's
+        // start, which would drop the first tick by the lead-in's seconds.
+        assertNull(out.restStartedAtMs)
         assertFalse(out.leadInRunning)
         assertNull(out.cancelTo)
     }
