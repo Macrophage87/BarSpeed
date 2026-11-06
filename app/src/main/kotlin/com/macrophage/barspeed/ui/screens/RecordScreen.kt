@@ -173,6 +173,7 @@ import com.macrophage.barspeed.ui.components.SectionCaption
 import com.macrophage.barspeed.ui.components.SensorDot
 import com.macrophage.barspeed.ui.components.SideArrow
 import com.macrophage.barspeed.ui.components.TargetLineBars
+import com.macrophage.barspeed.ui.components.TurnOnBluetoothButton
 import com.macrophage.barspeed.ui.components.VerdictChip
 import com.macrophage.barspeed.ui.components.VoiceWarningBanner
 import com.macrophage.barspeed.ui.components.confirmTap
@@ -339,17 +340,28 @@ fun RecordScreen(
                         // the same false claim the other way round.
                         val deliveryA =
                             rememberArmedDelivery(state.imuState, state.imuFrameAtMs, state.imuArmedAtMs)
+                        // A tap opens Devices on top of this screen, so Back
+                        // returns to the session (ble-devices F6). Inert during
+                        // a set and while a write or close needs the lifter
+                        // here: RecordExitPolicy.mayOpenDevices decides.
+                        val openDevices: (() -> Unit)? =
+                            if (RecordExitPolicy.mayOpenDevices(prompt)) {
+                                { navController.navigate("devices") }
+                            } else {
+                                null
+                            }
                         SensorDot(
                             roster.analysed?.name ?: "Bar",
                             state.imuState,
                             delivery = deliveryA,
+                            onClick = openDevices,
                         )
                         roster.secondary?.let {
                             val deliveryB =
                                 rememberArmedDelivery(state.imuStateB, state.imuFrameAtMsB, state.imuArmedAtMsB)
-                            SensorDot(it.name, state.imuStateB, delivery = deliveryB)
+                            SensorDot(it.name, state.imuStateB, delivery = deliveryB, onClick = openDevices)
                         }
-                        SensorDot("HR", state.hrmState)
+                        SensorDot("HR", state.hrmState, onClick = openDevices)
                     }
                 },
             )
@@ -1002,6 +1014,10 @@ private fun SetupStage(state: RecordState, viewModel: RecordViewModel, hideResum
                         style = MaterialTheme.typography.bodySmall,
                         color = BarColors.Sub,
                     )
+                    // One tap to the system dialog instead of the shade
+                    // (ble-devices F5); AutoConnectManager reconnects as soon
+                    // as the adapter reports on.
+                    if (imuAdvice == SensorAdvice.TURN_ON_PHONE_BLUETOOTH) TurnOnBluetoothButton()
                 } else {
                     PermissionBannerBody(step = permissionHeld)
                 }
