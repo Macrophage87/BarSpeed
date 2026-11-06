@@ -84,6 +84,35 @@ class JournalRecoveryPolicyTest {
         assertEquals(RecoveryTarget.NewSession, target(nowMs = late))
     }
 
+    /**
+     * THE ATTACH (#100). The header's own session is still open and is the one
+     * Record would offer to continue: the set is one of its sets, and it takes
+     * the next free position, never the header's `orderIdx`, which a set
+     * recorded after the kill may already hold.
+     */
+    @Test
+    fun `the set rejoins its own session while that session is open and current`() {
+        assertEquals(RecoveryTarget.Attach(sessionId = 7L, orderIdx = 2), target())
+    }
+
+    /**
+     * A set write or a session close still running could be writing THIS set,
+     * or could give the session an end time after the answer: nothing is
+     * decided while one is outstanding.
+     */
+    @Test
+    fun `nothing is decided while a write is outstanding`() {
+        assertEquals(RecoveryTarget.Wait, target(writeOutstanding = true))
+        assertEquals(RecoveryTarget.Wait, target(headerSessionId = null, writeOutstanding = true))
+    }
+
+    /** A capture whose set is already a row is never written a second time, current session or not. */
+    @Test
+    fun `a capture whose set is already stored is not written again`() {
+        assertEquals(RecoveryTarget.AlreadyStored, target(alreadyStored = true))
+        assertEquals(RecoveryTarget.AlreadyStored, target(headerSessionId = null, alreadyStored = true))
+    }
+
     // ---- the duplicate ------------------------------------------------------
 
     @Test
