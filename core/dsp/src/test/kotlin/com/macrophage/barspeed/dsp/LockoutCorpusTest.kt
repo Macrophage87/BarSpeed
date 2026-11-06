@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
  *   straight back squats (#335), on both units: the owner's bound is at least
  *   4 and most likely 5, and the rule calls 5, 5, 4, 4 and 5 on role a and
  *   the same on role b. Its constants were fitted on these and on the
- *   owner's 2026-11-06 session, which the repository does not hold.
+ *   owner's 2026-11-06 session (`SquatLockoutFieldTest`, `LockoutSweepTest`).
  * - TEMPO'D CAPTURES. A set with a prescribed tempo is counted by the
  *   metronome (`CountingPolicy.counterFor`), so no app path feeds one of these
  *   to a live counter. They are pinned so a change to the rule shows what it
@@ -89,8 +89,11 @@ class LockoutCorpusTest {
     /**
      * Against [CycleRepCounter] on the eccentric-first captures with a truth:
      * the summed miss, |calls - truth|, is 15 for this rule and 18 for the
-     * full-cycle rule. The four holds, where nothing is lifted, go from a
-     * phantom each to none; the slow 3010 RDLs lose the most.
+     * full-cycle rule -- but 4 of the full-cycle rule's are the four holds'
+     * phantoms, and a hold is never sensor-counted in the app. Without them
+     * it is 15 against 14, and on the bench and RDL rows alone 12 against 6:
+     * off the squat this rule is WORSE on every capture the corpus holds,
+     * all of them tempo'd.
      */
     @Test
     fun `against the full-cycle rule on the scored eccentric-first captures`() {

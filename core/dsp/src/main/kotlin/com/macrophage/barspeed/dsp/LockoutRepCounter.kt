@@ -1,5 +1,7 @@
 package com.macrophage.barspeed.dsp
 
+import kotlin.math.exp
+
 /**
  * A live rep counter for an ECCENTRIC-FIRST lift that calls each rep at
  * LOCKOUT: an eccentric, then a concentric, called as the concentric ends.
@@ -36,7 +38,9 @@ package com.macrophage.barspeed.dsp
  *   off it, so a bias the integrator would turn into a standing velocity is
  *   gone;
  * - that is integrated into a LEAKY velocity, decaying with
- *   [DspConfig.lockoutVelocityTauS]. It is not the bar's velocity: it forgets
+ *   [DspConfig.lockoutVelocityTauS]. Both decays are exact exponentials in
+ *   the frame gap, so a long gap between frames forgets rather than
+ *   overshoots. It is not the bar's velocity: it forgets
  *   in seconds, so it cannot run away the way the tracker's does.
  *
  * Then a three-state machine. IDLE until the leaky velocity falls under
@@ -54,20 +58,30 @@ package com.macrophage.barspeed.dsp
  *
  * ## What it was measured on, and what it costs
  *
- * Fitted and swept on every untempo'd squat the owner has bounded or stated:
- * the seven sets above on both units (5, 5, 2, 3, 3, 3 where stated; set 3's
- * count unstated) and field-46's five straight sets (#335, at least 4, likely
- * 5), with field-backsquat-99hz-6rep's six. It calls each of those within
- * the owner's figure on both units, where [CycleRepCounter] called 4, 6, 1,
- * 4, 3, 4 today and 6, 4, 5, 5, 5 on field-46.
+ * Fitted and swept (`LockoutSweepTest`) on every untempo'd back squat the
+ * owner has counted or bounded, on both units: the 2026-11-06 session
+ * (`SquatLockoutFieldTest`), field-46's five straight sets (#335) and
+ * field-backsquat-99hz-6rep. It calls 5, 5, 4, 2, 3, 3, 3 on the 2026-11-06
+ * sets -- equal to the owner's count on sets 1, 4, 5, 6 and 7; sets 2 and 3
+ * he did not settle -- where [CycleRepCounter] called 4, 6, 5, 1, 4, 3, 4;
+ * and 5, 5, 4, 4, 5 on field-46, inside "at least 4, likely 5", where
+ * [CycleRepCounter] called 6, 4, 5, 5, 5.
  *
  * - ONE LIFTER'S BACK SQUAT. Every constant is fitted there. Bench press,
  *   Romanian deadlift and every other eccentric-first lift reach this rule
- *   with no untempo'd capture behind it; their tempo'd captures, which the
- *   sensor never counts in the app, read about as well as on
- *   [CycleRepCounter] (`LockoutCorpusTest`).
- * - THE RISE MARGIN IS NARROW: 0.25 against 0.19. A re-rack that rises more
- *   than its rack will be called.
+ *   with no untempo'd capture behind it. On their tempo'd captures -- which
+ *   the sensor never counts in the app -- it does WORSE than
+ *   [CycleRepCounter]: on the bench and RDL rows its summed miss is 12
+ *   against 6, the slow 3-s eccentrics rising too little
+ *   (`LockoutCorpusTest`).
+ * - THE RISE MARGIN IS A FEW HUNDREDTHS. A re-rack that rises a little more,
+ *   or a grinding rep that rises a little less, than this session's will be
+ *   miscounted.
+ * - THE LIVE BAR OFTEN HAS NO FIGURE. The call is made at lockout, and
+ *   `LiveRepFigures` matches it against the tracker's drive runs at that
+ *   sample, before the tracker has closed the concentric's run: on the
+ *   2026-11-06 role a streams 3 of 25 calls get a figure, against 8 of 27
+ *   under [CycleRepCounter]. The count is unaffected.
  * - A REP CUT SHORT IS NOT CALLED until its concentric ends, and a failed
  *   rep that is caught and lowered never rises far enough to be.
  */
@@ -134,9 +148,8 @@ internal class LockoutRule(private val config: DspConfig) {
         windowSum += clipped
         if (window.size > config.cycleSmoothFrames) windowSum -= window.removeFirst()
         val smoothed = windowSum / window.size
-        bias = if (bias.isNaN()) smoothed else bias + (smoothed - bias) * dt / config.lockoutBiasTauS
-        velocity += (smoothed - bias) * dt
-        velocity -= velocity * dt / config.lockoutVelocityTauS
+        bias = if (bias.isNaN()) smoothed else bias + (smoothed - bias) * (1.0 - exp(-dt / config.lockoutBiasTauS))
+        velocity = velocity * exp(-dt / config.lockoutVelocityTauS) + (smoothed - bias) * dt
         return step(t, dt)
     }
 

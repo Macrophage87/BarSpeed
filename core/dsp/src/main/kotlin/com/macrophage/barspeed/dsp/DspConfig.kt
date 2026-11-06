@@ -367,33 +367,34 @@ data class DspConfig(
      * ascent short. Removing a running mean first keeps the rise a real rep
      * makes.
      *
-     * FITTED AND SWEPT on the squat corpus `LockoutRepCounter`'s KDoc names.
-     * 1.0-1.5 score every set there; 0.7 and 2.0 each miss one.
+     * FITTED AND SWEPT on the squat streams `LockoutSweepTest` names: 1.0
+     * and 1.2 miss nothing there; 0.7 and 1.5 miss one, 2.0 three.
      */
     val lockoutBiasTauS: Double = 1.0,
     /**
      * `LockoutRepCounter`'s leaky integrator: the time constant the velocity
      * it integrates decays with, s. Not a measured bar velocity.
      *
-     * FITTED AND SWEPT. 1.5-2.5 score every set of the squat corpus; 1.0
-     * misses one.
+     * FITTED AND SWEPT (`LockoutSweepTest`). 1.5-2.5 miss nothing; 1.0 and
+     * 3.0 miss one.
      */
     val lockoutVelocityTauS: Double = 2.0,
     /**
      * The leaky velocity below which the eccentric has begun, m/s, in the
-     * DRIVE frame (negative is the eccentric). FITTED AND SWEPT: 0.15-0.2
-     * score every squat set.
+     * DRIVE frame (negative is the eccentric). SWEPT (`LockoutSweepTest`):
+     * 0.15-0.30 miss nothing, so the squat streams do not constrain it.
      */
     val lockoutDescentMps: Double = 0.2,
     /**
      * The leaky velocity above which the concentric has begun, after an
-     * eccentric, m/s. FITTED AND SWEPT: 0.15-0.2 score every squat set.
+     * eccentric, m/s. FITTED AND SWEPT (`LockoutSweepTest`): 0.15-0.20 miss
+     * nothing; 0.10 misses three, 0.25 one.
      */
     val lockoutAscentMps: Double = 0.15,
     /**
      * The leaky velocity the concentric must fall back under for the rep to
-     * be at LOCKOUT, m/s: the call is made on that sample. CHOSEN, NEVER
-     * VARIED.
+     * be at LOCKOUT, m/s: the call is made on that sample. CHOSEN, then
+     * SWEPT (`LockoutSweepTest`): 0.02-0.05 miss nothing; 0.10 misses one.
      */
     val lockoutEndMps: Double = 0.05,
     /**
@@ -402,10 +403,11 @@ data class DspConfig(
      * of a high-passed acceleration, not a measured bar height, so it is
      * named without a unit of length.
      *
-     * FITTED AND SWEPT. Every real rep of the squat corpus rises 0.25 or
-     * more; every walk-out, settle and re-rack 0.19 or less. 0.20-0.25 score
-     * every set; 0.18 and 0.28 each miss one. The margin is that narrow, and
-     * it is the number to look at when a re-rack is next called.
+     * FITTED AND SWEPT (`LockoutSweepTest`), and the narrowest band of the
+     * six: 0.20 and 0.22 miss nothing; 0.18 calls a re-rack (2026-11-06 set
+     * 5, role b) and 0.24 already drops a real rep (set 7, role a). Real reps
+     * and set-up motion are separated by a few hundredths here. It is the
+     * number to look at when a re-rack is called or a grinding rep missed.
      */
     val lockoutMinRise: Double = 0.22,
 )
