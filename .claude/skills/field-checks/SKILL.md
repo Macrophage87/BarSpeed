@@ -45,8 +45,9 @@ The items live in three places and none of them is complete alone:
    goes in the PDF as a check.
 
 Drop an item only when its issue is closed AND the field-38-style ingest has discharged it in a
-report. An item nobody can act on (needs another phone, another API level) stays in, marked
-`Deferred`, so the list is visibly complete.
+report. An item nobody can act on (needs another phone, another API level) is marked `Deferred`:
+the builder leaves it out of the PDF and prints it, and the chat message lists it in one line so
+the list is visibly complete.
 
 ## 2. Write the items
 
@@ -54,12 +55,22 @@ Each page is one item: a source tag, the issue refs, a title, an optional one-se
 line, and a list of **checks** — each check is one thing the owner can tick. Split a
 paragraph into its checks; a check that bundles two observations is two checks.
 
+**Never put in the PDF** (the builder fails on the first four by pattern, but the rule is
+yours, not the regex's):
+- **Stopwatch checks.** The app records every time; read it from the export.
+- **Second-device checks.** The owner has one phone. Those items are `Deferred`, in chat.
+- **Questions hidden in a check** ("does the grid move enough to mistap?", "can you follow
+  it?"). A check is pass or fail; a question goes in the chat message.
+- **Checks Claude does itself** ("I verify the export carries X"). The owner's check is "export
+  the Raw zip and send it"; say once in the chat message what you will read from it.
+- Screenshots as a check. Fold them in as "screenshot it if it fails".
+
 Rules that came from the first build:
 - Plain language, the owner's words where the issue quotes them. No file paths, no SHAs, no
   test names — the owner is holding a phone in a gym.
 - State the **pass** as what the screen or voice does, not what the code does.
 - Where the check is really *my* offline verification (a key in the export), the owner's check
-  is "export and send the zip"; say the rest is mine.
+  is "export the Raw zip and send it"; say the rest is mine, in chat, not on the page.
 - Tier every item. Owner, 2026-09-05: "Since there's 3 items, the first is questions, just
   display them in chat. Have the field tested ones like I asked. The ones that just require me
   to use the app without actually lifting can be on a one page checklist." So:
@@ -72,8 +83,8 @@ Rules that came from the first build:
     one item per page.
   - `Tier 1` — inside a normal set, no gym cost. `Tier 2` — an extra set or an unusual mount;
     the owner takes these only when convenient. `Deferred` — needs hardware the owner does not
-    have. One page each, a checkbox per check.
-  Order after the index: the App page, then Tier 1, then Tier 2, then Deferred.
+    have; in chat only, never a page. Tier 1 and Tier 2 get one page each, a checkbox per check.
+  Order after the index: the App page, then Tier 1, then Tier 2.
 - Put the quantities the owner needs *in* the check ("+5 lb at rung 6"), never "see the issue".
 
 Items are a JSON list next to the build script — one object per page:
@@ -83,8 +94,10 @@ Items are a JSON list next to the build script — one object per page:
  "checks": ["Reps tiles read \"About 3-4 reps left\" / ...", "..."], "tier": "Tier 1"}
 ```
 `tag` picks the colour band: the release version (blue), `Field-38 question` style report
-asks (brown), `Open issue` (green). Keep the previous release's JSON in the field-checks
-folder; the next one starts from it, dropping what the ingest discharged.
+asks (brown), `Open issue` (green). Keep the previous release's JSON in the durable
+field-checks folder (§5); the next one starts from it, dropping what the ingest discharged.
+`items-example.json` next to the script is a format example that passes every rule, not a
+predecessor to start from.
 
 ## 3. Build
 
@@ -92,10 +105,18 @@ folder; the next one starts from it, dropping what the ingest discharged.
 python .claude/skills/field-checks/build_field_checks.py <items.json> <out.pdf>
 ```
 100 x 178 mm pages (a phone's aspect, so "fit width" reads at 12 pt), a colour header with the
-tag, refs and tier, the title, the context line in grey italic, then one **AcroForm checkbox**
-per check with the check text beside it. Body text shrinks per page only if a page overflows
-(the script prints the font size it settled on — anything under 10 pt means the item should be
-split into two pages). Page 1 is an index of every item with its refs and tier.
+page ID, tag, refs and tier, the title, the context line in grey italic, then one **AcroForm
+checkbox** per check with the check text beside it.
+
+**IDs.** Every page is `F<page number>` (F7) and every check on it `F<page>.<n>` (F7.3), printed
+in bold before the check text. Every page with checks ends with the footer line
+"Reply in chat: F7.1 pass/fail - what you saw". The owner answers by ID in chat; the checkbox is
+only for his own tracking. Page 1 is an index of every item with its page ID, refs and tier.
+
+**10 pt is a hard floor**, for every piece of text including the App page, the index and the
+footer. Body text shrinks per page only as far as the floor; a page that still overflows, an
+index that does not fit page 1, or a check that breaks the ban list in §2 makes the script exit
+non-zero with the reason. Split the item or fix the check; never send a PDF from a failed build.
 
 Write the JSON with the Write tool, not a bash heredoc: the item text carries `\'` and quotes
 and the heredoc route broke on them on the first build.
@@ -109,7 +130,9 @@ cut. `pypdf`'s `get_fields()` count equals the number of checks. The Read tool r
 
 ## 5. Deliver and keep
 
-- `SendUserFile` the PDF as an attachment with a one-line caption (pages, checkboxes).
+- Attach the PDF with a one-line caption (pages, checkboxes). The chat message also carries
+  the questions and the `Deferred` items the builder printed, and ends by asking for results
+  by ID: "Reply with F-numbers: F7.3 pass, F9.1 fail - what you saw".
 - Copy the PDF and its JSON to `C:\Users\steph\Documents\BarSpeed-field-captures\field-checks\`
   — the scratchpad is disposable and the next build starts from this JSON.
 - Name it by the date and the release it goes with, for example

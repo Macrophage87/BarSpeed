@@ -1,0 +1,47 @@
+{
+ "heading": "vX.Y.Z, next session",
+ "items": [
+  {
+   "tag": "vX.Y.Z",
+   "ref": "#000",
+   "title": "The plan prompt names the current schema",
+   "intro": "Ten seconds, no gym needed.",
+   "checks": [
+    "Guide, COPY PLAN PROMPT, paste it anywhere: the prose and the JSON skeleton name the same schema version."
+   ],
+   "tier": "App"
+  },
+  {
+   "tag": "vX.Y.Z",
+   "ref": "#000",
+   "title": "Rep count is called at lockout",
+   "intro": "Any working set of a barbell lift with both sensors on the bar.",
+   "checks": [
+    "Each rep is called (\"rep 3\") as the bar reaches the top, not on the way down.",
+    "\"Last rep\" is called going into the final planned rep.",
+    "After the set, export the session's Raw zip and send it in chat."
+   ],
+   "tier": "Tier 1"
+  },
+  {
+   "tag": "Open issue",
+   "ref": "#000",
+   "title": "Both units on one weight stack",
+   "intro": "An extra set, only if a stack machine is free.",
+   "checks": [
+    "Clip unit A and unit B to the same stack; the SETUP card shows both as connected before START SET.",
+    "The set records reps from both units; History shows the set."
+   ],
+   "tier": "Tier 2"
+  },
+  {
+   "tag": "Open issue",
+   "ref": "#000",
+   "title": "Older Android versions",
+   "checks": [
+    "Needs a phone on Android 8-11: the app installs and scans."
+   ],
+   "tier": "Deferred"
+  }
+ ]
+}
