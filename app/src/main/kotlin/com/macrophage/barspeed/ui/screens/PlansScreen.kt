@@ -50,6 +50,7 @@ import com.macrophage.barspeed.model.PlanLifecycle
 import com.macrophage.barspeed.model.PlanStartDecision
 import com.macrophage.barspeed.model.PlanStartPolicy
 import com.macrophage.barspeed.ui.BarColors
+import com.macrophage.barspeed.ui.RecordRoute
 import com.macrophage.barspeed.ui.components.BodyWeightDialog
 import com.macrophage.barspeed.ui.components.PlanWarnings
 
@@ -80,7 +81,7 @@ fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewMo
     // Navigation is driven by the ViewModel rather than by the tap, because the
     // activation has to land first: see PlansViewModel.start.
     LaunchedEffect(Unit) {
-        viewModel.recordRequests.collect { navController.navigate("record") }
+        viewModel.recordRequests.collect { navController.navigate(RecordRoute.path()) }
     }
 
     Scaffold(

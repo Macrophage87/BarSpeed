@@ -1,7 +1,6 @@
 package com.macrophage.barspeed.ui.screens
 
 import android.app.Application
-import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -60,6 +59,7 @@ import com.macrophage.barspeed.model.PlanWarningLine
 import com.macrophage.barspeed.model.ProgressionKind
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.ui.BarColors
+import com.macrophage.barspeed.ui.RecordRoute
 import com.macrophage.barspeed.ui.components.ChipTone
 import com.macrophage.barspeed.ui.components.ExpandableNote
 import com.macrophage.barspeed.ui.components.PlanWarnings
@@ -94,9 +94,7 @@ fun PlanDetailScreen(navController: NavController, planId: Long) {
             // A session's START opens it the way Home's hero opens the next
             // session: Record's PREVIEW entry, which waits for the resume check.
             val name = session?.let { state.plan?.sessions?.getOrNull(it)?.name }
-            navController.navigate(
-                if (name == null) "record" else "record?entry=preview&planSession=${Uri.encode(name)}",
-            )
+            navController.navigate(if (name == null) RecordRoute.path() else RecordRoute.preview(name))
         }
     }
     // One start path for the hero and every session header: start now when

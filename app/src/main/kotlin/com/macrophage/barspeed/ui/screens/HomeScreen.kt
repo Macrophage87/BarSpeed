@@ -1,6 +1,5 @@
 package com.macrophage.barspeed.ui.screens
 
-import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -66,7 +65,9 @@ import com.macrophage.barspeed.model.RecordingHold
 import com.macrophage.barspeed.model.RecoveryRefusal
 import com.macrophage.barspeed.model.RestoreVerdict
 import com.macrophage.barspeed.model.WeightUnit
+import com.macrophage.barspeed.record.RecordEntry
 import com.macrophage.barspeed.ui.BarColors
+import com.macrophage.barspeed.ui.RecordRoute
 import com.macrophage.barspeed.ui.components.PermissionBanner
 import com.macrophage.barspeed.ui.components.SectionCaption
 import com.macrophage.barspeed.ui.components.SensorDot
@@ -324,9 +325,9 @@ private fun HomeSensorDot(label: String, state: ConnectionState, delivery: Armed
  * `RecordViewModel.applyHomeEntry` carries the entry out.
  */
 private fun heroRoute(hero: HomeHero): String = when (hero) {
-    is HomeHero.Continue -> "record?entry=continue"
-    is HomeHero.Next -> "record?entry=preview&planSession=${Uri.encode(hero.sessionName)}"
-    HomeHero.Loading, HomeHero.NoPlan, HomeHero.Pick -> "record"
+    is HomeHero.Continue -> RecordRoute.path(RecordEntry.CONTINUE)
+    is HomeHero.Next -> RecordRoute.preview(hero.sessionName)
+    HomeHero.Loading, HomeHero.NoPlan, HomeHero.Pick -> RecordRoute.path()
 }
 
 /**
@@ -393,11 +394,11 @@ private fun HeroCard(state: HomeState, onNavigate: (String) -> Unit) {
         // Kept TextButtons (#201): the way past the primary, not a next step of its own.
         when (hero) {
             is HomeHero.Continue ->
-                TextButton(onClick = { onNavigate("record?entry=new") }) {
+                TextButton(onClick = { onNavigate(RecordRoute.path(RecordEntry.NEW)) }) {
                     Text("Start a new session", color = BarColors.Sub)
                 }
             is HomeHero.Next ->
-                TextButton(onClick = { onNavigate("record") }) {
+                TextButton(onClick = { onNavigate(RecordRoute.path()) }) {
                     Text("Other session", color = BarColors.Sub)
                 }
             HomeHero.Loading, HomeHero.NoPlan, HomeHero.Pick -> Unit
