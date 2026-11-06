@@ -5,8 +5,8 @@ package com.macrophage.barspeed.model
  * read as by the speech engine (#339).
  *
  * The owner, 2026-10-25: *"For some reason the app keeps saying
- * "representative 1" instead of "rep one"."* The text handed to the engine is
- * `Rep N` -- [VoiceMilestonePolicy.repMilestone] on a sensor-counted set, and
+ * "representative 1" instead of "rep one"."* The cue a rep call is spoken
+ * from is `Rep N` -- [VoiceMilestonePolicy.repMilestone] on a sensor-counted set, and
  * `CadencePlan.announcementFor` in `:core:dsp` on a guided one -- and which
  * reading an engine picks for a capitalised `Rep` before a number is the
  * engine's choice. Nothing in this repo has measured one; the report above is
@@ -21,8 +21,9 @@ package com.macrophage.barspeed.model
  * the engine is handed is [utterance]: the same text with the word
  * lower-cased. The owner, 2026-11-06, first live session on v0.2.2, which
  * carried the spans alone: *"it kept saying "representative" and not
- * "rep"."* His engine did not honour the span, so the text now carries the
- * reading too, and the span stays for an engine that does.
+ * "rep"."* The span alone did not change what his engine said -- whether it
+ * reached the engine and was refused is not known -- so the text now carries
+ * the reading too, and the span stays for an engine that does honour it.
  *
  * WHAT IS MARKED. The word `rep`, in any case, wherever it stands as a whole
  * word -- `Rep 3` and `Last rep` both -- read as [WORD]; and the number that

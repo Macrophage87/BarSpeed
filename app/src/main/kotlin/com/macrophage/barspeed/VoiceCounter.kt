@@ -33,8 +33,8 @@ import java.util.Locale
  *
  * - **How a rep call is read.** [speak] hands the engine
  *   [SpokenRepCall.utterance] of the text it was given -- the word `rep`
- *   lower-cased, since the owner's engine ignored the span alone and still
- *   said "representative" -- with a `TtsSpan` over each span [SpokenRepCall]
+ *   lower-cased, since with the span alone the owner's engine still said
+ *   "representative" -- with a `TtsSpan` over each span [SpokenRepCall]
  *   marks: TYPE_TEXT reading `rep` over the word, TYPE_CARDINAL over its
  *   number. The cue track never sees this; the caller recorded its text
  *   before calling.

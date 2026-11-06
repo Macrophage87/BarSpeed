@@ -141,4 +141,19 @@ class SpokenRepCallTest {
         assertEquals("REPS 3", SpokenRepCall.utterance("REPS 3"))
         assertEquals("Representative 1", SpokenRepCall.utterance("Representative 1"))
     }
+
+    /**
+     * "In whatever case" and "whole word", pinned: a capitalised or upper-case
+     * rep call is lowered whatever follows it, and a word that merely
+     * contains the letters keeps its spelling.
+     */
+    @Test
+    fun `every case of the whole word is lowered and nothing else is`() {
+        assertEquals("rep 3", SpokenRepCall.utterance("REP 3"))
+        assertEquals("rep 2", SpokenRepCall.utterance("rEp 2"))
+        assertEquals("rep.", SpokenRepCall.utterance("Rep."))
+        assertEquals("Prep 3", SpokenRepCall.utterance("Prep 3"))
+        assertEquals("Reps 3", SpokenRepCall.utterance("Reps 3"))
+        assertEquals("Last rep", SpokenRepCall.utterance("Last Rep"))
+    }
 }
