@@ -3174,8 +3174,26 @@ private fun EndSetControl(state: RecordState, viewModel: RecordViewModel) {
             }
             if (SetEndControl.END_FAILED in controls) FailSetButton(state, viewModel)
             if (SetEndControl.END_UNRATED in controls) EndSetEarlyButton(viewModel)
+            if (state.mayCancelSet) CancelSetButton(viewModel)
         }
     }
+}
+
+/**
+ * Takes back a START tapped too early or on the wrong exercise (owner's ruling
+ * 2026-11-06, UX review rest F2). Drawn only while `RecordState.mayCancelSet`
+ * holds -- the lead-in, or a rep set with no rep counted yet -- and it writes
+ * nothing: the screen the set was started from comes back with the same set
+ * next. A text button under the end-set controls, because it is the way out
+ * of a mistake rather than a way to end a set.
+ */
+@Composable
+private fun CancelSetButton(viewModel: RecordViewModel) {
+    Spacer(Modifier.height(6.dp))
+    TextButton(onClick = viewModel::cancelSet, modifier = Modifier.fillMaxWidth()) {
+        Text("CANCEL SET", style = MaterialTheme.typography.titleMedium, color = BarColors.Sub)
+    }
+    SectionCaption("Nothing is saved · the same set is next")
 }
 
 /**

@@ -94,6 +94,7 @@ import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.model.SensorRoster
 import com.macrophage.barspeed.model.SessionCloseState
 import com.macrophage.barspeed.model.SessionResumePolicy
+import com.macrophage.barspeed.model.SetCancelPolicy
 import com.macrophage.barspeed.model.SetClockPolicy
 import com.macrophage.barspeed.model.SetCompletionPolicy
 import com.macrophage.barspeed.model.SetEndKind
@@ -2943,6 +2944,9 @@ private fun restingState(
             nextDeclaredTempo = nextSlot?.tempo,
             lastRanTempo = p.tempoText,
         ) ?: "",
+        // The set is written, so there is nothing left for CANCEL SET to take
+        // back (UX review 2026-11-06, rest F2).
+        cancelTo = null,
     )
 }
 
@@ -3093,6 +3097,9 @@ internal fun startedNextSetState(s: RecordState): RecordState? {
     return advancedState(s).copy(
         sessionClose = close,
         closeUnwritten = s.closeUnwritten.takeIf { close != SessionCloseState.NONE },
+        // The rest screen as it stood, for CANCEL SET (UX review 2026-11-06,
+        // rest F2): the slot not consumed, the statements not baked.
+        cancelTo = s,
     )
 }
 
@@ -3289,8 +3296,68 @@ private fun closedState(s: RecordState): RecordState = s.copy(
  */
 private fun startedFromReadyState(s: RecordState): RecordState {
     val slot = s.currentSlot
-    if (s.adHoc || slot == null) return s
-    return bakedState(s, slot, s.queueIndex)
+    val started = if (s.adHoc || slot == null) s else bakedState(s, slot, s.queueIndex)
+    // What CANCEL SET puts back (UX review 2026-11-06, rest F2): the rest
+    // screen where START NEXT SET already took it, else READY before the bake.
+    return started.copy(cancelTo = s.cancelTo ?: s)
+}
+
+/**
+ * The state CANCEL SET leaves behind, or null where it may not be taken
+ * ([RecordState.mayCancelSet]); owner's ruling 2026-11-06, UX review rest F2.
+ *
+ * The screen the set was started from, put back: its stage (READY, or RESTING
+ * between sets), its queue and position, so the slot is not consumed, the
+ * lifter's statements as they stood before the bake, and every in-set field
+ * as it was. Everything else -- the links, the heart rate, the settings, the
+ * close -- is today's, because those moved on their own while the set ran.
+ * A close the set start dropped stays dropped: `startNextSet` has already
+ * discarded its frozen copy.
+ *
+ * The rest clock resumes from what was left less the seconds the set's clock
+ * ran. A hold's prep runs before its clock, so those seconds are not taken
+ * off and the rest reads a little long, which errs on the side the owner's
+ * "rest is a minimum" ruling allows.
+ *
+ * Nothing is written: no set row, no stream, no skip. The capture is stopped
+ * and its journal deleted by `RecordViewModel.cancelSet`.
+ */
+internal fun cancelledSetState(now: RecordState): RecordState? {
+    val back = now.cancelTo?.takeIf { now.mayCancelSet } ?: return null
+    return now.copy(
+        stage = back.stage,
+        queue = back.queue,
+        queueIndex = back.queueIndex,
+        loadInput = back.loadInput,
+        statedLoadKg = back.statedLoadKg,
+        statedTempo = back.statedTempo,
+        statedReps = back.statedReps,
+        statedDurationS = back.statedDurationS,
+        statedSide = back.statedSide,
+        repsInput = back.repsInput,
+        durationInput = back.durationInput,
+        tempoInput = back.tempoInput,
+        armedRoster = back.armedRoster,
+        setElapsedS = back.setElapsedS,
+        live = back.live,
+        manualSet = back.manualSet,
+        manualReps = back.manualReps,
+        sensorCounted = back.sensorCounted,
+        sensorReps = back.sensorReps,
+        liveCountWithheld = back.liveCountWithheld,
+        liveTrackerDropped = back.liveTrackerDropped,
+        guidedSet = back.guidedSet,
+        guidedLabel = back.guidedLabel,
+        guidedCountdown = back.guidedCountdown,
+        guidedPhaseTotal = back.guidedPhaseTotal,
+        guidedFinished = back.guidedFinished,
+        leadInRunning = back.leadInRunning,
+        repCallAtDriveEnd = back.repCallAtDriveEnd,
+        explosiveUpStroke = back.explosiveUpStroke,
+        explosiveDownStroke = back.explosiveDownStroke,
+        restRemainingS = (back.restRemainingS - now.setElapsedS).coerceAtLeast(0),
+        cancelTo = null,
+    )
 }
 
 /**
@@ -3760,6 +3827,17 @@ data class RecordState(
      */
     val resumedAtOrderIdx: Int? = null,
     /**
+     * The screen the set in progress was started from -- READY, or the rest
+     * screen when START NEXT SET was the door -- for CANCEL SET to put back
+     * (UX review 2026-11-06, rest F2), or null when no set is running.
+     *
+     * Taken by [startedNextSetState] and [startedFromReadyState] before either
+     * advances or bakes the queue, cleared by [restingState] when the set is
+     * written and by `beginSet`'s refusal, which starts no set. Its own
+     * [cancelTo] is always null, so the snapshot never nests.
+     */
+    val cancelTo: RecordState? = null,
+    /**
      * True once the lifter has tapped Finish session and before they have
      * answered or skipped the session rating (#159).
      *
@@ -4146,6 +4224,15 @@ data class RecordState(
      */
     val setStarted: Boolean
         get() = !leadInRunning
+
+    /**
+     * Whether CANCEL SET is drawn: a set is running, there is a screen to go
+     * back to, and [SetCancelPolicy] says nothing it is measured on has
+     * happened yet -- still in the lead-in, or no rep counted on a rep set.
+     */
+    val mayCancelSet: Boolean
+        get() = stage == Stage.IN_SET && cancelTo != null &&
+            SetCancelPolicy.mayCancel(currentIsTimed, leadInRunning, maxOf(manualReps, sensorReps))
 
     /**
      * Which completion signal, if any, the set in progress has -- the decision
@@ -4744,14 +4831,11 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Equipment busy: every decision is [jumpedToExerciseState]'s; this is the tap. */
-    fun jumpToExercise(exerciseId: String) {
-        stateFlow.value = jumpedToExerciseState(stateFlow.value, exerciseId) ?: return
-    }
+    fun jumpToExercise(exerciseId: String) =
+        jumpedToExerciseState(stateFlow.value, exerciseId)?.let { stateFlow.value = it }
 
     /** One more set of the exercise just finished (#177, #188); every decision is [appendedState]'s. */
-    fun addSetOfCurrentExercise() {
-        stateFlow.value = appendedState(stateFlow.value) ?: return
-    }
+    fun addSetOfCurrentExercise() = appendedState(stateFlow.value)?.let { stateFlow.value = it }
 
     /**
      * Take back a set the lifter appended (#206); every decision is
@@ -4762,9 +4846,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * for it. A set that HAS run is not reachable from this control at all --
      * `RemoveSetControl.target` refuses every index below `upcomingIndex`.
      */
-    fun removeAddedSetOfCurrentExercise() {
-        stateFlow.value = removedState(stateFlow.value) ?: return
-    }
+    fun removeAddedSetOfCurrentExercise() = removedState(stateFlow.value)?.let { stateFlow.value = it }
 
     /**
      * Drop the upcoming PRESCRIBED set (#300); every decision is
@@ -4869,7 +4951,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         val gate = readyStartState(stateFlow.value) ?: return
         val before = stateFlow.value
         if (SetLoadPolicy.blocksSetStart(before.currentExercise.bodyweight, before.bodyWeightKg)) {
-            stateFlow.value = before.copy(bodyWeightRequiredForSet = true)
+            stateFlow.value = before.copy(bodyWeightRequiredForSet = true, cancelTo = null)
             return
         }
         // The rating panel goes with it. Starting another set is how a lifter
@@ -5469,10 +5551,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     fun endSet(rating: SetRating? = null) {
         if (endingSet) return
         endingSet = true
-        collectJob?.cancel()
-        collectJobB?.cancel()
-        hrJob?.cancel()
-        tickJob?.cancel()
+        listOf(collectJob, collectJobB, hrJob, tickJob).forEach { it?.cancel() }
         guidedCadence?.cancel()
         val s = stateFlow.value
         // The set has to SAY it is over, or nothing on the record does. A
@@ -5718,6 +5797,27 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // than by neither.
         restHrBuffer += RestClockPolicy.restWindowSeed(hrBuffer.toList(), restStartedAtMs)
         launchSetWrite()
+    }
+
+    /**
+     * CANCEL SET (UX review 2026-11-06, rest F2): the set is thrown away and the
+     * screen it was started from comes back; [cancelledSetState] decides.
+     *
+     * The capture stops as [endSet] stops it, the journal is closed and
+     * deleted so no recovery offers it later, and nothing is frozen or
+     * written. [endingSet] is set so a `+1 REP` or an end-set tap already in
+     * flight from the in-set screen lands on nothing; `beginSet` clears it.
+     */
+    fun cancelSet() {
+        val back = cancelledSetState(stateFlow.value)?.takeIf { !endingSet } ?: return
+        endingSet = true
+        listOf(collectJob, collectJobB, hrJob, tickJob).forEach { it?.cancel() }
+        guidedCadence?.cancel()
+        voice?.setEnded()
+        journal?.let { j -> container.appScope.launch { j.close() }.invokeOnCompletion { j.discard() } }
+        journal = null
+        stateFlow.value = back
+        if (back.stage == Stage.RESTING) startRestCountdown()
     }
 
     /**
@@ -6056,9 +6156,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     fun declineResume() = stateFlow.value.copy(resumeOffer = null).let { stateFlow.value = it }
 
     /** Back to the session picker; every decision is [previewCancelledState]'s. */
-    fun abandonSetup() {
-        stateFlow.value = previewCancelledState(stateFlow.value)
-    }
+    fun abandonSetup() = previewCancelledState(stateFlow.value).let { stateFlow.value = it }
 
     /**
      * The record flow's owner is going away: the "record" nav entry was popped
