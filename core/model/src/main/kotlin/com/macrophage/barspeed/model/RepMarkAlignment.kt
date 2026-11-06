@@ -46,7 +46,9 @@ import kotlin.math.abs
  * second and a half against the guide) and the two cancelling ones at least
  * 0.90 (4493 ms of 5005). A missed rep and an invented one shift every pair
  * between them by a whole cycle, so their residuals sit a cycle from the rest
- * and half a cycle is the boundary that is furthest from both.
+ * and half a cycle is the midpoint of the two ideal shifts, none and one
+ * whole cycle. It is not fitted to the measured split, whose midpoint is
+ * 0.66; it sits inside it.
  *
  * WHAT IT CANNOT CATCH. A list shifted by one whole cycle -- a movement before
  * the first cycle and the last rep missed -- moves every residual alike, which

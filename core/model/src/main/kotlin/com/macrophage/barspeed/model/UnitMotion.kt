@@ -45,7 +45,7 @@ object UnitMotion {
      */
     const val STILL_ACCEL_SD_G = 0.01
 
-    /** A buffer's time on the link: its last arrival stamp minus its first, or null with fewer than two samples. */
+    /** A buffer's span: its last arrival stamp minus its first, or null with fewer than two samples; it sees no gap. */
     fun spanMs(samples: List<ImuSample>): Long? {
         if (samples.size < 2) return null
         return samples.maxOf { it.timestampMs } - samples.minOf { it.timestampMs }

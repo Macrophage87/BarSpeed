@@ -161,8 +161,10 @@ fun armedCaptureOf(
             spanMsByRole = spanMsByRole,
             stillByRole = stillByRole,
         )
-    // Which armed roles delivered too few frames to analyse, and what the app
-    // could see of each one's link when the set ended (#213, #209). The roles
+    // Which armed roles `analysable` refused -- too few frames (#209), or
+    // since #242 and #287 a short span or a still stream beside a partner that
+    // moved -- and what the app could see of each one's link when the set
+    // ended (#213). The roles
     // come from `analysable` above and NOT from `present`, so since #209 a
     // role can appear in `present` and in `silent` at once -- that is the
     // change, not a disagreement.

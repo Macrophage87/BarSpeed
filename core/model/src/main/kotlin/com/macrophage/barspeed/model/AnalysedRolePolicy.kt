@@ -89,8 +89,9 @@ enum class AnalysedRoleBasis(val published: String) {
      * is one `VelocityEstimator.estimate` refuses outright, so a unit whose
      * roll says "stack" cannot be analysed if it sent nothing. This is
      * [AnalysedStream.fellBack] and the same population it always named,
-     * widened since #242 and #287 to an armed unit that stopped early beside
-     * its partner or never moved while its partner did; see
+     * widened since #242 and #287 to an armed unit whose stream spanned less
+     * of the set than its partner's (a late start or an early stop) or that
+     * never moved while its partner did; see
      * [SensorCapturePolicy.analysable].
      */
     FALLBACK("fallback"),
@@ -193,7 +194,7 @@ object AnalysedRolePolicy {
      *   set, never a guess from the exercise's name.
      * @param signalByRole what each role's own stream says about riding the
      *   load; a missing key is [StackMountSignal.UNMEASURED].
-     * @param spanMsByRole each role's time on the link, [UnitMotion.spanMs];
+     * @param spanMsByRole each role's first-to-last arrival span, [UnitMotion.spanMs];
      *   read by [SensorCapturePolicy.analysable], a missing key unjudged.
      * @param stillByRole whether each role's stream moved, [UnitMotion.still];
      *   read by [SensorCapturePolicy.analysable], a missing key unjudged.

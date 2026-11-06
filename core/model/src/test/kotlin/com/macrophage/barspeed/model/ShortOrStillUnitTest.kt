@@ -177,15 +177,40 @@ class ShortOrStillUnitTest {
     }
 
     /**
-     * RED before the fix, and the withholding half of #287. Before it, the
-     * still armed unit's ON_STACK signature confirmed it and it kept the
-     * analysis. Now it hands over by fallback, and
-     * `SetAnalyzer` refuses a fallback under a mount-specific declaration
-     * (#247), so the set publishes no figures rather than the partner's read
-     * under a mount nobody declared for it.
+     * Review round 1 (lens A 3): the "never when every unit is still" guard in
+     * [SensorCapturePolicy.analysable], pinned where it is computed. Through
+     * [armedCaptureOf] it is invisible on the analysed role -- with nothing
+     * analysable, `analysedStream` keeps the armed role anyway, so
+     * `two still units keep the armed one` stays green without it -- but the
+     * list is also what `silent` is computed from, and without the guard both
+     * still units drop out of it and either could be named silent.
      */
     @Test
-    fun `a still armed unit on a stack declaration falls back, which the analyzer withholds`() {
+    fun `with every unit still, every unit stays analysable`() {
+        val both = listOf(SensorRole.A, SensorRole.B)
+        assertEquals(
+            both,
+            SensorCapturePolicy.analysable(
+                expected = both,
+                framesByRole = mapOf(SensorRole.A to 6_000, SensorRole.B to 6_000),
+                spanMsByRole = mapOf(SensorRole.A to 59_990L, SensorRole.B to 59_990L),
+                stillByRole = mapOf(SensorRole.A to true, SensorRole.B to true),
+            ),
+        )
+    }
+
+    /**
+     * RED before the fix, and the fallback half of #287. Before it, the
+     * still armed unit's ON_STACK signature confirmed it and it kept the
+     * analysis. Now it hands over by fallback. That a fallback under a
+     * mount-specific declaration then publishes no figures is #247's pin,
+     * `FallbackMountGeometryTest.a fallback under a mount-specific declaration
+     * publishes no figures` in `:core:dsp`, and is not exercised here; this
+     * test was named for the withholding until review round 1 (lens A 12,
+     * lens B N6) said the name claimed more than it asserts.
+     */
+    @Test
+    fun `a still armed unit on a stack declaration falls back to its partner`() {
         val lying = buffer(6_000, moving = false)
         val c = capture(lying, partner, declaresStackMount = true) {
             if (it === lying) StackMountSignal.ON_STACK else StackMountSignal.NOT_ON_STACK
