@@ -141,6 +141,14 @@ object PlanWarningDisplay {
     private val UNKNOWN = Regex("""unknown key "([^"]+)" was ignored(?: \((\d+) places in this plan\))?""")
     private val PAIR = Regex("""so this plan's (.+?) means (\d+) × (.+?) in hand""")
 
+    /**
+     * ORDER MATTERS: first match wins. The RECORDS_WRONG checks (the key
+     * findings, the pair load, then start, drive and progression) must stay
+     * ahead of the NOTE checks, so a sentence that happens to share a phrase
+     * with a note is never demoted into the collapsed notes. Within the notes,
+     * "rides the weight stack with its drive" must precede the plainer
+     * "sensor rides the weight stack".
+     */
     @Suppress("CyclomaticComplexMethod", "LongMethod")
     private fun classify(body: String, place: String, exercise: String): Pair<PlanWarningRule, String> {
         MISSPELT.find(body)?.let { m ->

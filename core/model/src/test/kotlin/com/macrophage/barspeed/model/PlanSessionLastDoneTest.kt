@@ -27,11 +27,17 @@ class PlanSessionLastDoneTest {
 
     @Test
     fun `the label is the day in the lifter's zone`() {
-        assertEquals("Last done Wed 4 Nov", PlanSessionLastDone.label(at(4), london, Locale.UK))
+        assertEquals("Last done Wed 4 Nov", PlanSessionLastDone.label(at(4), at(6), london, Locale.UK))
         // 23:30 in London on the 4th is already the 5th in Tokyo.
         assertEquals(
             "Last done Thu 5 Nov",
-            PlanSessionLastDone.label(at(4, hour = 23), ZoneId.of("Asia/Tokyo"), Locale.UK),
+            PlanSessionLastDone.label(at(4, hour = 23), at(6), ZoneId.of("Asia/Tokyo"), Locale.UK),
         )
+    }
+
+    @Test
+    fun `a date from another year says the year`() {
+        val lastYear = ZonedDateTime.of(2025, 11, 4, 18, 0, 0, 0, london).toInstant().toEpochMilli()
+        assertEquals("Last done Tue 4 Nov 2025", PlanSessionLastDone.label(lastYear, at(6), london, Locale.UK))
     }
 }

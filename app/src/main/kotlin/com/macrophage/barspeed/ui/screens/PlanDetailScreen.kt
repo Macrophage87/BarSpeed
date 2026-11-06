@@ -346,7 +346,9 @@ private fun SessionHeader(session: PlanSessionDef, lastDoneMs: Long?, startable:
             }
         }
         Text(
-            lastDoneMs?.let { PlanSessionLastDone.label(it, ZoneId.systemDefault(), Locale.getDefault()) }
+            lastDoneMs?.let {
+                PlanSessionLastDone.label(it, System.currentTimeMillis(), ZoneId.systemDefault(), Locale.getDefault())
+            }
                 ?: "Not done yet",
             style = MaterialTheme.typography.bodySmall,
             color = BarColors.Sub,

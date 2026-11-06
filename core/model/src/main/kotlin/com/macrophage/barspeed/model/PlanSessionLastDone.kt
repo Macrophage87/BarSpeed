@@ -30,9 +30,15 @@ object PlanSessionLastDone {
         .groupBy { it.planSessionName!! }
         .mapValues { (_, runs) -> runs.maxOf { it.startedAtMs } }
 
-    /** "Last done Tue 4 Nov", in the zone and locale given. */
-    fun label(startedAtMs: Long, zone: ZoneId, locale: Locale): String {
+    /**
+     * "Last done Wed 4 Nov", in the zone and locale given; "Last done Wed 4
+     * Nov 2025" when it was not in the year of [nowMs], so a date from last
+     * year's block does not read as this week's.
+     */
+    fun label(startedAtMs: Long, nowMs: Long, zone: ZoneId, locale: Locale): String {
         val day = Instant.ofEpochMilli(startedAtMs).atZone(zone)
-        return "Last done " + DateTimeFormatter.ofPattern("EEE d MMM", locale).format(day)
+        val thisYear = Instant.ofEpochMilli(nowMs).atZone(zone).year == day.year
+        val pattern = if (thisYear) "EEE d MMM" else "EEE d MMM yyyy"
+        return "Last done " + DateTimeFormatter.ofPattern(pattern, locale).format(day)
     }
 }

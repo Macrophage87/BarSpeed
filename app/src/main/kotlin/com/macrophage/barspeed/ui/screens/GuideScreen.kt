@@ -123,7 +123,7 @@ private val SECTIONS =
         GuideSection(
             "Plans",
             "Import a plan on the Plans screen: paste JSON or pick a .json file. The plan is validated " +
-                "held — nothing becomes active until you make it active. Tap a plan to review every " +
+                "and saved — nothing becomes active until you make it active. Tap a plan to review every " +
                 "session, exercise, and set first. Use the prompt below to have an LLM " +
                 "generate the file.",
         ),

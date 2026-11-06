@@ -35,7 +35,7 @@ your training and write the next block.
 ## Get a training plan out of Claude and into the app
 
 Copy this prompt into Claude (fill in the bracketed context), then in the app:
-**Plans → Import plan → paste → Approve**.
+**Plans → Import plan → paste → Make active**.
 
 The short version below is enough to get started. The app's own **Guide →
 COPY PLAN PROMPT** carries the full contract and is the copy kept in step with
