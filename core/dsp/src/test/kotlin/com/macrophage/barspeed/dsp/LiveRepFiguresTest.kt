@@ -12,8 +12,7 @@ class LiveRepFiguresTest {
     private fun run(startS: Double, endS: Double, mean: Double) =
         StreamingSetTracker.DriveRun(startS, endS, mean, mean * 2)
 
-    private fun call(count: Int, startS: Double, endS: Double) =
-        RepCall.Speak(count, 0L, DriveWindow(startS, endS))
+    private fun call(count: Int, startS: Double, endS: Double) = RepCall.Speak(count, 0L, DriveWindow(startS, endS))
 
     @Test
     fun `a correction, a skipped total and a call with no drive are each a bar with no figure`() {
