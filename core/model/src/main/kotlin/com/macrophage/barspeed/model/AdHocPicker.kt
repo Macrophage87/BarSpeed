@@ -6,12 +6,13 @@ package com.macrophage.barspeed.model
  * Room.
  *
  * [addedKg] is on the ADDED scale the load box takes, never the
- * body-weight-inclusive one the row stores: `loadKg - bodyWeightKg` on
- * body-weight work, `loadKg` otherwise.
+ * body-weight-inclusive one the row stores ([AdHocPicker.addedKg] converts),
+ * and null when the row cannot say what was added: then the load box takes
+ * the default rather than a guess.
  */
 data class RecordedLift(
     val exerciseId: String,
-    val addedKg: Double,
+    val addedKg: Double?,
     val reps: Int?,
     val durationS: Int?,
     val tempo: String?,
@@ -123,6 +124,27 @@ object AdHocPicker {
                     block.exercise == exerciseId && block.sets.any { SideChoicePolicy.offersChoice(it.side) }
                 }
             }
+
+    /**
+     * The added load of a recorded set, from the row's stored load and the
+     * body weight it stored with it, or null when that cannot be known.
+     *
+     * A row that stored a body weight is body-weight work: added is
+     * `loadKg - bodyWeightKg`. A row that stored none is loaded work, where
+     * the load IS the added load -- except a body-weight lift recorded before
+     * the body weight was stored with the set (database v17), whose `loadKg`
+     * may hold the lifter's whole weight. Prefilling that as ADDED load would
+     * put his body weight on the bar twice, so it is null and the picker uses
+     * its default.
+     */
+    fun addedKg(exerciseId: String, loadKg: Double, bodyWeightKg: Double?): Double? =
+        loadKg - (bodyWeightKg ?: 0.0)
+
+    /**
+     * What "Different exercise..." offers: the picker's list without the lift
+     * of the block in progress, which ADD SET already adds a set of.
+     */
+    fun offPlanChoices(options: List<ExerciseDef>, inProgressExerciseId: String?): List<ExerciseDef> = options
 
     /** The active plan's first declaration of [exerciseId], or null when the plan does not list it. */
     fun planDeclaration(exerciseId: String, plan: List<PlanSessionDef>): PlanExerciseDef? =

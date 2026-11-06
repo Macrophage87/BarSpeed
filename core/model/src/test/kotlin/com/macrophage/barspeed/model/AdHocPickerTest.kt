@@ -20,7 +20,7 @@ class AdHocPickerTest {
     private fun lift(
         id: String,
         atMs: Long,
-        addedKg: Double = 50.0,
+        addedKg: Double? = 50.0,
         reps: Int? = 8,
         durationS: Int? = null,
         tempo: String? = null,
@@ -182,5 +182,46 @@ class AdHocPickerTest {
         assertEquals(ExerciseDef.resolvedById("dead_hang"), planned.exercise)
         assertEquals(SetGeometryPolicy.describe(planned.exercise, null), planned.geometry)
         assertFalse(planned.stackRuleApplied)
+    }
+
+    // ---- the added load of a stored row (review of batch1-adhoc-rel) --------
+
+    @Test
+    fun `a row with a stored body weight is body-weight work and its added load is the difference`() {
+        assertEquals(10.0, AdHocPicker.addedKg("pull_up", loadKg = 90.0, bodyWeightKg = 80.0))
+        assertEquals(-20.0, AdHocPicker.addedKg("assisted_pull_up", loadKg = 60.0, bodyWeightKg = 80.0))
+    }
+
+    @Test
+    fun `a loaded row's load is its added load`() {
+        assertEquals(100.0, AdHocPicker.addedKg("back_squat", loadKg = 100.0, bodyWeightKg = null))
+    }
+
+    /**
+     * A body-weight set recorded before the body weight was stored with it:
+     * `loadKg` may be his whole weight. Prefilled as added load it would put
+     * his body weight on him twice.
+     */
+    @Test
+    fun `a body-weight row with no stored body weight has no known added load`() {
+        assertNull(AdHocPicker.addedKg("pull_up", loadKg = 80.0, bodyWeightKg = null))
+        val fill = AdHocPicker.prefill(
+            ExerciseDef.resolvedById("pull_up"),
+            lift("pull_up", 1, addedKg = null, reps = 7),
+            WeightUnit.KG,
+        )
+        assertEquals(0.0, fill.addedKg)
+        assertEquals(7, fill.reps)
+    }
+
+    // ---- the off-plan chooser ------------------------------------------------
+
+    @Test
+    fun `different exercise does not offer the lift of the block in progress`() {
+        val options = AdHocPicker.options(emptyList(), emptyList())
+        val ids = AdHocPicker.offPlanChoices(options, inProgressExerciseId = "back_squat").map { it.id }
+        assertFalse("back_squat" in ids)
+        assertEquals(options.size - 1, ids.size)
+        assertEquals(options, AdHocPicker.offPlanChoices(options, inProgressExerciseId = null))
     }
 }
