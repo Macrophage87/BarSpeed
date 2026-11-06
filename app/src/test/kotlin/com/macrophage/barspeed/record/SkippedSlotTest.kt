@@ -256,6 +256,22 @@ class SkippedSlotTest {
 
         assertNull(out.statedSide, "a side stated for the skipped set reached the one that moved up")
     }
+
+    /**
+     * RED before `NextSetInputs` (code-health review 2026-11-06, F2). The
+     * ad-hoc tempo field follows the slot that moves up, as it already did on
+     * the rest transition and on switch exercise; a skip used to leave it
+     * describing the dropped set. Nothing on a plan session reads it, so this
+     * pins agreement between the five routes rather than a lifter-visible fix.
+     */
+    @Test
+    fun `a skip re-seeds the ad-hoc tempo field from the slot that moves up`() {
+        val state = resting(steppingSquats(), queueIndex = 2).copy(tempoInput = "2011")
+
+        val out = assertNotNull(skippedState(state))
+
+        assertEquals("3010", out.tempoInput)
+    }
 }
 
 private val squat = ExerciseDef("back_squat", "Back squat")
