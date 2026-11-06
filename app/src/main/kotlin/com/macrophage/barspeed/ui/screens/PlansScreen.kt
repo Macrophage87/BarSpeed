@@ -64,6 +64,9 @@ fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewMo
     // plan deleted underneath the dialog takes the dialog with it rather than
     // leaving a confirm button pointed at a row that no longer exists.
     var confirmingPlanId by rememberSaveable { mutableStateOf<Long?>(null) }
+    // Same shape as confirmingPlanId, for the same reason: a plan gone from the
+    // list takes its delete prompt with it.
+    var deletingPlanId by rememberSaveable { mutableStateOf<Long?>(null) }
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val filePicker =
@@ -135,6 +138,7 @@ fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewMo
                         row = row,
                         viewModel = viewModel,
                         onConfirmSwitch = { confirmingPlanId = row.entity.id },
+                        onDelete = { deletingPlanId = row.entity.id },
                         onOpen = { navController.navigate("plan/${row.entity.id}") },
                     )
                 }
@@ -145,6 +149,10 @@ fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewMo
     confirmingPlanId
         ?.let { id -> plans.firstOrNull { it.entity.id == id } }
         ?.let { row -> ConfirmSwitchDialog(row, viewModel) { confirmingPlanId = null } }
+
+    deletingPlanId
+        ?.let { id -> plans.firstOrNull { it.entity.id == id } }
+        ?.let { row -> ConfirmDeleteDialog(row, viewModel) { deletingPlanId = null } }
 
     if (showBodyWeightDialog) {
         BodyWeightDialog(
@@ -366,7 +374,13 @@ private fun relayText(heading: String, lines: List<String>): String =
     (listOf("$heading:") + lines.map { "- $it" }).joinToString("\n")
 
 @Composable
-private fun PlanCard(row: PlanRow, viewModel: PlansViewModel, onConfirmSwitch: () -> Unit, onOpen: () -> Unit) {
+private fun PlanCard(
+    row: PlanRow,
+    viewModel: PlansViewModel,
+    onConfirmSwitch: () -> Unit,
+    onDelete: () -> Unit,
+    onOpen: () -> Unit,
+) {
     val plan = row.entity
     Card(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
@@ -407,12 +421,41 @@ private fun PlanCard(row: PlanRow, viewModel: PlansViewModel, onConfirmSwitch: (
                         Text("Make active")
                     }
                 }
-                // Kept a TextButton (#201): it deletes the plan without asking, so it must not read
-                // as the card's next step.
-                TextButton(onClick = { viewModel.delete(plan.id) }) { Text("Delete") }
+                // Kept a TextButton (#201): it is never the card's next step. It
+                // asks first (UX review 2026-11-06, plans F8): it sits in the
+                // row beside Start, and one mis-tap used to lose the plan.
+                TextButton(onClick = onDelete) { Text("Delete") }
             }
         }
     }
+}
+
+/**
+ * Deleting a plan removes only the plan. A recorded session keeps its own
+ * copy of the plan's name and holds no reference to the plan row, so History
+ * is untouched, and the prompt says so because that is what a lifter about
+ * to delete an old plan wants to know.
+ */
+@Composable
+private fun ConfirmDeleteDialog(row: PlanRow, viewModel: PlansViewModel, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Delete ${row.entity.name}?") },
+        text = { Text("Its sessions in History stay.", style = MaterialTheme.typography.bodySmall) },
+        // Kept TextButtons (#201): this dialog's two actions; the dialog's frame already marks them
+        // as its answers.
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onDismiss()
+                    viewModel.delete(row.entity.id)
+                },
+            ) { Text("Delete") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
 }
 
 /**
