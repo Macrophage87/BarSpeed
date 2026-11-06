@@ -16,6 +16,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.macrophage.barspeed.model.RestEffortPromptPolicy
+import com.macrophage.barspeed.model.SetEndControlPolicy
+import com.macrophage.barspeed.model.SetEndKind
 import com.macrophage.barspeed.record.RecordState
 import com.macrophage.barspeed.record.RecordViewModel
 import com.macrophage.barspeed.ui.components.SectionCaption
@@ -160,7 +162,18 @@ internal fun RestEffortPromptSection(state: RecordState, viewModel: RecordViewMo
     // The failure tile is not among these. The policy has already established
     // that nothing on this row says the set fell short, and a tile offering to
     // say so after the set finished is the ask the owner's rule forbids.
-    val options = rpeOptions(timed, feedback.explosive, state.weightUnit, feedback.rpeAsk).filter { !it.failed }
+    val options =
+        rpeOptions(timed, feedback.explosive, state.weightUnit, feedback.rpeAsk).filter { !it.failed }
+            // A sensor-counted set's tiles in the in-set grid's order, "2 reps
+            // left" and "1 rep left" first, so END SET's deferred question
+            // reads the same as the one it skipped (record-live F4).
+            .let { tiles ->
+                if (feedback.sensorCounted) {
+                    SetEndControlPolicy.gridOrder(SetEndKind.SENSOR_COUNTED, tiles) { it.rpe }
+                } else {
+                    tiles
+                }
+            }
     Spacer(Modifier.height(6.dp))
     // The owner's own words for the thing a hold never showed him.
     SectionCaption("How hard was that set?")
