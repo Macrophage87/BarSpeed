@@ -118,6 +118,7 @@ class JournalRecoveryTest {
         prep: Boolean = true,
         roleA: String? = roleAText,
         marks: List<Long> = emptyList(),
+        cues: String = cuesText,
     ): OrphanedSet {
         val store = store()
         val journal = checkNotNull(store.open(header))
@@ -125,7 +126,7 @@ class JournalRecoveryTest {
         val dir = journal.directory
         File(dir, SetJournal.IMU).writeText(ImuCsv.HEADER + "\n")
         roleA?.let { File(dir, SetJournal.secondaryImuFile(SensorRole.A)).writeText(it) }
-        File(dir, SetJournal.CUES).writeText(cuesText)
+        File(dir, SetJournal.CUES).writeText(cues)
         if (prep) File(dir, SetJournal.PREP).writeText(PrepWindowCsv.encode(window))
         if (marks.isNotEmpty()) {
             val rows = marks.joinToString(separator = "\n", postfix = "\n")
@@ -295,6 +296,34 @@ class JournalRecoveryTest {
         val set = ready(recovery(FakeSessionDao()).prepare(journaled()))
         val last = maxOf(roleA.maxOf { it.timestampMs }, CueCsv.decode(cuesText).maxOf { it.timestampMs })
         assertEquals(last, set.endedAtMs)
+    }
+
+    /**
+     * The end is the latest instant of ANY stream, not of the samples alone: a
+     * cue spoken after the last sample reached the disk bounds the set too.
+     */
+    @Test
+    fun `a cue spoken after the last sample still bounds the end`() = runTest {
+        val late = roleA.maxOf { it.timestampMs } + 5_000L
+        val set = ready(recovery(FakeSessionDao()).prepare(journaled(cues = cuesText + "$late,Set ended\n")))
+        assertEquals(late, set.endedAtMs)
+    }
+
+    /**
+     * The analysis moved off the armed unit, and the declaration describes
+     * the armed unit's mount: where that mount decides the figures -- a 2:1
+     * pulley here -- they are withheld, exactly as the set's own write
+     * withholds them (#247). The recovery must hand the analyzer the
+     * fell-back flag the capture decided, not a default.
+     */
+    @Test
+    fun `an analysis moved off the armed unit is withheld where the mount decides it`() = runTest {
+        val pulley = squat.copy(travelRatio = 2.0)
+        val pulleyFacts = facts.copy(exercise = pulley, geometry = SetGeometryPolicy.describe(pulley, null))
+        val set = ready(recovery(FakeSessionDao()).prepare(journaled(header = header(facts = pulleyFacts))))
+        assertEquals(true, set.sensors?.analysedFellBack)
+        assertEquals(listOf(SetAnalyzer.MOUNT_NOT_DECLARED_VERDICT), set.analysis.verdicts)
+        assertTrue(set.analysis.reps.isEmpty())
     }
 
     /**
