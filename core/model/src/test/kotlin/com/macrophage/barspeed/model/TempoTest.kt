@@ -75,28 +75,58 @@ class TempoTest {
     }
 
     /**
-     * A fractional component parses and its own [Tempo.notation] does not
-     * parse back: `notation()` writes "1.5" as three characters, and the
-     * compact form reads one character per component, so the round trip is
-     * six components and is refused.
-     *
-     * Characterization, not an endorsement: this is what the code does today.
-     * It is why a tempo carrying a fraction is not a thing four
-     * single-character wheels can display without rewriting it.
+     * A fractional component is written back in the dash form, which parses.
+     * It used to be written "301.50" -- six characters the compact form reads
+     * as six components -- so the export's `tempoCompliance.prescribed` could
+     * not be read back (core-model review 2026-11-06, F5).
      */
     @Test
-    fun `a fractional component parses but its own notation does not parse back`() {
+    fun `a fractional component is written back in the dash form`() {
         val tempo = Tempo.parse("3-0-1.5-0")
         assertEquals(1.5, tempo.upS)
-        assertEquals("301.50", tempo.notation())
-        assertNull(Tempo.parseOrNull(tempo.notation()))
+        assertEquals("3-0-1.5-0", tempo.notation())
+        assertEquals(tempo, Tempo.parseOrNull(tempo.notation()))
     }
 
     /** A component of ten or more needs the dash form; the compact form is one digit each. */
     @Test
     fun `a component wider than one character needs the dash form`() {
         assertNull(Tempo.parseOrNull("10010"))
-        assertEquals(10.0, Tempo.parse("10-0-1-0").downS)
+        val tempo = Tempo.parse("10-0-1-0")
+        assertEquals(10.0, tempo.downS)
+        assertEquals("10-0-1-0", tempo.notation(), "it used to be written 10.0010")
+        assertEquals("X-0-1.5-0", Tempo(null, 0.0, 1.5, 0.0).notation(), "X keeps its letter in the dash form")
+    }
+
+    /** Whole single digits keep the compact form every plan and export already uses. */
+    @Test
+    fun `whole single digits keep the compact form`() {
+        assertEquals("3010", Tempo.parse("3-0-1-0").notation())
+        assertEquals("90X9", Tempo(9.0, 0.0, null, 9.0).notation())
+    }
+
+    /**
+     * Property: every tempo over a grid of strokes and pauses -- single digits,
+     * X, halves, tenths, and two-digit values -- parses back to itself from
+     * its own notation (F5).
+     */
+    @Test
+    fun `notation round-trips through parse over a grid`() {
+        val values = listOf(0.0, 0.5, 1.0, 1.25, 2.0, 3.0, 4.5, 9.0, 9.5, 10.0, 12.0, 30.0, 0.1)
+        val strokes = values + listOf<Double?>(null)
+        var checked = 0
+        for (down in strokes) {
+            for (bottom in values) {
+                for (up in strokes) {
+                    for (top in values) {
+                        val tempo = Tempo(down, bottom, up, top)
+                        assertEquals(tempo, Tempo.parseOrNull(tempo.notation()), tempo.notation())
+                        checked++
+                    }
+                }
+            }
+        }
+        assertEquals(14 * 13 * 14 * 13, checked)
     }
 
     /**
