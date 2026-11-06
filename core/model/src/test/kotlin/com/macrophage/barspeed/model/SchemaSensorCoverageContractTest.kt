@@ -30,6 +30,13 @@ class SchemaSensorCoverageContractTest {
     private fun exportVersionLog() = schema()["properties"]!!
         .jsonObject["schemaVersion"]!!.jsonObject["description"]!!.jsonPrimitive.content
 
+    private fun rawMeta() = Json.parseToJsonElement(
+        javaClass.getResourceAsStream("/raw-meta.schema.json")!!.readBytes().decodeToString(),
+    ).jsonObject
+
+    private fun rawSetDescription(name: String) = rawMeta()["\$defs"]!!.jsonObject["set"]!!
+        .jsonObject["properties"]!!.jsonObject[name]!!.jsonObject["description"]!!.jsonPrimitive.content
+
     private val shippedPrompt: String =
         checkNotNull(
             javaClass.getResourceAsStream("/kotlin/com/macrophage/barspeed/ui/screens/GuideScreen.kt"),
@@ -230,6 +237,66 @@ class SchemaSensorCoverageContractTest {
         assertTrue(
             "publishes this block too, unless its link was still delivering as the set ended" in shippedPrompt,
             "the prompt's absent-sensors sentence still says too few frames always publishes the block",
+        )
+    }
+
+    /**
+     * Review round 4 (lens A BLK-1): the raw archive's manifest publishes the
+     * same two facts as `analysedFellBack` and `sensorsSilent`, read from the
+     * same stored [RecordedSensors] fields, and still described them with the
+     * pre-1.26 single cause -- "delivered too little", "delivered too few
+     * frames to analyse" -- and `sensorsSilent` without the delivering
+     * qualifier. A reader holding only the zip was told a still unit's full
+     * stream was short.
+     */
+    @Test
+    fun `the raw manifest's fallback and silent keys carry the 1_26 causes`() {
+        val fellBack = rawSetDescription("analysedFellBack")
+        assertFalse("because that unit delivered too little" in fellBack, "raw analysedFellBack: $fellBack")
+        val causes = listOf(
+            "could not stand for the set",
+            "spanned less of the set than its partner",
+            "never moved while its partner did",
+            "`analysedRoleBasis`",
+        )
+        for (fact in causes) {
+            assertTrue(fact in fellBack, "raw analysedFellBack does not state: $fact")
+        }
+
+        val silent = rawSetDescription("sensorsSilent")
+        assertFalse(
+            silent.startsWith("Which armed units delivered too few frames to analyse, keyed by role"),
+            "raw sensorsSilent still names one cause: $silent",
+        )
+        for (fact in listOf("the analysis refused", "never moved", "not delivering as the set ended")) {
+            assertTrue(fact in silent, "raw sensorsSilent does not state: $fact")
+        }
+
+        val sole = rawSetDescription("sensorsSoleSilent")
+        assertTrue("not delivering as the set ended" in sole, "raw sensorsSoleSilent: $sole")
+
+        val rawLog = rawMeta()["description"]!!.jsonPrimitive.content
+        assertEquals(1, rawLog.split("Within 1.0 (#242, #287").size - 1, "raw-meta's log does not file #242/#287 once")
+    }
+
+    /**
+     * Review round 4 (lens B N1): the 1.26 entry listed the keys whose meaning
+     * moves and left out `silent`, which from 1.26 may name a unit that
+     * delivered enough frames.
+     */
+    @Test
+    fun `the 1_26 coverage entry says silent may now name such a unit`() {
+        val entry = exportVersionLog().substringAfter(marker).substringBefore(" 1.26 (")
+        assertTrue("`silent` may now also name such a unit" in entry, "the #242/#287 entry does not name silent")
+        assertTrue("`sensorsSilent`" in entry, "the #242/#287 entry does not say the raw manifest moves with it")
+    }
+
+    /** Review round 4 (lens B N3): the prompt's absent-sensors sentence opened with the old absolute. */
+    @Test
+    fun `the shipped prompt's absent-sensors sentence does not open with an absolute`() {
+        assertTrue(
+            "Absent \"sensors\" usually means one sensor that delivered" in shippedPrompt,
+            "the prompt still says absent sensors means one sensor that delivered",
         )
     }
 }
