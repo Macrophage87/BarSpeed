@@ -200,6 +200,38 @@ class ShortOrStillUnitTest {
     }
 
     /**
+     * Review round 2 (lens A N1): the near neighbour of the still rule.
+     * "While a covering partner did" is computed over the units that COVERED
+     * the set, so a partner that moved but fell short on its span does not
+     * count as having moved. Here the armed unit moved and stopped half way,
+     * and the partner covered the minute and never moved: the armed unit
+     * drops out on its span, nothing covering moved, so the still partner is
+     * not refused and takes the analysis, flagged as a fallback. Pinned as it
+     * stands, a characterization and not a fix; which of two bad streams is
+     * the better one is the choice the KDoc of [SensorCapturePolicy.analysable]
+     * records. Judging "moved" over every delivered unit instead empties the
+     * list, and the analysis then stays on the half-set unit.
+     */
+    @Test
+    fun `a still partner takes the analysis from an armed unit that moved and stopped half way`() {
+        val both = listOf(SensorRole.A, SensorRole.B)
+        assertEquals(
+            listOf(SensorRole.B),
+            SensorCapturePolicy.analysable(
+                expected = both,
+                framesByRole = mapOf(SensorRole.A to 3_000, SensorRole.B to 6_000),
+                spanMsByRole = mapOf(SensorRole.A to 29_990L, SensorRole.B to 59_990L),
+                stillByRole = mapOf(SensorRole.A to false, SensorRole.B to true),
+            ),
+        )
+        val lying = buffer(6_000, moving = false)
+        val c = capture(buffer(3_000, moving = true), lying)
+        assertEquals(SensorRole.B, c.sensors?.analysed)
+        assertEquals(true, c.sensors?.analysedFellBack)
+        assertTrue(c.samples === lying, "the analysis is not on the still partner's buffer")
+    }
+
+    /**
      * RED before the fix, and the fallback half of #287. Before it, the
      * still armed unit's ON_STACK signature confirmed it and it kept the
      * analysis. Now it hands over by fallback. That a fallback under a
