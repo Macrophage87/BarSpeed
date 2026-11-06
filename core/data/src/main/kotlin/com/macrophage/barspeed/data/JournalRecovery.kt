@@ -127,6 +127,18 @@ class JournalRecovery(
      * failure reaches the caller. A process killed between the row and the
      * discard leaves a capture whose set is stored, which the next attempt
      * answers AlreadyStored and removes without writing it twice.
+     *
+     * A NEW SESSION IS TWO WRITES, NOT ONE (#100 review round 1, Lens A N6,
+     * Lens B N5): `recordFirstSet` opens the session with the set in it, and
+     * `endSession` closes it. A process killed, or an `endSession` that
+     * throws, between the two leaves the set stored in a session that is
+     * still open; the next attempt answers AlreadyStored and removes the
+     * capture, and nothing closes that session. The set itself is not lost
+     * or duplicated. The open session then reads as an unfinished workout,
+     * and Record can offer "Continue this session?" for it while it is inside
+     * the resume window. Stated rather than handled: closing it from here on
+     * the AlreadyStored path would need a session-level write this class
+     * does not otherwise make, and that has not been designed.
      */
     suspend fun recover(orphan: OrphanedSet, writeOutstanding: Boolean): RecoveryOutcome {
         val set =

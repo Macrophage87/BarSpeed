@@ -115,7 +115,12 @@ sealed interface RecoveryTarget {
     /** A row for this very set is already in History; writing again would duplicate it. */
     data object AlreadyStored : RecoveryTarget
 
-    /** A set write or a session close is still running; nothing is decided until it ends. */
+    /**
+     * A recording hold is held: a set write or a session close still
+     * running, or a set still recording on the record screen (or that
+     * screen's hold, leaked by a task swipe). Nothing is decided until it is
+     * released; [JournalRecoveryPolicy.waitNote] says which.
+     */
     data object Wait : RecoveryTarget
 }
 
@@ -160,6 +165,19 @@ object JournalRecoveryPolicy {
      * at the next free position rather than the header's `orderIdx`, which a
      * set recorded after the kill may hold. Everything else, a closed session
      * above all, gets a session of its own.
+     *
+     * WHERE IT JOINS, ORDER IS NOT TIME. An attached set takes the next
+     * free `orderIdx`, after any set the lifter recorded in that session
+     * after the interruption, so in that session `orderIdx` order is no
+     * longer the order the sets were lifted in. The export's measured rest
+     * pairs each set with the next by `orderIdx`, so the set before the
+     * kill measures its rest to the first set recorded after it -- a span
+     * with the recovered set inside it -- and the last set recorded before
+     * the recovery pairs with the recovered set, which began before it, a
+     * negative span `RestMeasurePolicy` refuses rather than publishes.
+     * Rejoining at the header's own
+     * position would collide with the set that took it, and renumbering
+     * stored sets is a rewrite of rows this never makes.
      *
      * One boundary with the resume prompt, by construction: the offer is
      * asked here rather than restated, so the recovery cannot call a session
@@ -290,12 +308,27 @@ object JournalRecoveryPolicy {
     /**
      * What the lifter is told when [target] answered [RecoveryTarget.Wait],
      * given the recording holds [held] at the moment of asking.
+     *
+     * WHAT BRINGS IT BACK DEPENDS ON THE HOLD, `rescuedRestoreNote`'s
+     * reading (#100 review round 1, Lens A N5, Lens B N4). A set-end write
+     * or a session close finishes on its own: wait. The record screen's own
+     * hold, [RecordingHold.SESSION], is released when that screen goes away,
+     * so held under Home it is a set still recording there or a hold a task
+     * swipe leaked, and nothing will finish it: the note says to finish the
+     * set on Record, and that force-stopping clears a leaked hold, since the
+     * holds live in process memory. That a force-stop clears it on a device
+     * is reasoned, not observed.
      */
-    @Suppress("UNUSED_PARAMETER", "UnusedParameter")
-    fun waitNote(held: Set<RecordingHold>): String = SAVING_NOTE
+    fun waitNote(held: Set<RecordingHold>): String =
+        if (RecordingHold.SET_WRITE in held || RecordingHold.SESSION_CLOSE in held) SAVING_NOTE else RECORDING_NOTE
 
     /** [waitNote] while a set-end write or a session close, which finishes on its own, is held. */
     const val SAVING_NOTE = "A set is still being saved -- try again in a moment"
+
+    /** [waitNote] while only the record screen's own hold is held. */
+    const val RECORDING_NOTE =
+        "A set is still recording on the Record screen -- finish it there first. If you are not recording, " +
+            "force-stop BarSpeed in Android settings and try again."
 
     /** What the card says in place of [ACTION_LABEL] when [refusal] refused. */
     fun refusalNote(refusal: RecoveryRefusal): String = when (refusal) {
