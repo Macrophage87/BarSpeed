@@ -860,7 +860,7 @@ object SetAnalyzer {
         // #92's table: over on the presses, under on the leg curl -- so it
         // neither tracks nor bounds the dwell.
         //
-        // Measured at a6d3c4f2 by a scratch run over the committed captures
+        // Measured at 9eaae8a2 by a scratch run over the committed captures
         // with SetAnalyzer's own defaults, NOT committed and NOT pinned: every
         // median is under 0.1 s -- 0.04-0.05 s on the four field-legcurl-1030
         // captures and 0.07-0.08 s on the three leg-press ones; the leg curl
