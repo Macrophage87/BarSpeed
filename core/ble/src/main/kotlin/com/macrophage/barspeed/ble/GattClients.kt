@@ -413,7 +413,7 @@ class WitmotionClient(context: Context, private val clock: () -> Long = System::
      * [onReady] has not run and nothing is unlocked.
      *
      * The register reports centivolts; `SensorBattery.percentFromCentivolts`
-     * is the map, moved there unchanged so a test holds it.
+     * is the map (a Li-ion curve since the linear one warned too late).
      *
      * WHETHER A REGISTER READ MID-STREAM COSTS ANY 100 Hz FRAMES has not been
      * watched on a WT901BLECL: [Field]. The reply is one RegisterData frame in

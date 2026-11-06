@@ -22,23 +22,48 @@ object SensorBattery {
      */
     const val REFRESH_INTERVAL_MS = 5 * 60_000L
 
-    private const val EMPTY_VOLTS = 3.4
-    private const val FULL_VOLTS = 4.1
+    /**
+     * A generic single-cell Li-ion discharge curve, as (centivolts, percent)
+     * points in rising order. A typical rest-voltage table, not a measurement
+     * of the WT901BLECL's own cell: [Field].
+     */
+    private val liIonCurve =
+        listOf(
+            340 to 0,
+            350 to 5,
+            360 to 10,
+            365 to 20,
+            370 to 30,
+            375 to 40,
+            380 to 50,
+            390 to 65,
+            400 to 80,
+            410 to 90,
+            420 to 100,
+        )
 
     /**
      * WT901BLECL battery register (centivolts) to a rough percent.
      *
-     * The linear 3.4-4.1 V map `WitmotionClient` has always used, moved here
-     * unchanged so a test can hold it. It is NOT a Li-ion discharge curve: a
-     * real cell sits near 3.7-3.8 V for most of its charge and falls fast
-     * below about 3.6 V, so this reads mid-charge cells low-ish and reaches
-     * [LOW_PCT] only at about 3.54 V, where a real cell has little left. The
-     * warning therefore comes late rather than early. Not changed here
-     * because nothing has measured this unit's curve: [Field].
+     * Interpolated along [liIonCurve], truncated to a whole percent, and
+     * clamped at both ends. It replaced the linear 3.4-4.1 V map
+     * `WitmotionClient` used to have: a real cell sits near 3.7-3.8 V for most
+     * of its charge and falls fast below about 3.6 V, so the linear map read
+     * 3.60 V as 28% and reached [LOW_PCT] only at about 3.54 V, where the cell
+     * has little left. On this curve "low" starts below 3.65 V, so it warns
+     * early rather than late. The register is read while the unit streams, so
+     * the voltage is under some load and may read a little low; that also
+     * errs towards warning early.
      */
     fun percentFromCentivolts(centivolts: Int): Int {
-        val volts = centivolts / 100.0
-        return (((volts - EMPTY_VOLTS) / (FULL_VOLTS - EMPTY_VOLTS)) * 100).toInt().coerceIn(0, 100)
+        val (firstCv, firstPct) = liIonCurve.first()
+        val (lastCv, lastPct) = liIonCurve.last()
+        if (centivolts <= firstCv) return firstPct
+        if (centivolts >= lastCv) return lastPct
+        val upper = liIonCurve.indexOfFirst { it.first >= centivolts }
+        val (hiCv, hiPct) = liIonCurve[upper]
+        val (loCv, loPct) = liIonCurve[upper - 1]
+        return loPct + (hiPct - loPct) * (centivolts - loCv) / (hiCv - loCv)
     }
 
     /** True only for a reading under [LOW_PCT]. An unknown reading is not low. */
