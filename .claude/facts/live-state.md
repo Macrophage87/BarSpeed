@@ -257,21 +257,11 @@ mutation killed, and that mapping is the whole content of a mutation table.
 
 - **`:core:ble` has no test source set at all** — `core/ble/src/` contains only `main`. Its
   `testDebugUnitTest`/`testReleaseUnitTest` report `NO-SOURCE`.
-- **`:app` has a real test source set, and this entry stops naming a per-file or per-method
-  count (#298).** Every count of that shape written here has gone stale faster than it was
-  read: "TWO test files, 18 executed per variant, 36 across the two variants" was true at
-  `eba5aad8df2fcd2f01bf288c94a31a568f8c24e6` and was already stale by
-  `a3c3a2e5aff70eebc88468f0d4bd3c9cf7bbfe08`, where
-  `find app/src/test -name '*.kt'` lists **twelve** files under
-  `app/src/test/kotlin/com/macrophage/barspeed/record/`, not two:
-  `AppendedSlotTest.kt`, `CaptureAtTest.kt`, `LastPlannedSetTest.kt`, `LiveFallbackTest.kt`,
-  `LiveFeedSourceTest.kt`, `NextSetSideTest.kt`, `PlanQueueTest.kt`, `RefusedSetAnswerTest.kt`,
-  `SkippedSlotTest.kt`, `SlotCardLineTest.kt`, `WeightUnitChangeDifferentialTest.kt`,
-  `WeightUnitChangeTest.kt`. Even that file list is a structural fact that only survives until
-  the next file is added or removed — it is not immune to the same drift, only cheaper to
-  re-verify (`find`, no Gradle). This bullet carries no current execution count; re-run
-  it per §4's "one measurement per gate" rule and quote the SHA you ran it at. Earlier
-  definitions said `:app` had **zero** test source sets; false too, and it stays retracted.
+- **`:app` has a real test source set, and this entry names no count of it (#298).** Every
+  per-file or per-method count written here went stale faster than it was read. Measure it:
+  `find app/src/test -name '*.kt' | wc -l` for files, and §4's "one measurement per gate" rule
+  for executions. Earlier definitions said `:app` had **zero** test source sets; false too, and
+  it stays retracted.
 - **`:app`'s unit tests run on a JDK 21 launcher as of #188** —
   `app/build.gradle.kts`, `tasks.withType<Test>().configureEach { javaLauncher.set(…21…) }`, the
   block `:core:data` already carried. Before it, `:app` ran its tests on 17 while
@@ -286,11 +276,14 @@ mutation killed, and that mapping is the whole content of a mutation table.
   Compiled is not tested. #193 tracks the wider sweep of sites that still assert a module has no
   test source set; these lines are among them and are fixed here rather than waiting for it.
 - **There is no `androidTest` directory anywhere in the tree.**
-- **`./gradlew test` compiles both `:app:compileDebugKotlin` and `:app:compileReleaseKotlin`**, and
-  the release variant additionally runs `isMinifyEnabled = true` with `proguard-rules.pro`
-  (`app/build.gradle.kts:41-42`) — so a change that compiles debug can still fail release.
-- **`:core:data` has a real test source set** — 17 files under
-  `core/data/src/test/kotlin/com/macrophage/barspeed/data/`, run twice per push
+- **`./gradlew test` compiles both `:app:compileDebugKotlin` and `:app:compileReleaseKotlin`**,
+  so a change that compiles debug can still fail release. It does **not** run R8: unit-test tasks
+  do not depend on `minifyReleaseWithR8` (check with `./gradlew test --dry-run | grep -i r8`), so
+  CI never exercises `isMinifyEnabled = true` with `proguard-rules.pro`. `release.yml` runs
+  `./gradlew test :app:assembleRelease` unsigned before it decodes the keystore, so a missing
+  keep rule fails the release before anything is signed or uploaded.
+- **`:core:data` has a real test source set** — count it with
+  `find core/data/src/test -name '*.kt' | wc -l` — run twice per push
   (`testDebugUnitTest` and `testReleaseUnitTest`). But its `SessionRepository*` classes take a
   `FakeSessionDao` implementing the DAO interface, and their own KDoc says it plainly:
   *"nothing here executes Room, SQLite or Android."* What is pinned is `SessionRepository`'s own
@@ -298,30 +291,25 @@ mutation killed, and that mapping is the whole content of a mutation table.
 - **So no test in this repo can verify Android, BLE or Room behaviour.** A comment may state what
   the code *calls*; it may not state what the GATT stack delivered, what thread a callback landed
   on, what Room migrated, or what the lifter saw.
-- **Room's version, its migrations and its committed schemas — the canonical copy, measured here
-  rather than relayed.** At `c44f1c531d6343d0071f82c062344e7f4eff950f`, by `git show
-  c44f1c5:core/data/src/main/kotlin/com/macrophage/barspeed/data/AppDatabase.kt`:
-  `const val DATABASE_VERSION = 13` at `AppDatabase.kt:53`, `exportSchema = true` at
-  `AppDatabase.kt:67`, and **twelve** hand-written migrations — `MIGRATION_1_2` through
-  `MIGRATION_12_13`, all declared in that one file and all twelve passed to `.addMigrations(…)`.
-  `git ls-tree -r --name-only c44f1c5 -- core/data/schemas` lists **four** tracked schemas under
-  `core/data/schemas/com.macrophage.barspeed.data.AppDatabase/`: `10.json` (landed at `7db7046`),
-  `11.json` (`47781c1`), `12.json` (`5ba69dd`) and `13.json` (`d190aea`), each added by
-  `git log --diff-filter=A` on that path. They are written by
-  `room { schemaDirectory("$projectDir/schemas") }`, `core/data/build.gradle.kts:58`.
-  **Schemas 1–9 do not exist**, so a migration test could validate 10→11, 11→12 and 12→13 and has
-  nothing to migrate from below 10. **There are still zero migration tests of any kind** — no
+- **Room's version, its migrations and its committed schemas — the canonical copy. Measure,
+  do not quote a number from here.**
+
+  ```
+  grep -rn "const val DATABASE_VERSION" core/data/src/main/kotlin
+  ls core/data/schemas/com.macrophage.barspeed.data.AppDatabase/
+  grep -n "val MIGRATION_" core/data/src/main/kotlin/com/macrophage/barspeed/data/AppDatabase.kt
+  ```
+
+  At v0.2.1 (`6e9d7d0`) that gave `DATABASE_VERSION = 21` and twelve tracked schemas, `10.json`
+  through `21.json`, written by `room { schemaDirectory("$projectDir/schemas") }` in
+  `core/data/build.gradle.kts`. **Schemas 1–9 do not exist**, so a migration test has nothing to
+  migrate from below 10. **There are still zero migration tests of any kind** — no
   `room-testing` dependency, no `MigrationTestHelper`, no `androidTest` directory anywhere.
   `DatabaseRescueTest` is the near neighbour and is NOT one: it drives `DatabaseRescue` against
   real files in a temp directory, and its own KDoc says *"Nothing here executes Room's open path
   -- no room-testing dependency, no MigrationTestHelper, no instrumented test."*
-  **Six agent definitions carry a stale copy of this paragraph** — `version = 10`, nine
-  migrations, no schema above `10.json`, and in `barspeed-implementer.md` an `exportSchema` line
-  number of `AppDatabase.kt:49` that is `:67`: `barspeed-implementer.md`,
-  `barspeed-implementer-sonnet.md`, `barspeed-orchestrator.md`, `barspeed-reviewer.md`,
-  `barspeed-reviewer-sonnet.md` and `barspeed-reviewer-stall.md`. This entry is the copy to
-  trust. Those six are the drift class §15 names and #162 was filed for, and they are not edited
-  from inside a code round.
+  The agent definitions point here rather than carrying their own copy; any agent text that
+  states a Room version is drift (#162) and this entry wins.
 - **A task reported `UP-TO-DATE` or `FROM-CACHE` has not run.** `./gradlew -PjvmOnly test` can
   report `BUILD SUCCESSFUL` in seconds having executed no test at all. Use `--rerun-tasks`
   whenever a number matters, and read the task list rather than the last line.
@@ -348,8 +336,9 @@ inherits none of them. `echo` all three first and export any that are empty rath
 concluding a toolchain is absent.
 
 `C:\Program Files\Eclipse Adoptium\` holds `jdk-17.0.20.8-hotspot`, `jdk-21.0.12.8-hotspot` and
-`jdk-25.0.3.9-hotspot`. The SDK is at `%LOCALAPPDATA%\Android\Sdk` with `platforms/android-35`,
-`build-tools/{34.0.0,35.0.0}`, `platform-tools`, `emulator`, `system-images` and accepted
+`jdk-25.0.3.9-hotspot`. The SDK is at `%LOCALAPPDATA%\Android\Sdk`; `compileSdk` is 36
+(`app/build.gradle.kts`), so check `ls "$ANDROID_HOME/platforms"` for `android-36`, plus
+`build-tools`, `platform-tools`, `emulator`, `system-images` and accepted
 `licenses`. Treat those as where to look first, not as a guarantee — the machine changes
 underneath this file.
 
@@ -374,7 +363,8 @@ With those set, **every step of `ci.yml` reproduces locally**: the JVM suite, li
 modules, `:app:lintDebug`, `:app:assembleDebug`, and the ajv schema validation.
 
 Run `ktlintCheck detekt` **unrestricted**, never under `-PjvmOnly`: that flag excludes `:app`
-(37 Kotlin files; `RecordScreen.kt` alone is 2,318 lines), `:core:ble` and `:core:data` from
+(the largest module; `wc -l app/src/main/kotlin/**/*.kt` for its size), `:core:ble` and
+`:core:data` from
 exactly the check most likely to red CI, and `end_of_line = lf` on Windows bites hardest in the
 Android modules local lint historically never reached.
 
@@ -412,34 +402,32 @@ Android modules local lint historically never reached.
 > Read `.claude/skills/bench-test/SKILL.md`. It carries the AVD name, the RAM-poor launch flags,
 > the `ANDROID_SERIAL` pin and the two-way migration test.
 
-## 7. Release is dispatched, never tagged
+## 7. Release: push the tag at the cut SHA, or dispatch
+
+Only after CI is green on the landed cut SHA. The canonical path builds exactly that SHA:
 
 ```
-gh workflow run Release -f tag=v0.1.NN
+git tag vX.Y.Z <full 40-char cut SHA>
+git push origin vX.Y.Z
 ```
 
-Only after CI is green, because `release.yml` runs `:app:assembleRelease` and dies on the same
-compile errors CI would have caught.
+Fallback, only when the git proxy refuses the tag push:
+`gh workflow run Release -f tag=vX.Y.Z --repo Macrophage87/BarSpeed`. The release action then
+creates the tag with no `target_commitish`, so it lands on `main`'s HEAD when that step runs, at
+the end of the build: nothing may land on `main` until the run completes (v0.1.5 and v0.1.6 both
+resolve to `56448cb` because of this). `release.yml` has no concurrency group.
 
-`release.yml` **does** also trigger on `push: tags: ["v*"]` (lines 3–4), so a stray
-`git push --tags` runs a full signed release build. The dispatch convention exists because, in
-the workflow's own comment, *"environments whose git proxy blocks tag pushes can dispatch the
-release directly; the tag is then created by the release action itself."*
+What the run does, in order: checks the tag is `vX.Y.Z`; runs `./gradlew test
+:app:assembleRelease` unsigned (unit tests plus R8); decodes the keystore; builds the signed APK
+and AAB; attaches APK, AAB and mapping to a GitHub Release; uploads the AAB to the Play
+**internal** track; deletes the keystore. The Play upload step is **skipped, not failed**, while
+the `PLAY_SERVICE_ACCOUNT_JSON` secret is unset, so a green run does not mean "on Play" — read
+the step's status in the job log.
 
-The tag is created by the action at publish time, and at least once it did not land on the SHA
-that was built: `v0.1.5` **and** `v0.1.6` both resolve to
-`56448cb9613fe81fab346bd128c4571c157149ab` (`git rev-list -n1`), whose `versionName` is **0.1.6**
-— so v0.1.5 names a commit that was never built as 0.1.5. That is one collision among 44 `v*`
-tags (`git tag -l 'v*' | wc -l`); later tags landed correctly. The mechanism is readable in
-`.github/workflows/release.yml:59` — the release step passes `tag_name` with no
-`target_commitish`, so GitHub creates the tag from `main`'s HEAD at the moment that step runs,
-the end of the build, not the dispatch — and `.claude/skills/release-cut/SKILL.md` derives the
-freeze rule from it. What remains unverified is narrower: no one has read the v0.1.5 run's log,
-so the specific incident's causation is inferred from the mechanism, not confirmed against it.
-`release.yml` has **no concurrency group**, so do not push to `main` while a release run is in
-flight, and after every release verify `git rev-list -n1 vX.Y.Z` is the SHA you intended.
+After every release, `git rev-parse vX.Y.Z^{commit}` must equal the cut SHA.
 
-> When cutting a release → Read `.claude/skills/release-cut/SKILL.md`.
+> When cutting a release → Read `.claude/skills/release-cut/SKILL.md` (its Play section covers
+> versionCode, the manual first upload and the signing-key consequence).
 
 ## 8. The commit body is the record
 
@@ -480,9 +468,8 @@ written; the numerator still holds, the denominator has moved.)
 **Never `git add` a directory, `-A` or `.`** — name every file path explicitly. Issue #97 records
 six sweeps of `core/data/schemas`, then untracked, one of which reached a remote branch at 1,212
 insertions on an eight-line change (`.claude/skills/land/SKILL.md:33-36`).
-`core/data/schemas/com.macrophage.barspeed.data.AppDatabase/` is **tracked now** and holds
-**four** schemas, `10.json` through `13.json` — §5 measures them and names the commit each landed
-in, and is the canonical copy. Only a `DATABASE_VERSION` bump writes an untracked sibling
+`core/data/schemas/com.macrophage.barspeed.data.AppDatabase/` is **tracked** (`10.json` up to
+the current version; §5 gives the command that lists them). Only a `DATABASE_VERSION` bump writes an untracked sibling
 `<N>.json`, and that new file must ship in the same commit as the migration, never swept in
 separately.
 
@@ -532,10 +519,12 @@ validates two hand-written examples the app never produced, themselves stale.
 - Do **not** add a `repositories {}` block to a module —
   `RepositoriesMode.FAIL_ON_PROJECT_REPOS` (`settings.gradle.kts:10`) hard-fails the build.
 - Do **not** tighten `ImuCsv`'s `require(f.size >= 10)` (`ImuCsv.kt:46`) to `== 11`, and do not
-  regenerate fixtures through `encode()`. `HEADER` declares 11 columns, and 4 of the 34
-  `core/dsp/src/test/resources/field-*.csv` fixtures carry 10 — the loose bound is what keeps the
-  oldest field captures readable. (Earlier definitions said "all four crown-jewel CSVs"; there are
-  34 field fixtures now, of which four are the 10-column ones. The imperative is unchanged.)
+  regenerate fixtures through `encode()`. `HEADER` declares 11 columns, and the oldest
+  `core/dsp/src/test/resources/field-*.csv` fixtures carry 10 — the loose bound is what keeps them
+  readable. Count them rather than quoting a number:
+  `ls core/dsp/src/test/resources | grep -c '^field-'` for all field fixtures, and
+  `for f in core/dsp/src/test/resources/field-*.csv; do grep -v '^#' "$f" | head -1 | awk -F, -v f="$f" 'NF==10{print f}'; done`
+  for the 10-column ones.
 
 Implement the task at hand; name adjacent defects and raise them rather than folding them in
 silently.
