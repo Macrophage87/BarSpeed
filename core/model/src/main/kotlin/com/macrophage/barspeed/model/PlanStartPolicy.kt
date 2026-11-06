@@ -31,6 +31,20 @@ enum class PlanLifecycle {
             else -> UNKNOWN
         }
     }
+
+    /**
+     * The word a plan card and Plan detail show for this status (UX review
+     * 2026-11-06, plans F6, copy F6). The database constants are schema terms:
+     * "staged" was printed raw on every card and explained nowhere. Null for
+     * [UNKNOWN], where the app has no word it can stand behind.
+     */
+    val label: String?
+        get() = when (this) {
+            ACTIVE -> "Active"
+            STAGED -> "Not started"
+            ARCHIVED -> "Archived"
+            UNKNOWN -> null
+        }
 }
 
 /**
@@ -90,8 +104,19 @@ object PlanStartPolicy {
     /** The consent word on a start that switches plans. */
     const val START = "START"
 
-    /** The consent word on a start that also performs the approval. */
+    /**
+     * The import gate's consent word for approving a fresh import and starting
+     * it in one tap. Not used by [decide]: a stored plan's start says
+     * [MAKE_ACTIVE_AND_START], the same verb as the "Make active" control.
+     */
     const val APPROVE_AND_START = "APPROVE & START"
+
+    /**
+     * The consent word on a start that also makes a never-activated plan the
+     * active one. One verb for one act (UX review 2026-11-06, copy F6): this
+     * and the "Make active" control both do `PlanDao.activate`.
+     */
+    const val MAKE_ACTIVE_AND_START = "MAKE ACTIVE & START"
 
     /**
      * [stagedWarnings] is how many warnings the import gate raised about this
@@ -126,8 +151,7 @@ object PlanStartPolicy {
                 buildString {
                     append(
                         if (staged) {
-                            "This plan is staged and has never been approved. Starting it approves " +
-                                "it and makes it the active plan."
+                            "This plan is not active yet. Starting it makes it the active plan."
                         } else {
                             "Starting this makes it the active plan."
                         },
@@ -141,7 +165,7 @@ object PlanStartPolicy {
                     // from the home screen next session.
                     activePlanName?.let { append(" \"$it\" is archived.") }
                 },
-                confirmLabel = if (staged) APPROVE_AND_START else START,
+                confirmLabel = if (staged) MAKE_ACTIVE_AND_START else START,
             ),
         )
     }
@@ -149,6 +173,6 @@ object PlanStartPolicy {
     /** The staged prompt's sentence about the import's warnings; see [decide]. */
     fun warningsLine(count: Int): String {
         val noun = if (count == 1) "warning" else "warnings"
-        return " Its import raised $count $noun that approving it accepts; \"Make active\" shows them first."
+        return " Its import raised $count $noun; \"Make active\" shows them first."
     }
 }

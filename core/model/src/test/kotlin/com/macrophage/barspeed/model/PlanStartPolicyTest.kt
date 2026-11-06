@@ -113,8 +113,8 @@ class PlanStartPolicyTest {
 
         assertNotNull(switch)
         assertEquals("Start \"Winter Block\"?", switch.title)
-        assertEquals("APPROVE & START", switch.confirmLabel)
-        assertTrue(switch.body.contains("staged"), "the lifter is told it was never approved")
+        assertEquals("MAKE ACTIVE & START", switch.confirmLabel)
+        assertTrue(switch.body.contains("not active yet"), "the lifter is told it was never made active")
         assertTrue(switch.body.contains("active plan"), "and that approving makes it the active one")
     }
 
@@ -134,7 +134,7 @@ class PlanStartPolicyTest {
 
         assertTrue(PlanStartPolicy.warningsLine(2) in body(PlanLifecycle.STAGED, 2))
         assertTrue("raised 2 warnings" in body(PlanLifecycle.STAGED, 2))
-        assertTrue("raised 1 warning that" in body(PlanLifecycle.STAGED, 1))
+        assertTrue("raised 1 warning;" in body(PlanLifecycle.STAGED, 1))
         assertFalse("warning" in body(PlanLifecycle.STAGED, 0), "a clean plan's prompt is unchanged")
         assertFalse("warning" in body(PlanLifecycle.ARCHIVED, 3), "an approved plan's warnings were seen")
     }
@@ -151,7 +151,7 @@ class PlanStartPolicyTest {
         assertNotNull(switch)
         assertEquals("START", switch.confirmLabel)
         assertTrue(switch.body.contains("Autumn Block"), "the displaced plan is named, not implied")
-        assertFalse(switch.body.contains("staged"), "an archived plan was approved once already")
+        assertFalse(switch.body.contains("not active yet"), "an archived plan was active once already")
     }
 
     @Test
@@ -177,7 +177,7 @@ class PlanStartPolicyTest {
 
         assertNotNull(switch)
         assertEquals("START", switch.confirmLabel)
-        assertFalse(switch.body.contains("staged"))
+        assertFalse(switch.body.contains("not active yet"))
     }
 
     @Test
@@ -189,5 +189,14 @@ class PlanStartPolicyTest {
 
         assertEquals("START", PlanStartDecision.Startable(prompt).switch?.confirmLabel)
         assertNull(PlanStartDecision.Startable(switch = null).switch)
+    }
+
+    @Test
+    fun `cards say what a status means, never the database word`() {
+        // UX review 2026-11-06, plans F6: "staged · tap to view" was printed raw.
+        assertEquals("Active", PlanLifecycle.ACTIVE.label)
+        assertEquals("Not started", PlanLifecycle.STAGED.label)
+        assertEquals("Archived", PlanLifecycle.ARCHIVED.label)
+        assertEquals(null, PlanLifecycle.UNKNOWN.label)
     }
 }
