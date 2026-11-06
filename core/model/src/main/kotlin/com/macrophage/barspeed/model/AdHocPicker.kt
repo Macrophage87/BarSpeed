@@ -74,14 +74,24 @@ object AdHocPicker {
         lifts: List<RecordedLift>,
         plan: List<PlanSessionDef>,
         seeds: List<ExerciseDef> = ExerciseDef.SEED,
-    ): List<ExerciseDef> = seeds
+    ): List<ExerciseDef> {
+        val recent = lifts.filterNot { it.voided }.sortedByDescending { it.endedAtMs }.map { it.exerciseId }
+        val planned = plan.flatMap { session -> session.exercises.map { it.exercise } }
+        return (recent + planned + seeds.map { it.id })
+            .filter { it.isNotBlank() }
+            .distinct()
+            .map(ExerciseDef::resolvedById)
+    }
 
     /**
      * The last time the lifter did [exerciseId]: his latest working set of it,
      * or his latest warm-up when he has only warmed up on it. Voided sets are
      * never a source.
      */
-    fun lastLift(lifts: List<RecordedLift>, exerciseId: String): RecordedLift? = null
+    fun lastLift(lifts: List<RecordedLift>, exerciseId: String): RecordedLift? {
+        val mine = lifts.filter { it.exerciseId == exerciseId && !it.voided }
+        return mine.filterNot { it.warmup }.maxByOrNull { it.endedAtMs } ?: mine.maxByOrNull { it.endedAtMs }
+    }
 
     /**
      * What the boxes open on for [exercise]: [last]'s numbers when there is a
@@ -90,10 +100,10 @@ object AdHocPicker {
      * weight plus 60.
      */
     fun prefill(exercise: ExerciseDef, last: RecordedLift?, unit: WeightUnit): AdHocPrefill = AdHocPrefill(
-        addedKg = unit.toKg(DEFAULT_LOAD_IN_UNIT),
-        reps = DEFAULT_REPS,
-        durationS = DEFAULT_HOLD_S,
-        tempo = null,
+        addedKg = last?.addedKg ?: if (startsUnloaded(exercise)) 0.0 else unit.toKg(DEFAULT_LOAD_IN_UNIT),
+        reps = last?.reps?.takeIf { it > 0 } ?: DEFAULT_REPS,
+        durationS = last?.durationS?.takeIf { it > 0 } ?: DEFAULT_HOLD_S,
+        tempo = last?.tempo?.takeIf { it.isNotBlank() },
     )
 
     /** True for a lift whose load box opens on 0 rather than the loaded default. */
@@ -104,7 +114,15 @@ object AdHocPicker {
      * one-sided built-in, an id that names one side, or a lift the lifter has
      * recorded, or the plan prescribes, one side at a time.
      */
-    fun offersSide(exerciseId: String, lifts: List<RecordedLift>, plan: List<PlanSessionDef>): Boolean = true
+    fun offersSide(exerciseId: String, lifts: List<RecordedLift>, plan: List<PlanSessionDef>): Boolean =
+        exerciseId in ONE_SIDED_SEED_IDS ||
+            ONE_SIDED_ID_WORDS.any { it in exerciseId } ||
+            lifts.any { it.exerciseId == exerciseId && SideChoicePolicy.offersChoice(it.side) } ||
+            plan.any { session ->
+                session.exercises.any { block ->
+                    block.exercise == exerciseId && block.sets.any { SideChoicePolicy.offersChoice(it.side) }
+                }
+            }
 
     /** The active plan's first declaration of [exerciseId], or null when the plan does not list it. */
     fun planDeclaration(exerciseId: String, plan: List<PlanSessionDef>): PlanExerciseDef? =

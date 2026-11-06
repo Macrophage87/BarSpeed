@@ -141,7 +141,10 @@ object LeadInPolicy {
      * ([resolve]); a [deltaS] of `planned - current` is the "Use plan prep"
      * reset.
      */
-    fun overrideAfterTap(declaredS: Int?, currentS: Int, deltaS: Int): Int? = clamp(currentS + deltaS)
+    fun overrideAfterTap(declaredS: Int?, currentS: Int, deltaS: Int): Int? {
+        val next = clamp(currentS + deltaS)
+        return if (next == planned(declaredS)) null else next
+    }
 
     /**
      * The word a TIMED set's prep ends on, or null for a kind whose timed sets
