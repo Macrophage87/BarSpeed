@@ -293,3 +293,45 @@ explosive. Otherwise I don't look at it." Field-44's deadlifts are straight reps
 - **Lifts that do not start from the floor.** Every floor-cycle route assumes a dead-stop floor
   start. No plan field declares one today, and that is unmeasured.
 - **The success measure's correctness half**, section 5.
+
+## 7. Back squat, 2026-11-06 (app 0.2.2): withheld by the owner's ruling
+
+**What was asked.** Robocoach reported no range-of-motion data for the 2026-11-06 back squat
+session. Every squat rep in that export carries `romBounded: false`, with `rom_m` running from 0.14 to 1.8 m,
+so `summary.meanRom_m` and `romSpread_pct` are absent on all seven squat sets. The seated leg curl
+sets in the same export were bounded and published both figures.
+
+**How it was measured.** The seven squat sets are enrolled under
+`core/dsp/src/test/resources/live-squat-v022/` (role a, role b, cues; commit `146bdb8` on
+`claude/project-thread-jz3ujf`). `VelocityEstimator`'s anchor walk was replayed window by window
+on all fourteen streams in a throwaway test that was not committed. The figures below are from
+that replay at that commit.
+
+**Why nothing is bounded:**
+
+1. **No capped anchor inside any working window, on all fourteen streams.** The accepted anchors
+   sit before the first rep or after the re-rack. The anchor that closes each working window is
+   taken on starvation, which caps nothing (section 2's fourth clause).
+2. **The bar at rest drifts faster than the cap.** In the rack after the set, raw velocity is flat
+   to 0.004-0.017 m/s across a 0.3 s window. That makes the windows `stable`, but the drift since the
+   previous anchor runs at about 0.05-0.10 m/s2 against `anchorAcceptable`'s 0.05 m/s2 bias-rate
+   cap, so they are refused. The 0.02 m/s stability band independently refuses any window drifting
+   faster than about 0.067 m/s2.
+3. **The rep spacing makes the displacement cap unreachable.** Reps sit about 4 s apart. Bounding
+   one across a 4 s interval needs `0.5 * dv * dt <= 0.10 m`, so drift under about 0.0125 m/s2,
+   or 0.13 % of g. Nothing in this session comes close to that.
+4. **Plate-knock spikes are present but not binding.** Every squat stream carries 2-6
+   single-sample readings of 5-22 g, mostly on both units at the same instant, so the cause is
+   mechanical. Each one steps the integrated velocity by up to about 1.5 m/s. Holding the last
+   in-range sample in their place changes `rom_m` a lot but adds no anchor on any stream.
+
+**Ruling.** On 2026-11-06 the owner was offered three options: a separately flagged depth estimate,
+keep withholding, or look for another signal first. He chose **keep withholding**. Loosening
+the caps would publish depths that could be off by about 0.3 m, and no reference depth exists to
+check an estimate against. The schema's `summary.meanRom_m` description now tells a consumer to
+expect the figure absent on bar-mounted back squats.
+
+**Adjacent and not changed here:** about half of every squat stream's frames repeat the frame
+before them exactly, so the unique rate is about 50 Hz at a nominal 99 Hz. The `romSpread_pct`
+description's statement that no seated leg curl rep is bounded is contradicted by this export's
+leg curl sets. That statement was measured on the committed leg-curl fixtures, not on these sets.
