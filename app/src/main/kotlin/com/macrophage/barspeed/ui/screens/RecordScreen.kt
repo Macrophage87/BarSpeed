@@ -3474,12 +3474,7 @@ private fun EndSetUnratedButton(viewModel: RecordViewModel) {
  * on the path a miscounted rep total arrives on.
  */
 @Composable
-private fun EndSetRpeGrid(
-    state: RecordState,
-    viewModel: RecordViewModel,
-    failedTile: Boolean,
-    lastRepTapAtMs: Long?,
-) {
+private fun EndSetRpeGrid(state: RecordState, viewModel: RecordViewModel, failedTile: Boolean, lastRepTapAtMs: Long?) {
     val options =
         rpeOptions(
             state.currentIsTimed,

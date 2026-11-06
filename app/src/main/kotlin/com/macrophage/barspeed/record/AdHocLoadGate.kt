@@ -14,11 +14,10 @@ import com.macrophage.barspeed.model.SetLoadPolicy
  * `RecordViewModel.kt`, for the `LargeClass` reason that file's free functions
  * give.
  */
-internal fun RecordState.adHocLoadRefused(): Boolean =
-    adHoc &&
-        !SetLoadPolicy.loadEntryAccepted(
-            adHoc = true,
-            typedText = loadInput,
-            unit = weightUnit,
-            bodyweight = currentExercise.bodyweight,
-        )
+internal fun RecordState.adHocLoadRefused(): Boolean = adHoc &&
+    !SetLoadPolicy.loadEntryAccepted(
+        adHoc = true,
+        typedText = loadInput,
+        unit = weightUnit,
+        bodyweight = currentExercise.bodyweight,
+    )
