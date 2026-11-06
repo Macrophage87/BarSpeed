@@ -140,6 +140,45 @@ class OffPlanSetTest {
         assertEquals(queue, assertNotNull(removedState(added)).queue)
     }
 
+    /**
+     * Whole-release review: he corrected the squat to 110 against the plan's
+     * 100 and that stands for set 2; an off-plan curl put in front of set 2
+     * and then removed used to re-seed set 2 from the plan's 100.
+     */
+    @Test
+    fun `removing an off-plan set gives back the block's standing statements`() {
+        val corrected =
+            resting(queueIndex = 0).copy(
+                loadInput = "110",
+                statedLoadKg = 110.0,
+                repsInput = "4",
+                statedReps = 4,
+                statedTempo = "4010",
+                statedSide = "left",
+            )
+        val added = assertNotNull(offPlanAddedState(corrected, "leg_curl"))
+        assertEquals("40", added.loadInput)
+        assertNull(added.statedLoadKg)
+        val removed = assertNotNull(removedState(added))
+        assertEquals(queue, removed.queue)
+        assertEquals(110.0, removed.statedLoadKg)
+        assertEquals("110", removed.loadInput)
+        assertEquals(4, removed.statedReps)
+        assertEquals("4", removed.repsInput)
+        assertEquals("4010", removed.statedTempo)
+        assertEquals("left", removed.statedSide)
+        assertNull(removed.heldStatements)
+    }
+
+    @Test
+    fun `an off-plan set holds the statements standing for the slot it displaces`() {
+        val corrected = resting(queueIndex = 0).copy(loadInput = "110", statedLoadKg = 110.0)
+        val held = assertNotNull(assertNotNull(offPlanAddedState(corrected, "leg_curl")).heldStatements)
+        assertEquals("back_squat", held.slot.exerciseId)
+        assertEquals(1, held.slot.setIndexInExercise)
+        assertEquals(110.0, held.stated.loadKg)
+    }
+
     @Test
     fun `an ad-hoc session has no plan to leave`() {
         assertNull(offPlanAddedState(RecordState(adHoc = true), "leg_curl"))
