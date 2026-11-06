@@ -54,11 +54,12 @@ object SensorStatusCopy {
 
     /**
      * The name a row, chip or sentence uses for a paired device: "Sensor A",
-     * "Sensor B", plain "Sensor" while unlabelled, or "Strap".
+     * "Sensor B", "Bar sensor" while unlabelled, or "Heart-rate strap" (the
+     * nouns the copy pass settled on, copy F4).
      */
     fun deviceName(isStrap: Boolean, role: SensorRole?): String = when {
-        isStrap -> "Strap"
-        role == null -> "Sensor"
+        isStrap -> "Heart-rate strap"
+        role == null -> "Bar sensor"
         else -> "Sensor ${role.name}"
     }
 
@@ -67,7 +68,7 @@ object SensorStatusCopy {
      * noun and the physical advice: a strap has no power button.
      */
     fun failed(state: ConnectionState.Failed, isStrap: Boolean): StatusCopy {
-        val noun = if (isStrap) "strap" else "sensor"
+        val noun = if (isStrap) "heart-rate strap" else "bar sensor"
         return when {
             state.phoneBluetoothOff ->
                 StatusCopy("Your phone's Bluetooth is off.", offerTurnOnBluetooth = true)
@@ -82,7 +83,7 @@ object SensorStatusCopy {
                 )
             isStrap ->
                 StatusCopy(
-                    "Couldn't connect. Check the strap is on and close by, then tap Retry.",
+                    "Couldn't connect. Check the heart-rate strap is on and close by, then tap Retry.",
                     state.reason,
                     offerRetry = true,
                 )

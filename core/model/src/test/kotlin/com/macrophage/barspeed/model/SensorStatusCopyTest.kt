@@ -27,7 +27,7 @@ class SensorStatusCopyTest {
     @Test
     fun `a strap is not told to power-cycle`() {
         val copy = SensorStatusCopy.failed(ConnectionState.Failed("Service discovery failed (133)"), isStrap = true)
-        assertEquals("Couldn't connect. Check the strap is on and close by, then tap Retry.", copy.line)
+        assertEquals("Couldn't connect. Check the heart-rate strap is on and close by, then tap Retry.", copy.line)
         assertTrue(copy.offerRetry)
     }
 
@@ -49,7 +49,7 @@ class SensorStatusCopyTest {
                 isStrap = false,
             )
         assertEquals(
-            "It answered, but it isn't a sensor BarSpeed can read. Check you paired the right device.",
+            "It answered, but it isn't a bar sensor BarSpeed can read. Check you paired the right device.",
             copy.line,
         )
         assertFalse(copy.offerRetry)
@@ -73,11 +73,11 @@ class SensorStatusCopyTest {
     }
 
     @Test
-    fun `device names use the label, not the role enum`() {
+    fun `device names use the label, and copy F4's nouns, not the role enum`() {
         assertEquals("Sensor A", SensorStatusCopy.deviceName(isStrap = false, role = SensorRole.A))
         assertEquals("Sensor B", SensorStatusCopy.deviceName(isStrap = false, role = SensorRole.B))
-        assertEquals("Sensor", SensorStatusCopy.deviceName(isStrap = false, role = null))
-        assertEquals("Strap", SensorStatusCopy.deviceName(isStrap = true, role = SensorRole.A))
+        assertEquals("Bar sensor", SensorStatusCopy.deviceName(isStrap = false, role = null))
+        assertEquals("Heart-rate strap", SensorStatusCopy.deviceName(isStrap = true, role = SensorRole.A))
     }
 
     @Test
