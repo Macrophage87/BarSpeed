@@ -1624,11 +1624,14 @@ class RawExporter(
             // manifest had no published schema and so no version entry; it is
             // in raw-meta.schema.json's first entry (#326).
             str("analysedRoleBasis", d.analysedRoleBasis?.published)
-            // Which armed units delivered too few frames to analyse across
-            // the whole set (#209), and what the app could see
-            // of each one's link when the set ended (#213). Written only when
-            // something was silent, so an ordinary dual set's descriptor is
-            // what it has always been.
+            // Which armed units the analysis refused -- too few frames to
+            // analyse across the whole set (#209), or, from export 1.26, a
+            // stream that spanned less of the set than its partner's or a
+            // unit that never moved while its partner did (#242, #287) --
+            // and whose link was not delivering as the set ended, with what
+            // the app could see of each one's link then (#213). Written only
+            // when such a unit exists, so an ordinary dual set's descriptor
+            // is what it has always been.
             //
             // An object under one key, where every other sensor key here is
             // flat. The flat convention is about keeping one name from meaning
