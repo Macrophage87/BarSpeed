@@ -76,7 +76,15 @@ class LiveRepFigures {
         claimedUntilS = Double.NEGATIVE_INFINITY
     }
 
-    /** Not matched yet: every sensor bar has no figure until the run matching lands. */
-    @Suppress("UNUSED_PARAMETER", "FunctionOnlyReturningConstant")
-    private fun match(drive: DriveWindow, runs: List<StreamingSetTracker.DriveRun>): RepFigure? = null
+    private fun match(drive: DriveWindow, runs: List<StreamingSetTracker.DriveRun>): RepFigure? {
+        val run = runs
+            .filter { it.startS >= claimedUntilS }
+            .map { it to minOf(it.endS, drive.endS) - maxOf(it.startS, drive.startS) }
+            .filter { it.second > 0.0 }
+            .maxByOrNull { it.second }
+            ?.first
+            ?: return null
+        claimedUntilS = run.endS
+        return RepFigure(run.meanMps, run.peakMps)
+    }
 }
