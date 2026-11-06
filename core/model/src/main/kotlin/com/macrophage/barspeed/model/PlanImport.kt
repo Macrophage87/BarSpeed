@@ -44,7 +44,31 @@ object PlanImport {
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    fun parse(text: String): Result {
+    /**
+     * The document inside the envelope a plan picks up on its way to the
+     * phone: a UTF-8 byte-order mark from a saved file, surrounding
+     * whitespace, and the ``` or ```json fence a chat reply puts round a code
+     * block (UX review 2026-11-06, plans F4). Only an envelope that wraps the
+     * WHOLE text is removed; prose before or after a fence is left in place
+     * and refused as before, because guessing where a plan starts inside free
+     * text is a different rule from peeling off a known wrapper.
+     */
+    internal fun unwrap(text: String): String {
+        var body = text.removePrefix("﻿").trim()
+        if (body.startsWith(FENCE) && body.endsWith(FENCE) && body.length >= 2 * FENCE.length) {
+            val firstLineEnd = body.indexOf('\n')
+            val info = if (firstLineEnd < 0) "" else body.substring(FENCE.length, firstLineEnd).trim()
+            if (firstLineEnd >= 0 && (info.isEmpty() || info.equals("json", ignoreCase = true))) {
+                body = body.substring(firstLineEnd + 1, body.length - FENCE.length).trim()
+            }
+        }
+        return body
+    }
+
+    private const val FENCE = "```"
+
+    fun parse(rawText: String): Result {
+        val text = unwrap(rawText)
         val plan =
             try {
                 json.decodeFromString(PlanFile.serializer(), text)
