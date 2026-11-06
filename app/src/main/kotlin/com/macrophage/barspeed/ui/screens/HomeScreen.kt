@@ -544,6 +544,8 @@ private fun InterruptedSetNotice(
 ) {
     if (interrupted.isEmpty()) return
     var confirmRecover by remember { mutableStateOf<OrphanedSet?>(null) }
+    var confirmDiscard by remember { mutableStateOf<OrphanedSet?>(null) }
+    val clock = DateTimeFormatter.ofPattern("EEE HH:mm")
     var showAll by remember { mutableStateOf(false) }
     val hidden = if (showAll) 0 else (interrupted.size - INTERRUPTED_SHOWN).coerceAtLeast(0)
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -564,8 +566,15 @@ private fun InterruptedSetNotice(
                     Spacer(Modifier.height(4.dp))
                     Text(orphan.header.exerciseName, style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(2.dp))
+                    // When the set STARTED, labelled as such: the scan reads no
+                    // stream, so when the capture stopped is not known here
+                    // (InterruptedSetSummary's KDoc), and an unlabelled time would
+                    // read as that. It is what tells two cards apart (home-nav F6).
+                    val started =
+                        Instant.ofEpochMilli(orphan.header.startedAtMs).atZone(ZoneId.systemDefault())
                     Text(
-                        InterruptedSetSummary.lines(orphan).joinToString(" · "),
+                        (listOf("Started ${clock.format(started)}") + InterruptedSetSummary.lines(orphan))
+                            .joinToString(" · "),
                         style = MaterialTheme.typography.bodySmall,
                         color = BarColors.Sub,
                     )
@@ -580,7 +589,18 @@ private fun InterruptedSetNotice(
                         )
                     }
                     Spacer(Modifier.height(6.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // PUT IT BACK first and filled: it is what the card is for
+                    // (home-nav F6). It still asks before it writes.
+                    if (refusals[orphan.directory] == null) {
+                        Button(
+                            onClick = { confirmRecover = orphan },
+                            enabled = !isBusy,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(JournalRecoveryPolicy.ACTION_LABEL)
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                         OutlinedButton(
                             onClick = { onShare(orphan) },
                             enabled = !isBusy,
@@ -588,19 +608,12 @@ private fun InterruptedSetNotice(
                         ) {
                             Text("SEND IT TO ME", color = BarColors.Volt)
                         }
-                        // Kept a TextButton (#201): destructive, so it stays quieter than the SEND
-                        // beside it.
-                        TextButton(onClick = { onDiscard(orphan) }, enabled = !isBusy) {
+                        Spacer(Modifier.weight(1f))
+                        // Kept a TextButton (#201): destructive, so it stays quieter than the SEND,
+                        // and last, at the far edge, so a mis-tap meant for SEND does not land on
+                        // it. It asks first: the capture may be the only copy of the set.
+                        TextButton(onClick = { confirmDiscard = orphan }, enabled = !isBusy) {
                             Text("DISCARD", color = BarColors.Red)
-                        }
-                    }
-                    if (refusals[orphan.directory] == null) {
-                        OutlinedButton(
-                            onClick = { confirmRecover = orphan },
-                            enabled = !isBusy,
-                            contentPadding = ButtonDefaults.TextButtonContentPadding,
-                        ) {
-                            Text(JournalRecoveryPolicy.ACTION_LABEL, color = BarColors.Volt)
                         }
                     }
                 }
@@ -632,6 +645,30 @@ private fun InterruptedSetNotice(
             },
             dismissButton = {
                 TextButton(onClick = { confirmRecover = null }) { Text("Cancel") }
+            },
+        )
+    }
+    confirmDiscard?.let { orphan ->
+        AlertDialog(
+            onDismissRequest = { confirmDiscard = null },
+            title = { Text("Discard this set?") },
+            text = {
+                Text(
+                    "The ${orphan.header.exerciseName} capture is deleted from this phone. It is not in " +
+                        "History, so this cannot be undone.",
+                )
+            },
+            // Kept TextButtons (#201): this dialog's two actions.
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDiscard(orphan)
+                        confirmDiscard = null
+                    },
+                ) { Text("Discard", color = BarColors.Red) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDiscard = null }) { Text("Cancel") }
             },
         )
     }
@@ -760,14 +797,12 @@ private fun CrashReportNotice(
  *
  * Same card shape as [InterruptedSetNotice], reused rather than reinvented
  * per that issue's own instruction -- but not its confirmation posture.
- * InterruptedSetNotice's DISCARD fires on tap alone: a set journal is
- * hundreds of kilobytes, and [SessionDetailScreen]'s own single-session
- * delete already sits behind a titled dialog naming what is lost, which a
- * set journal does not need a second copy of. A rescued database is the
- * opposite case -- potentially an entire training history, three to four
- * orders of magnitude larger, deletable in one tap from the FIRST screen
- * of every cold launch. [SessionDetailScreen]'s delete-one-session dialog
- * is the bar this meets, not [InterruptedSetNotice]'s silence; issue #111
+ * InterruptedSetNotice's DISCARD used to fire on tap alone; since UX review
+ * 2026-11-06 (home-nav F6) it asks too, because a mis-tap there removed the
+ * only copy of a set. A rescued database is the larger case --
+ * potentially an entire training history, three to four orders of
+ * magnitude larger, deletable from the FIRST screen of every cold launch. [SessionDetailScreen]'s delete-one-session dialog
+ * is the bar this meets; issue #111
  * asked for that card's SHAPE, not its confirmation posture.
  *
  * DISCARD IS OFFERED ON ALL THREE STATES, INCLUDING THE FRAGMENT, and this

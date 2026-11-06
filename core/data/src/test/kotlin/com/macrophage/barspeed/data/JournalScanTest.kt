@@ -196,7 +196,7 @@ class JournalScanTest {
             InterruptedSetSummary.lines(
                 orphan(imu = stream("imu.csv", rows = 412, bytes = 40_000)),
             ).joinToString(" · ")
-        assertEquals("412 from the armed sensor · 40.0 KB on disk", text)
+        assertEquals("412 rows from the armed sensor · 40.0 KB on disk", text)
     }
 
     /**
@@ -213,7 +213,7 @@ class JournalScanTest {
                     imu = stream("imu.csv", rows = 0, bytes = 314_572_800L, malformed = true),
                 ),
             ).joinToString(" · ")
-        assertFalse("0 from the armed sensor" in text, "a stream nobody can read was counted: $text")
+        assertFalse("0 rows from the armed sensor" in text, "a stream nobody can read was counted: $text")
         assertTrue("could not be read" in text, text)
         assertTrue("314.6 MB on disk" in text, text)
         assertTrue("unreadable: imu.csv" in text, text)
@@ -226,7 +226,7 @@ class JournalScanTest {
             InterruptedSetSummary.lines(
                 orphan(imu = stream("imu.csv", rows = 700_000, bytes = 70_000_000L, oversize = true)),
             ).joinToString(" · ")
-        assertFalse("700000 from the armed sensor" in text, text)
+        assertFalse("700000 rows from the armed sensor" in text, text)
         assertTrue("unreadable: imu.csv" in text, text)
     }
 
@@ -252,7 +252,7 @@ class JournalScanTest {
             InterruptedSetSummary.lines(
                 orphan(imu = stream("imu.csv", 120), secondaryImuConnected = true),
             ).joinToString(" · ")
-        assertTrue("none from the second sensor" in text, text)
+        assertTrue("no rows from the second sensor" in text, text)
     }
 
     /**
@@ -274,7 +274,7 @@ class JournalScanTest {
                     sensorRoles = listOf(SensorRole.A, SensorRole.B),
                 ),
             ).joinToString(" · ")
-        assertEquals("412 from the armed sensor, the second sensor was not connected · 40.0 KB on disk", text)
+        assertEquals("412 rows from the armed sensor, the second sensor was not connected · 40.0 KB on disk", text)
     }
 
     /**
@@ -301,7 +301,7 @@ class JournalScanTest {
                     secondaryImuConnected = true,
                 ),
             ).joinToString(" · ")
-        assertTrue("120 from the armed sensor, 340 from the second sensor" in text, text)
+        assertTrue("120 rows from the armed sensor, 340 rows from the second sensor" in text, text)
     }
 
     /** Marks the lifter made are counted; none is silence, not "0 reps". */

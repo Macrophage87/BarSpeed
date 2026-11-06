@@ -752,8 +752,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      *
      * No confirmation dialog, and the posture is chosen rather than copied.
      * `RescuedDatabaseNotice` puts one in front of DISCARD because a rescued
-     * database can be an entire training history; [discardInterrupted] does
-     * not, because a set journal is one set. A crash report is neither -- it
+     * database can be an entire training history, and `InterruptedSetNotice`
+     * puts one in front of [discardInterrupted] because a set journal may be
+     * the only copy of a set (UX review 2026-11-06, home-nav F6). A crash
+     * report is neither -- it
      * is a diagnostic
      * about the app, not a record of anything the lifter did, and the app
      * itself deletes the eleventh oldest without asking. A dialog guarding

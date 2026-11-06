@@ -189,7 +189,7 @@ object InterruptedSetSummary {
         val imu = orphan.imu
         return when {
             imu != null && !imu.counted -> "the armed sensor's stream could not be read$second"
-            orphan.header.imuConnected -> "${imu?.rows ?: 0L} from the armed sensor$second"
+            orphan.header.imuConnected -> "${imu?.rows ?: 0L} rows from the armed sensor$second"
             second.isNotEmpty() -> "no armed sensor connected$second"
             else -> "no sensor connected"
         }
@@ -212,8 +212,8 @@ object InterruptedSetSummary {
         val secondary = orphan.secondaryImu
         return when {
             secondary != null && !secondary.counted -> ", the second sensor's stream could not be read"
-            (secondary?.rows ?: 0L) > 0L -> ", ${secondary?.rows} from the second sensor"
-            orphan.header.secondaryImuConnected -> ", none from the second sensor"
+            (secondary?.rows ?: 0L) > 0L -> ", ${secondary?.rows} rows from the second sensor"
+            orphan.header.secondaryImuConnected -> ", no rows from the second sensor"
             orphan.header.sensorRoles.isNotEmpty() -> ", the second sensor was not connected"
             else -> ""
         }
