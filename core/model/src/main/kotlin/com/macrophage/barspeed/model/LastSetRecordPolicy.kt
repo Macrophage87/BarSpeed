@@ -129,13 +129,13 @@ object LastSetRecordPolicy {
      * set is not an RPE of zero, and a blank there reads as the app having lost
      * the rating -- the reason [EffortCorrectionPolicy.NOT_RATED] exists.
      *
-     * THE REASON CLAUSE FOLLOWS [SetLimiterPolicy.offersCorrection] AND NOT THE
-     * PRESENCE OF AN ANSWER, which is why [rpe] is taken beside the wording of
-     * it. An unanswered failure is exactly the set the lifter still has
-     * something to do about, and the row this box replaces says so in amber
-     * with SAY WHY beside it; dropping the clause because the answer is missing
-     * would take an actionable gap off the screen. A set nobody would be asked
-     * about carries no clause at all rather than an empty one.
+     * THE REASON CLAUSE FOLLOWS [SetLimiterPolicy.statesReason]. An unanswered
+     * failure is exactly the set the lifter still has something to do about,
+     * so it keeps its "Ended: Not given"; dropping it would take an actionable
+     * gap off the screen. An unanswered set that did NOT fail carries no clause
+     * (UX review 2026-11-06, rest F4): on an on-target set nothing limited it
+     * but the plan, and "Limited by: Not given" in amber made every normal set
+     * look unfinished. The rating no longer enters it, so it is not taken.
      *
      * THE WARM-UP WORD IS SAID ONLY WHERE THE SET WAS ONE. "Working set" is the
      * ordinary case and stating it on every set would spend a third of the line
@@ -152,7 +152,6 @@ object LastSetRecordPolicy {
      */
     fun status(
         ratedDescription: String?,
-        rpe: Int?,
         failed: Boolean,
         tappedFailed: Boolean,
         limiter: SetLimiter?,
@@ -162,7 +161,7 @@ object LastSetRecordPolicy {
         warmupMark: Boolean?,
     ): String {
         val clauses = mutableListOf(EffortCorrectionPolicy.lineText(ratedDescription, failed, tappedFailed))
-        if (SetLimiterPolicy.offersCorrection(failed, rpe, limiter)) {
+        if (SetLimiterPolicy.statesReason(failed, limiter)) {
             val label = SetLimiterPolicy.lineLabel(failed)
             clauses += "$label: ${SetLimiterPolicy.lineText(limiter, limiterNote, timed, failed)}"
         }

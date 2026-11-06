@@ -555,9 +555,30 @@ object SetLimiterPolicy {
         expanded: Boolean = false,
     ): SetLimiterPagePlacement = when {
         changing -> SetLimiterPagePlacement.CORRECTION
-        prompts(failed, rpe, limiter, dismissed) -> SetLimiterPagePlacement.PROMPT
-        else -> SetLimiterPagePlacement.NONE
+        !prompts(failed, rpe, limiter, dismissed) -> SetLimiterPagePlacement.NONE
+        expanded || opensItself(failed, rpe) -> SetLimiterPagePlacement.PROMPT
+        else -> SetLimiterPagePlacement.COLLAPSED
     }
+
+    /**
+     * Whether an asked set gets the whole page without a tap (UX review
+     * 2026-11-06, rest F4): a failure, or "Nothing left". Something did limit
+     * those. A set rated 7 to 9 is the RIR 1-2 target the plan stopped, so it
+     * gets [COLLAPSED_ROW] instead, which costs nothing to ignore; [expanded]
+     * in [placement] is the lifter's tap on it.
+     */
+    fun opensItself(failed: Boolean, rpe: Int?): Boolean = failed || rpe == NOTHING_LEFT_RPE
+
+    /**
+     * Whether the Last set box states a reason clause at all: a failure, so an
+     * unanswered one still reads "Ended: Not given", or any set carrying an
+     * answer. An unanswered set that did not fail says nothing (rest F4): it
+     * used to read "Limited by: Not given" in amber on every on-target set.
+     */
+    fun statesReason(failed: Boolean, limiter: SetLimiter?): Boolean = failed || limiter != null
+
+    /** The rung that reads "Nothing left" on the rep scale. */
+    private const val NOTHING_LEFT_RPE = 10
 
     /**
      * Whether leaving the page is a SKIP -- true only where no answer stands.

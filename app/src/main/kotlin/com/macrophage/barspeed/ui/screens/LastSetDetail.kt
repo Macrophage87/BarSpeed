@@ -173,7 +173,6 @@ private fun LastSetCard(state: RecordState, feedback: SetFeedback) {
     val status =
         LastSetRecordPolicy.status(
             ratedDescription = rated,
-            rpe = state.lastSetRpe,
             failed = state.lastSetFailed,
             tappedFailed = state.lastSetTappedFailed,
             limiter = state.lastSetLimiter,

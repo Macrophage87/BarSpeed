@@ -191,14 +191,14 @@ class LastSetRecordPolicyTest {
 
     @Test
     fun `a set nobody would be asked about carries no limiter clause at all`() {
-        assertEquals("Hard · RPE 8", status(rated = "Hard · RPE 8", rpe = 5))
+        assertEquals("Hard · RPE 8", status(rated = "Hard · RPE 8"))
     }
 
     @Test
     fun `a completed set rated at the counted end says what limited it`() {
         assertEquals(
             "Hard · RPE 8 · Limited by: Grip was the limit",
-            status(rated = "Hard · RPE 8", rpe = 8, limiter = SetLimiter.GRIP),
+            status(rated = "Hard · RPE 8", limiter = SetLimiter.GRIP),
         )
     }
 
@@ -266,7 +266,6 @@ class LastSetRecordPolicyTest {
 
     private fun status(
         rated: String? = null,
-        rpe: Int? = null,
         failed: Boolean = false,
         tapped: Boolean = failed,
         limiter: SetLimiter? = null,
@@ -276,7 +275,6 @@ class LastSetRecordPolicyTest {
         mark: Boolean? = null,
     ) = LastSetRecordPolicy.status(
         ratedDescription = rated,
-        rpe = rpe,
         failed = failed,
         tappedFailed = tapped,
         limiter = limiter,

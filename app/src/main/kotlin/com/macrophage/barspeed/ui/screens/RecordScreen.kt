@@ -3705,6 +3705,10 @@ internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     // already offered the page. A skip stores nothing -- absence is already
     // what the row carries -- so there is nothing for the record to remember.
     var dismissed by remember(state.setsCompleted) { mutableStateOf(false) }
+    // The lifter's tap on the collapsed row (UX review 2026-11-06, rest F4).
+    // Keyed like `dismissed`, so a row opened in one rest is folded again in
+    // the next.
+    var expanded by remember(state.setsCompleted) { mutableStateOf(false) }
     val timed = state.lastFeedback?.actualDurationS != null
     // `changing` is passed FALSE and no longer exists as state (#237). It was
     // the lifter's own tap on the reason ROW, and the row is gone: every
@@ -3728,6 +3732,7 @@ internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
                 limiter = state.lastSetLimiter,
                 dismissed = dismissed,
                 changing = false,
+                expanded = expanded,
             )
         } else {
             SetLimiterPagePlacement.NONE
@@ -3767,6 +3772,18 @@ internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
         // app opened BY ITSELF, which closes on the stored answer.
         LimiterPage(state, timed, viewModel, onSkip = { dismissed = true }) {}
         Spacer(Modifier.height(10.dp))
+    } else if (placement == SetLimiterPagePlacement.COLLAPSED) {
+        // An on-target set (rpe 7 to 9): one line, zero taps to ignore, one to
+        // open. The whole page here pushed Up next and FINISH below the fold on
+        // nearly every working set. SetLimiterPolicy.placement decides which.
+        TextButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
+            Text(
+                SetLimiterPolicy.COLLAPSED_ROW,
+                color = BarColors.Sub,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        Spacer(Modifier.height(6.dp))
     }
     // Sets two onwards start from here, not from READY, and this is the screen
     // where the lifter has a rest period to spend fixing it.

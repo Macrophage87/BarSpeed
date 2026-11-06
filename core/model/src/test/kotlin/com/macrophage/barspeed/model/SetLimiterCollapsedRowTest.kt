@@ -84,7 +84,6 @@ class SetLimiterCollapsedRowTest {
             val status =
                 LastSetRecordPolicy.status(
                     ratedDescription = "2 reps left",
-                    rpe = rpe,
                     failed = false,
                     tappedFailed = false,
                     limiter = null,
