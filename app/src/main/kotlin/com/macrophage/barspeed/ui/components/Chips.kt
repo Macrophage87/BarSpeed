@@ -1,8 +1,11 @@
 package com.macrophage.barspeed.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -108,9 +111,24 @@ fun rememberArmedDelivery(state: ConnectionState, frameAtMs: Long?, armedAtMs: L
  * the threshold are `SensorBattery`'s, where a test holds them. Its colour is
  * its own, separate from the dot's, so a low battery never reads as a link
  * state.
+ *
+ * [onClick], when given, makes the dot a 48 dp tap target (ble-devices F6).
+ * It moved in here from Home's call site so every screen that draws the dots
+ * opens Devices the same way; the touch target and the drawn size are kept
+ * separate by wrapping rather than resizing, as Home's wrapper did (#200).
+ * Null draws the dot exactly as before, with no click, and is the default
+ * on purpose: #200 kept the click off Record's dots because navigating away
+ * mid-set could abandon the set in progress, so whether and when Record
+ * passes one is that screen's decision, not this component's.
  */
 @Composable
-fun SensorDot(label: String, state: ConnectionState, modifier: Modifier = Modifier, delivery: ArmedDelivery? = null) {
+fun SensorDot(
+    label: String,
+    state: ConnectionState,
+    modifier: Modifier = Modifier,
+    delivery: ArmedDelivery? = null,
+    onClick: (() -> Unit)? = null,
+) {
     // The when has a subject, deliberately, so a fifth ConnectionState variant
     // fails this compile instead of falling into a silent else.
     val color =
@@ -120,7 +138,17 @@ fun SensorDot(label: String, state: ConnectionState, modifier: Modifier = Modifi
             is ConnectionState.Failed -> BarColors.Red
             is ConnectionState.Disconnected -> BarColors.Ghost
         }
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+    val tappable =
+        if (onClick == null) {
+            modifier
+        } else {
+            modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp).clickable(onClick = onClick)
+        }
+    Row(
+        modifier = tappable,
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Text("$label ●", style = MaterialTheme.typography.bodySmall, color = color)
         SensorBattery.badgeOf(state)?.let { badge ->
             Text(
