@@ -123,6 +123,7 @@
           "reps": 4,
           "repsSource": "manual",
           "repsManual": true,
+          "analysisSchemaVersion": "1.26",
           "recovered": true,
           "summary": {}
         },

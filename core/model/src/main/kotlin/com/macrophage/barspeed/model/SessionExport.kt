@@ -2727,8 +2727,14 @@ data class SessionExport(
          * version string, and its `geometrySource` is closed, so it would
          * reject the key too; this schema accepts a 1.25 document unchanged.
          * No key is removed, renamed or retyped. `DATABASE_VERSION` does NOT
-         * move: the source rides in the stored geometry JSON, beside the
-         * value it describes. The plan schema is untouched.
+         * move for this entry: the source rides in the stored geometry JSON,
+         * beside the value it describes. The plan schema is untouched.
+         *
+         * THE RELEASE'S DATABASE, said once for every 1.26 entry: 1.26 ships
+         * with `DATABASE_VERSION` 21 (`MIGRATION_20_21`), which adds two
+         * columns, #38's `analysisSchemaVersion` and #100's `recovered`. No
+         * other 1.26 entry adds a column, and each entry's own sentence about
+         * the database below is about that entry alone.
          *
          * PINNED. `SchemaInversionSourceContractTest` asserts this entry's
          * marker in the published log, the tip literal, the key's declaration
@@ -2757,9 +2763,11 @@ data class SessionExport(
          * its version string, and this schema accepts a 1.25 document. The
          * published schema states the condition with an if/else on `kind`:
          * the two words are REQUIRED off a hold or a carry and not forbidden
-         * on one, which is how it still accepts a 1.25 hold. Nothing is renamed
-         * or retyped, `DATABASE_VERSION` does NOT move, and the plan schema is
-         * untouched.
+         * on one, which is how it still accepts a 1.25 hold. The raw archive's
+         * `meta.json` takes the same split: on a hold or a carry it writes no
+         * `startsWith`, `concentric` or `concentricSource` (raw-meta's own
+         * log). Nothing is renamed or retyped, `DATABASE_VERSION` does NOT
+         * move for this entry, and the plan schema is untouched.
          *
          * PINNED. `SchemaHoldStrokeContractTest` asserts this entry's marker,
          * the condition, both descriptions and the example's hold;
@@ -2814,8 +2822,8 @@ data class SessionExport(
          * keys; `tempoCompliance` is `additionalProperties: false`, so a reader
          * validating against an earlier schema rejects it, as it already
          * rejects a 1.26 document on its version string. Nothing is renamed or
-         * retyped, `DATABASE_VERSION` does NOT move, and the plan schema is
-         * untouched.
+         * retyped, `DATABASE_VERSION` does NOT move for this entry, and the
+         * plan schema is untouched.
          *
          * PINNED. `SchemaTempoByPhaseContractTest` asserts this entry's marker,
          * the key's declaration and description, and the example;
@@ -2847,8 +2855,8 @@ data class SessionExport(
          * keys; the set object is closed, so a reader validating against an
          * earlier schema rejects the key, as it already rejects a 1.26
          * document on its version string. Nothing is renamed or retyped. The
-         * column is `DATABASE_VERSION` 21's, minted with this release; the
-         * plan schema is untouched.
+         * column is `DATABASE_VERSION` 21's, one of the two that version adds
+         * in this release (see #289's entry); the plan schema is untouched.
          *
          * PINNED. `SchemaAnalysisProvenanceContractTest` asserts this entry's
          * marker and the key's declaration in both published schemas;
@@ -2868,8 +2876,8 @@ data class SessionExport(
          * RETROACTIVE: the marks are stored per set, so an older guided set
          * re-exported gains the key and, where corrected, the new word; one
          * with no stored marks reads as before. Nothing is renamed or
-         * retyped, `DATABASE_VERSION` does NOT move, and the plan schema is
-         * untouched. `RepsSourcePolicy.publishedGuideReps` decides the key;
+         * retyped, `DATABASE_VERSION` does NOT move for this entry, and the
+         * plan schema is untouched. `RepsSourcePolicy.publishedGuideReps` decides the key;
          * `SchemaExportKeySetContractTest` pins it as declared;
          * `RepsSourcePublishedTest` in `:core:data` is the export
          * differential.
@@ -2926,9 +2934,9 @@ data class SessionExport(
          * contact is no longer trusted, so it reaches no figure of a set's `hr`
          * block. No R-R and no report is still trusted on its bpm, and a sample
          * with possible R-R intervals is never overruled. UNMEASURED: whether
-         * the strap in use sets Sensor Contact Support at all. NOT RETROACTIVE.
-         * No key is added, removed, renamed or retyped, and no database column
-         * moves.
+         * the strap in use sets Sensor Contact Support at all. Under 1.26 and
+         * not a mint: 1.26 is unreleased. NOT RETROACTIVE. No key is added,
+         * removed, renamed or retyped, and this entry moves no database column.
          *
          * PINNED. `SchemaSensorContactContractTest` asserts this entry and the
          * `hr` block's sentence; `HrTrustTest`, `HrCsvTest`, `SetJournalTest` and
@@ -2961,8 +2969,8 @@ data class SessionExport(
          * the analysis it was given. A reader of any earlier 1.2x schema
          * accepts the word, which has existed since 1.20, and rejects a 1.26
          * document on its version string. Nothing is added, renamed or
-         * retyped, `DATABASE_VERSION` does NOT move, and the plan schema is
-         * untouched.
+         * retyped, `DATABASE_VERSION` does NOT move for this entry, and the
+         * plan schema is untouched.
          *
          * PINNED. `SchemaMountFreeFallbackContractTest` asserts this entry's
          * marker and the word's description; `FallbackMountGeometryTest` in
@@ -2983,8 +2991,9 @@ data class SessionExport(
          * analysed before this version, and a guided set whose mark count
          * differs from its detection count. Under 1.26 and not a mint: 1.26
          * is unreleased. NOT RETROACTIVE: the drive instant is stored with the
-         * analysis from this version. `DATABASE_VERSION` does NOT move -- the
-         * instant rides in `analysisJson` -- and the plan schema is untouched.
+         * analysis from this version. `DATABASE_VERSION` does NOT move for
+         * this entry -- the instant rides in `analysisJson` -- and the plan
+         * schema is untouched.
          *
          * PINNED. `SchemaCountAgreementContractTest` asserts this entry's
          * marker and the key's description; `RepMarkAlignmentTest` pins the
@@ -3013,24 +3022,43 @@ data class SessionExport(
          * Measured over the committed corpus in `UnitMotionFieldTest`: no
          * committed pair moves under either rule, field-41 set 16's stack
          * unit included. NOT RETROACTIVE: the role is frozen when the set is
-         * recorded. No key moves; `DATABASE_VERSION` does NOT move.
+         * recorded. No key moves; `DATABASE_VERSION` does NOT move for this
+         * entry.
          *
          * PINNED. `ShortOrStillUnitTest` is the differential;
          * `SchemaSensorCoverageContractTest` asserts this entry and the three
          * descriptions.
          *
-         * 1.26 FURTHER ENTRY (#63, a carry counted in reps): [SetSummaryExport.noRepsReason]
-         * GAINS A TENTH WORD, `carryNotSegmented`, in [VALID_NO_REPS_REASONS].
-         * A carry prescribed in reps is kept off the segmenter by
-         * `RepAnalysisPolicy.segmentsReps`, and its document read `reps`
-         * beside an empty summary -- a set nobody measured, the collapse 1.18
-         * added the key to undo. `SetAnalyzer.withheldCarry` now records the
-         * word when the stream held at least
-         * [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES] samples, and nothing on a
-         * shorter stream, as a sensorless set records nothing. A CLOSED enum
-         * gains a value, so a 1.25 validator rejects a 1.26 document carrying
-         * it. NOT RETROACTIVE; `DATABASE_VERSION` does NOT move -- the word
-         * rides in `analysisJson`.
+         * 1.26 FURTHER ENTRY (#63, a carry counted in reps): FIGURES ARE
+         * WITHDRAWN, and [SetSummaryExport.noRepsReason] GAINS A TENTH WORD,
+         * `carryNotSegmented`, in [VALID_NO_REPS_REASONS]. WHAT v0.1.59
+         * PUBLISHED: a carry prescribed in reps is not timed, so its stream
+         * went to the segmenter like any other set's, and its document carried
+         * per-rep `repMetrics`, `summary` velocities, range and power and a
+         * `velocityLoss_pct` computed from whatever runs the segmenter found in
+         * a walker's gait -- figures nothing bounds. FROM 1.26
+         * `RepAnalysisPolicy.segmentsReps` keeps every carry off the
+         * segmenter: such a set publishes the lifter's count, no `repMetrics`,
+         * no `summary` figures, no `velocityLoss_pct` and no power, and
+         * `SetAnalyzer.withheldCarry` records the word when the stream held at
+         * least [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES] samples, and
+         * nothing on a shorter stream, as a sensorless set records nothing.
+         * NOT ADDITIVE: a reader comparing a 1.25 carry with a 1.26 one sees
+         * figures withdrawn, not a key added. A CLOSED enum gains a value, so
+         * a 1.25 validator rejects a 1.26 document carrying it. NOT
+         * RETROACTIVE: the analysis is stored when the set ends and never
+         * re-run, so a carry recorded by v0.1.59 or earlier keeps the
+         * segmenter figures it was stored with, and publishes them on
+         * re-export.
+         *
+         * THE SAME CHANGE SEEDS BOTH CARRIES HORIZONTAL. `farmers_walk` and
+         * `suitcase_carry` are seeded `horizontal` (the load travels with the
+         * walker), so where no plan declares the plane a new set of either id
+         * publishes `geometry.plane` `horizontal`, and the raw manifest's
+         * `plane` with it, where v0.1.59 published `vertical`; the plane's
+         * source reads `seeded` either way. NOT RETROACTIVE: the geometry is
+         * stored with the set. `DATABASE_VERSION` does NOT move for this
+         * entry -- the word rides in `analysisJson`.
          *
          * PINNED. `WithheldCarryReasonTest` in `:core:dsp` is the differential,
          * `SessionExportNoRepsReasonTest` in `:core:data` the export's, and
@@ -3046,7 +3074,7 @@ data class SessionExport(
          * key's description already said so (lane L5); this entry is the log
          * line a reader comparing a 1.25 export with a 1.26 one needs. The 1.20
          * entry above stays as the record of what was reachable then.
-         * `DATABASE_VERSION` does NOT move.
+         * `DATABASE_VERSION` does NOT move for this entry.
          *
          * PINNED. `SchemaVelocityLossRegimeContractTest` asserts this entry and
          * the decision for both lifts.
@@ -3061,7 +3089,12 @@ data class SessionExport(
          * journaled count, stated, where either counted the set, and the
          * batch segmenter's where the sensor did, because the live count died
          * with the process; and it carries no plan targets, side, effort
-         * rating or silence word, because none was captured. It sits in a
+         * rating or silence word, because none was captured (its tempo,
+         * warm-up, added and planned-side declarations and its prep seconds
+         * were journaled, and are carried). An interrupted set carries no
+         * terminal cue unless the guide had called Done before the kill, so
+         * its rep list is bounded by nothing but the end of the journal. It
+         * sits in a
          * session of its own unless its own session was still open and
          * current. OMITTED WHEN FALSE, `added`'s shape.
          * NOT RETROACTIVE in the sense that matters: read from database v21's
@@ -3073,11 +3106,31 @@ data class SessionExport(
          * set object is closed, so a reader validating against an earlier
          * schema rejects the key, as it already rejects a 1.26 document on
          * its version string. Nothing is renamed or retyped; the column is
-         * `DATABASE_VERSION` 21's, and the plan schema is untouched.
+         * `DATABASE_VERSION` 21's, the second of the two that version adds in
+         * this release (see #289's entry), and the plan schema is untouched.
          * `SchemaRecoveredContractTest` pins this entry and both
          * declarations; `SchemaExportKeySetContractTest` pins the set's keys
          * to [SetExport]; `SessionExportRecoveredTest` in `:core:data` is the
          * export differential.
+         *
+         * 1.26 DOCUMENTATION ENTRY (#28, a horizontal set's axis sign): NO KEY
+         * CHANGES, but the figures of a population move. On a horizontal-plane
+         * set the sign of the travel axis is fixed by the first movement run
+         * of the recording, and from this version that run must also have
+         * travelled `DspConfig.minRomM` (0.10 m), so a settle shorter than that
+         * in the lead-in no longer swaps the set's eccentric and concentric; a
+         * settle of 0.10 m or more still can. Where it moves, `ecc_s`, `con_s`,
+         * the velocities, power and the tempo grade of every rep move with it
+         * (a synthetic 3 cm settle: drive 1.87 s and 0.212 m/s before, 0.96 s
+         * and 0.412 m/s after). Measured on synthetic streams only: no
+         * committed capture reaches the rule. NOT RETROACTIVE: the stored
+         * analysis is never re-run, so a set recorded before this version
+         * keeps the orientation it was stored with; a set a released build
+         * recorded with `analysisSchemaVersion` 1.26 was oriented under the
+         * new rule, and one without the key was recorded before it. Under 1.26 and not
+         * a mint: 1.26 is unreleased. `DATABASE_VERSION` does NOT move for
+         * this entry. `HorizontalAxisOrientationTest` in `:core:dsp` is the
+         * differential.
          */
         const val SCHEMA_VERSION = "1.26"
 
@@ -4213,6 +4266,9 @@ data class SetExport(
      * computed the analysis stored with it (1.26, #38). It is that build's
      * [SessionExport.SCHEMA_VERSION] and nothing finer: an analysis change
      * shipped without moving the export contract is not distinguished by it.
+     * On a [recovered] set that is the build that put the set back into
+     * History and computed its analysis from the capture, not the build that
+     * was recording when the process was killed.
      *
      * The document's [SessionExport.schemaVersion] names the build that
      * EXPORTS it. The analysis is computed once, when the set ends, and
@@ -4257,7 +4313,11 @@ data class SetExport(
      * `manual` or `metronome`), and the batch segmenter's over an analysable
      * stream where the sensor did (`analysis`), because the live count died
      * with the process; and it carries no plan targets, side or effort rating,
-     * because none was captured. It carries no silence word either: those are
+     * because none was captured (its tempo, warm-up, added and planned-side
+     * declarations and its prep seconds were journaled, and are carried). An
+     * interrupted set carries no terminal cue unless the guide had called
+     * Done before the kill, so its rep list is bounded by nothing but the end
+     * of the journal. It carries no silence word either: those are
      * link readings taken as a set ends, and the links ended with the process,
      * so on a recovered set an absent [sensors] block does not mean the stream
      * was analysable. It sits in a single-set session of its own unless its

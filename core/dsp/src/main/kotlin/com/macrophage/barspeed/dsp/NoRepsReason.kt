@@ -307,8 +307,9 @@ enum class NoRepsReason(val wireName: String) {
      * it records what a sensorless set records -- no reason -- because the
      * carry gate is not what emptied it.
      *
-     * NOT RETROACTIVE. Every carry recorded before this keeps the empty
-     * summary it had.
+     * NOT RETROACTIVE. A rep-prescribed carry recorded by v0.1.59 or earlier
+     * was not timed, so it went to the segmenter, and it keeps the figures it
+     * was stored with; this word never reaches it (export 1.26's #63 entry).
      */
     @SerialName("carryNotSegmented")
     CARRY_NOT_SEGMENTED("carryNotSegmented"),
