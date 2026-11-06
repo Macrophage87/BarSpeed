@@ -1,5 +1,7 @@
 package com.macrophage.barspeed.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,6 +23,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -88,6 +91,14 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
     val recoveryRefusals by viewModel.recoveryRefusals.collectAsState()
     val busyCrashReports by viewModel.busyCrashReports.collectAsState()
     val crashReports by viewModel.crashReports.collectAsState()
+    val exportAllProgress by viewModel.exportAllProgress.collectAsState()
+    val exportAllMessage by viewModel.exportAllMessage.collectAsState()
+    // One picker for the whole archive (history-export F5): a single zip the
+    // lifter names and places once, holding every session's raw zip.
+    val exportAllLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+            viewModel.exportAllTo(uri)
+        }
     // Older sessions are drawn only on request, and the choice survives a
     // rotation; Home's own figures never read them.
     var showOlder by rememberSaveable { mutableStateOf(false) }
@@ -205,7 +216,11 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
                 }
             }
             Spacer(Modifier.height(6.dp))
-            SectionCaption("History")
+            HistoryHeader(
+                hasSessions = state.history.isNotEmpty(),
+                progress = exportAllProgress,
+                message = exportAllMessage,
+            ) { exportAllLauncher.launch(viewModel.allSessionsArchiveName()) }
             Spacer(Modifier.height(8.dp))
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(state.history) { row ->
@@ -316,6 +331,44 @@ private fun HeroCard(state: HomeState, onStart: () -> Unit) {
         Button(onClick = onStart, modifier = Modifier.fillMaxWidth().height(48.dp)) {
             Text("START SESSION", style = MaterialTheme.typography.titleMedium)
         }
+    }
+}
+
+/**
+ * The History caption with "Export all" beside it (history-export F5), and,
+ * under it, the export's progress while it runs and its result line after.
+ * Kept to one line in the common case: this Column does not scroll, so every
+ * line here comes out of the history list.
+ */
+@Composable
+private fun HistoryHeader(
+    hasSessions: Boolean,
+    progress: ExportAllProgress?,
+    message: String?,
+    onExportAll: () -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        SectionCaption("History")
+        if (hasSessions) {
+            TextButton(onClick = onExportAll, enabled = progress == null) {
+                Text("Export all sessions", color = BarColors.Sub)
+            }
+        }
+    }
+    if (progress != null) {
+        val fraction = if (progress.total > 0) progress.done.toFloat() / progress.total else 0f
+        LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
+        Text(
+            if (progress.total > 0) "Exporting ${progress.done} of ${progress.total} sessions" else "Exporting",
+            style = MaterialTheme.typography.bodySmall,
+            color = BarColors.Sub,
+        )
+    } else if (message != null) {
+        Text(message, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
     }
 }
 

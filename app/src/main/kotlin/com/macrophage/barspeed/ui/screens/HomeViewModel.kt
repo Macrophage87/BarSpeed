@@ -2,6 +2,8 @@ package com.macrophage.barspeed.ui.screens
 
 import android.app.Application
 import android.content.Intent
+import android.net.Uri
+import android.provider.DocumentsContract
 import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -12,6 +14,7 @@ import com.macrophage.barspeed.data.OrphanedSet
 import com.macrophage.barspeed.data.RecoveryOutcome
 import com.macrophage.barspeed.data.RescuedDatabase
 import com.macrophage.barspeed.data.SessionEntity
+import com.macrophage.barspeed.model.ExportNaming
 import com.macrophage.barspeed.model.JournalRecoveryPolicy
 import com.macrophage.barspeed.model.RecordingHold
 import com.macrophage.barspeed.model.RecordingServicePolicy
@@ -21,6 +24,7 @@ import com.macrophage.barspeed.model.SessionHeartRate
 import com.macrophage.barspeed.model.VoidSetPolicy
 import com.macrophage.barspeed.model.VolumeSet
 import com.macrophage.barspeed.model.WeightUnit
+import com.macrophage.barspeed.model.sessionTimestamp
 import com.macrophage.barspeed.ui.ShareUtil
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -30,13 +34,21 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
+import java.util.zip.CRC32
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 /**
  * Logcat tag for the one thing on this screen that is logged rather than shown.
@@ -49,6 +61,9 @@ private const val TAG = "HomeViewModel"
 
 /** Why RESTORE did not restart the app: a set-end write or a session close is still running. */
 private const val SAVING_NOTE = "A set or session is still saving -- try restoring again in a moment"
+
+/** Where "Export all sessions" has got to: [done] of [total] sessions written. */
+data class ExportAllProgress(val done: Int, val total: Int)
 
 /** One history row: session summary plus a per-set mean-velocity sparkline. */
 data class HistoryRow(
@@ -258,6 +273,14 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      */
     private val crashReportsFlow = MutableStateFlow<List<CrashReport>>(emptyList())
     val crashReports: StateFlow<List<CrashReport>> = crashReportsFlow
+
+    /** "Export all sessions" in flight: null when it is not running. */
+    private val exportAllFlow = MutableStateFlow<ExportAllProgress?>(null)
+    val exportAllProgress: StateFlow<ExportAllProgress?> = exportAllFlow
+
+    /** The last "Export all sessions" result line, kept on screen until the next run. */
+    private val exportAllMessageFlow = MutableStateFlow<String?>(null)
+    val exportAllMessage: StateFlow<String?> = exportAllMessageFlow
 
     init {
         refreshInterrupted()
@@ -842,6 +865,91 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
+    /** The name the system picker suggests for [exportAllTo]'s archive. */
+    fun allSessionsArchiveName(): String = ExportNaming.allSessionsArchiveName(LocalDate.now())
+
+    /**
+     * Write every stored session's raw zip into the one archive at [uri]
+     * (history-export F5). Each entry is exactly the bytes
+     * `RawExporter.buildZip` gives the session's own "Raw CSV" export, under
+     * the name that export gets ([ExportNaming.rawZipName]); entries are
+     * STORED, not deflated again, so unzipping the archive gives the same
+     * files a per-session save would. One session at a time, so memory holds
+     * one session's zip, not all of them.
+     *
+     * ALL SESSIONS, NOT [HISTORY_LIMIT]: read once from the database here,
+     * not from [state], which stops at the first 20 for its own figures.
+     *
+     * A SESSION THAT FAILS IS SKIPPED AND NAMED, never fatal to the rest: the
+     * point is getting everything out before a reinstall, and one bad row
+     * must not cost the other 46. A failure of the archive itself (the
+     * picked file cannot be opened or written) deletes the half-written
+     * document, as `SessionDetailViewModel.savePendingTo` does, and says so.
+     * Catches Throwable, not only Exception, for the reason
+     * [refreshInterrupted] gives: an OutOfMemoryError building one session
+     * must not take the app down mid-export. CancellationException is
+     * rethrown.
+     *
+     * Null [uri] is the picker cancelled. A second call while one runs is
+     * ignored; the screen also disables the action.
+     *
+     * Compile- and lint-gated only: no :app test reaches SAF, Room or the
+     * zip stream here. The naming and the summary line are
+     * [ExportNaming]'s, pinned in :core:model.
+     */
+    fun exportAllTo(uri: Uri?) {
+        if (uri == null || exportAllFlow.value != null) return
+        exportAllFlow.value = ExportAllProgress(0, 0)
+        exportAllMessageFlow.value = null
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            val message =
+                try {
+                    val sessions = sessionRepository.sessions.first()
+                    exportAllFlow.value = ExportAllProgress(0, sessions.size)
+                    val failed = mutableListOf<String>()
+                    var exported = 0
+                    withContext(Dispatchers.IO) {
+                        val stream = app.contentResolver.openOutputStream(uri) ?: error("couldn't open the file")
+                        ZipOutputStream(stream.buffered()).use { archive ->
+                            val taken = mutableSetOf<String>()
+                            sessions.forEachIndexed { index, session ->
+                                val bytes =
+                                    try {
+                                        container.rawExporter.buildZip(session.id)
+                                    } catch (e: CancellationException) {
+                                        throw e
+                                    } catch (e: Throwable) {
+                                        AppLog.w(TAG, "export all: session ${session.id} failed; skipping it", e)
+                                        null
+                                    }
+                                if (bytes == null) {
+                                    failed += failedLabel(session)
+                                } else {
+                                    archive.putStored(ExportNaming.uniqueEntryName(rawZipName(session), taken), bytes)
+                                    exported++
+                                }
+                                exportAllFlow.value = ExportAllProgress(index + 1, sessions.size)
+                            }
+                        }
+                    }
+                    ExportNaming.allSessionsSummary(exported, failed)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    AppLog.w(TAG, "export all failed; removing the partial archive", e)
+                    withContext(Dispatchers.IO) {
+                        runCatching { DocumentsContract.deleteDocument(app.contentResolver, uri) }
+                    }
+                    "Export failed: ${e.message ?: e.javaClass.simpleName}. Nothing was saved."
+                } finally {
+                    exportAllFlow.value = null
+                }
+            exportAllMessageFlow.value = message
+            Toast.makeText(app, message, Toast.LENGTH_LONG).show()
+        }
+    }
+
     companion object {
         const val HISTORY_LIMIT = 20
         const val DAYS_PER_WEEK = 7L
@@ -859,6 +967,35 @@ private fun recoveryToast(outcome: RecoveryOutcome): String = when (outcome) {
     RecoveryOutcome.AlreadyStored -> "Already in History -- the capture was removed"
     is RecoveryOutcome.Waiting -> JournalRecoveryPolicy.waitNote(outcome.held)
     is RecoveryOutcome.Refused -> JournalRecoveryPolicy.refusalNote(outcome.refusal)
+}
+
+/** The session's raw zip name, exactly as its own "Raw CSV" export names it. */
+private fun rawZipName(session: SessionEntity): String = ExportNaming.rawZipName(
+    sessionTimestamp(session.startedAtMs, session.zoneId, session.utcOffsetMinutes),
+    session.planSessionName,
+)
+
+/** How a session that could not be exported is named in the summary: its day, as History shows it. */
+private fun failedLabel(session: SessionEntity): String = DateTimeFormatter.ofPattern("EEE d MMM").format(
+    Instant.ofEpochMilli(session.startedAtMs).atZone(ZoneId.systemDefault()),
+)
+
+/**
+ * One archive entry holding [bytes] as they are: STORED, so a session's
+ * already-deflated zip is neither re-compressed nor changed.
+ */
+private fun ZipOutputStream.putStored(name: String, bytes: ByteArray) {
+    val crc = CRC32().apply { update(bytes) }
+    putNextEntry(
+        ZipEntry(name).apply {
+            method = ZipEntry.STORED
+            size = bytes.size.toLong()
+            compressedSize = bytes.size.toLong()
+            this.crc = crc.value
+        },
+    )
+    write(bytes)
+    closeEntry()
 }
 
 /** Names the file after the set it holds, so two captures cannot collide. */
