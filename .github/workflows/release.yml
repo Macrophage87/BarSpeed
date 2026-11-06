@@ -41,6 +41,19 @@ jobs:
             exit 1
           fi
 
+      # A tag that does not match the build's versionName publishes an APK
+      # whose Guide screen and Play listing name a different version from the
+      # GitHub release it hangs on. Read with grep/sed, no Gradle needed.
+      - name: Check the tag matches versionName
+        run: |
+          set -euo pipefail
+          version_name="$(grep -E '^[[:space:]]*versionName[[:space:]]*=' app/build.gradle.kts \
+            | head -n 1 | sed -E 's/.*"([^"]*)".*/\1/')"
+          if [ -z "$version_name" ] || [ "${RELEASE_TAG#v}" != "$version_name" ]; then
+            echo "::error::release tag $RELEASE_TAG does not match versionName '$version_name' in app/build.gradle.kts" >&2
+            exit 1
+          fi
+
       # Secrets are not usable in step-level `if`; this step reports only
       # whether each one is set, so later gates read a boolean, not the secret.
       - name: Check which secrets are configured
