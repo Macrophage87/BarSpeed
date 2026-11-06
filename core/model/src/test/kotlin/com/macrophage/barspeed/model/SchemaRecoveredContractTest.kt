@@ -123,6 +123,30 @@ class SchemaRecoveredContractTest {
         assertEquals(2, Regex("""except on a set carrying "recovered": true""").findAll(guide).count())
     }
 
+    /**
+     * The recovered bullet names what a recovered set lacks (#100 review
+     * round 2). Lens B N3: "the rest" left the reader to guess, and two plan
+     * keys -- `workingLoad_kg` and `tempoPrescribed` -- ARE published on a
+     * recovered set, so each key is named on the side it is on. Lens A N1: a
+     * sensor-counted set's mid-set correction tap was never journaled and is
+     * gone with the live count. Lens B N2: the set rejoins its session only
+     * while that session is still open AND current, as the schema, the KDoc
+     * and the confirmation say.
+     */
+    @Test
+    fun `the prompt's recovered bullet names what is absent and where the set sits`() {
+        val bullet = guide.lines().single { it.startsWith("- \"recovered\": true") }
+        assertFalse("and the rest" in bullet, "the bullet leaves what is absent to a guess")
+        for (key in listOf("plannedLoad_kg", "plannedReps", "workingReps", "plannedTempo", "rest_s")) {
+            assertTrue("\"$key\"" in bullet, "the bullet does not name the absent $key")
+        }
+        for (key in listOf("workingLoad_kg", "tempoPrescribed")) {
+            assertTrue("\"$key\"" in bullet, "the bullet does not say $key is published")
+        }
+        assertTrue("correction" in bullet, "the bullet does not say the mid-set correction is lost")
+        assertTrue("still open and current" in bullet, "the bullet drops \"and current\"")
+    }
+
     private companion object {
         const val KEY = "recovered"
     }

@@ -1,9 +1,12 @@
 package com.macrophage.barspeed.data
 
 import com.macrophage.barspeed.dsp.ImuCsv
+import com.macrophage.barspeed.dsp.NoRepsReason
 import com.macrophage.barspeed.dsp.RestStart
 import com.macrophage.barspeed.dsp.SetAnalyzer
+import com.macrophage.barspeed.dsp.SetEnd
 import com.macrophage.barspeed.dsp.SetTargets
+import com.macrophage.barspeed.dsp.StackRollSignature
 import com.macrophage.barspeed.dsp.liftDirection
 import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.ImuSample
@@ -15,6 +18,7 @@ import com.macrophage.barspeed.model.RecoveryRefusal
 import com.macrophage.barspeed.model.RepCounter
 import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.model.SetGeometryPolicy
+import com.macrophage.barspeed.model.StackMountSignal
 import com.macrophage.barspeed.model.Tempo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -98,6 +102,9 @@ class JournalRecoveryTest {
         CueCsv.decode(cuesText)
             .filter { it.cue.startsWith("Rep ") || it.cue == "Last rep" || it.cue == "Done" }
             .map { it.timestampMs }
+
+    /** Where the guided set's working window ends, as the analysis bounds it. */
+    private val guidedEnd: SetEnd = SetEnd.of(CueCsv.decode(cuesText), cadenceGuided = true)
 
     private val squat = ExerciseDef(id = "back_squat", displayName = "Back Squat")
     private val loadKg = 52.163122551154075
@@ -282,6 +289,7 @@ class JournalRecoveryTest {
                 cues = CueCsv.decode(cuesText),
                 workStartedAtMs = window.workStartedAtMs,
                 analysedUnitFellBack = true,
+                analysedSignal = StackRollSignature.of(roleA, window.workStartedAtMs, guidedEnd),
             )
         assertEquals(expected, set.analysis)
         assertEquals(roleA, set.imuSamples)
@@ -423,6 +431,36 @@ class JournalRecoveryTest {
     }
 
     /**
+     * The mirror (#279; #100 review round 2, Lens A B1): a fallback onto a
+     * partner whose own roll reads as riding a load is refused under a
+     * declaration naming NO mount, exactly as the set's own write refuses it
+     * -- `endSet` hands the analyzer `ArmedCapture.analysedSignal`, and so
+     * must the recovery. The squat's declaration is mount-free, so #247's
+     * refusal above cannot be what fires.
+     *
+     * The partner is SYNTHETIC, not field data: role a's own instants with
+     * every reading held at its first sample's, a unit lying still. That is
+     * a shape the 1.26 #279 entry names as reading the same as a stack
+     * partner and refused with it; no committed :core:data fixture is a
+     * partner clipped to a stack.
+     */
+    @Test
+    fun `a fallback onto a partner read as riding a load is refused as its own write refuses it`() = runTest {
+        val first = roleA.first()
+        val still = roleA.map { first.copy(timestampMs = it.timestampMs) }
+        assertEquals(
+            StackMountSignal.ON_STACK,
+            StackRollSignature.of(still, window.workStartedAtMs, guidedEnd),
+            "the fixture no longer reads as riding a load",
+        )
+        assertFalse(squat.liftDirection().mountSpecific, "the declaration names a mount")
+        val set = ready(recovery(FakeSessionDao()).prepare(journaled(roleA = ImuCsv.encode(still))))
+        assertEquals(true, set.sensors?.analysedFellBack)
+        assertEquals(NoRepsReason.MOUNT_NOT_DECLARED, set.analysis.noRepsReason)
+        assertTrue(set.analysis.reps.isEmpty())
+    }
+
+    /**
      * A recovered set carries no silence word (#100 review round 1, Lens A
      * B2). Role b was armed and delivered nothing, which the set's own write
      * would publish as `silent` from the link states read as the set ended;
@@ -477,6 +515,38 @@ class JournalRecoveryTest {
     }
 
     /** Counted whole by the listing scan and still not a stream: refused at the decode, not guessed around. */
+    /**
+     * A sensor-counted set whose analysis found no rep is refused, not
+     * written as a 0-rep set (#100 review round 2, Lens A B2). The pulley
+     * declaration withholds the fallen-back analysis (MOUNT_NOT_DECLARED)
+     * over a full stream. The live count died with the process and a
+     * sensor-counted set journals no mark, so nobody counted it, and
+     * `"reps": 0` beside `"repsSource": "analysis"` would publish a count of
+     * zero nobody made. The listing cannot run the analysis and still
+     * offers the set; the answer changes at recover, and the capture stays
+     * on the card.
+     */
+    @Test
+    fun `a sensor-counted set whose analysis found no rep is refused and kept`() = runTest {
+        val pulley = squat.copy(travelRatio = 2.0)
+        val sensorFacts =
+            facts.copy(
+                exercise = pulley,
+                geometry = SetGeometryPolicy.describe(pulley, null),
+                counter = RepCounter.SENSOR,
+            )
+        val orphan = journaled(header = header(facts = sensorFacts), marks = emptyList())
+        val dao = ownSession(endedAtMs = null)
+        val recovery = recovery(dao)
+        assertNull(recovery.refusal(orphan), "the listing refused a set it cannot yet judge")
+        assertEquals(
+            RecoveryOutcome.Refused(RecoveryRefusal.NOTHING_TO_COUNT),
+            recovery.recover(orphan, writeOutstanding = false),
+        )
+        assertEquals(2, dao.sets.size, "a set nobody counted was written")
+        assertTrue(orphan.directory.exists(), "the capture went with nothing written")
+    }
+
     @Test
     fun `a stream that will not parse is refused`() = runTest {
         val broken = roleAText.replaceFirst("\n", "\nnot,a,sample\n")

@@ -248,6 +248,21 @@ class JournalRecoveryPolicyTest {
         assertNull(JournalRecoveryPolicy.count(RepCounter.NOBODY, true, 6, 3))
     }
 
+    /**
+     * A sensor-counted set whose analysis found no rep has no count (#100
+     * review round 2, Lens A B2). Its live count died with the process, and
+     * a segmenter that withheld -- a mount it may not read, a stream that
+     * did not move -- answers an empty rep list over plenty of frames. On a
+     * set counted in reps, 0 is a count, and nobody made it. The listing,
+     * which cannot run the analysis, still offers such a set: the default
+     * [refusal] below is a SENSOR set with an analysable stream and no mark.
+     */
+    @Test
+    fun `a sensor-counted set whose analysis found no rep is not counted`() {
+        assertNull(JournalRecoveryPolicy.count(RepCounter.SENSOR, true, 0, 0))
+        assertNull(refusal(), "the listing refused a set only the analysis can judge")
+    }
+
     @Test
     fun `with no analysable stream the journaled marks are the stated count`() {
         assertEquals(RecoveredCount(8, stated = true), JournalRecoveryPolicy.count(RepCounter.MANUAL, false, 0, 8))
@@ -279,10 +294,11 @@ class JournalRecoveryPolicyTest {
      * A wait names what it waits for (#100 review round 1, Lens A N5, Lens B
      * N4). A set-end write or a session close finishes on its own, so the
      * lifter is told to wait. The record screen's own hold, SESSION, is
-     * released when that screen goes away, so held under Home it is either a
-     * set still recording or a leaked hold, and "try again in a moment" would
-     * never come true: the note says where to finish the set, and what clears
-     * a hold left by a swiped task -- `rescuedRestoreNote`'s reading.
+     * released when that screen goes away, and every way out of Record pops
+     * it, so held under Home it has leaked: "try again in a moment" would
+     * never come true, and neither is a set recording anywhere (#100 review
+     * round 2, Lens B B1 -- the round-1 note said one was). The note says
+     * what the app holds and what clears it, `rescuedRestoreNote`'s reading.
      */
     @Test
     fun `a wait names what it waits for`() {
@@ -290,7 +306,9 @@ class JournalRecoveryPolicyTest {
         assertTrue("being saved" in saving, saving)
         val recording = JournalRecoveryPolicy.waitNote(setOf(RecordingHold.SESSION))
         assertFalse("in a moment" in recording, recording)
-        assertTrue("Record screen" in recording, recording)
+        assertFalse("still recording" in recording, "a held SESSION under Home is no set recording: $recording")
+        assertFalse("Record screen" in recording, "there is no Record screen to finish a set on: $recording")
+        assertTrue("still counts a recording as running" in recording, recording)
         assertTrue("force-stop" in recording, recording)
     }
 
