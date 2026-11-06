@@ -412,15 +412,16 @@ git push origin vX.Y.Z
 ```
 
 Fallback, only when the git proxy refuses the tag push:
-`gh workflow run Release -f tag=vX.Y.Z --repo Macrophage87/BarSpeed`. The release action then
-creates the tag with no `target_commitish`, so it lands on `main`'s HEAD when that step runs, at
-the end of the build: nothing may land on `main` until the run completes (v0.1.5 and v0.1.6 both
-resolve to `56448cb` because of this). `release.yml` has no concurrency group.
+`gh workflow run Release -f tag=vX.Y.Z --repo Macrophage87/BarSpeed`, dispatched while `main`'s
+HEAD is the cut SHA. The release step tags the built commit (`target_commitish: ${{ github.sha }}`),
+so landings during the run cannot move the tag and there is no land freeze. (Without that key the
+tag went on `main`'s HEAD at the end of the build: v0.1.5 and v0.1.6 both resolve to `56448cb`.)
 
 What the run does, in order: checks the tag is `vX.Y.Z`; runs `./gradlew test
-:app:assembleRelease` unsigned (unit tests plus R8); decodes the keystore; builds the signed APK
-and AAB; attaches APK, AAB and mapping to a GitHub Release; uploads the AAB to the Play
-**internal** track; deletes the keystore. The Play upload step is **skipped, not failed**, while
+:app:assembleRelease` unsigned (unit tests plus R8); decodes the keystore (and fails
+with a clear error if the secret is unset); builds the signed APK and AAB; deletes the keystore
+before any third-party action runs; attaches APK, AAB and mapping to a GitHub Release, tagging
+the built SHA; uploads the AAB to the Play **internal** track. The Play upload step is **skipped, not failed**, while
 the `PLAY_SERVICE_ACCOUNT_JSON` secret is unset, so a green run does not mean "on Play" — read
 the step's status in the job log.
 

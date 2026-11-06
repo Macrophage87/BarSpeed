@@ -50,10 +50,11 @@ git push origin vX.Y.Z
 ```
 
 Fallback, only when the git proxy refuses the tag push:
-`gh workflow run Release -f tag=vX.Y.Z --repo Macrophage87/BarSpeed`. That path creates the tag
-from `main`'s HEAD at the end of the build (no `target_commitish`), so **nothing may land on
-`main` until that run completes**: v0.1.5 and v0.1.6 both resolve to 56448cb because something
-landed mid-run. Check nothing else is in flight (`gh run list --workflow release.yml`) first.
+`gh workflow run Release -f tag=vX.Y.Z --repo Macrophage87/BarSpeed`, dispatched while `main`'s
+HEAD is the cut SHA. The run builds that SHA and the release step tags it
+(`target_commitish: ${{ github.sha }}`), so later landings cannot move the tag and no land freeze
+is needed. (Before that key existed the tag went on `main`'s HEAD at the end of the build, which
+is why v0.1.5 and v0.1.6 both resolve to 56448cb.)
 
 ## 3a. Play
 

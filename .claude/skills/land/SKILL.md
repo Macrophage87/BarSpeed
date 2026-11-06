@@ -53,7 +53,8 @@ retract.
 
 ## Land
 
-Not while a Release run is in flight — `release.yml` has no concurrency group.
+A Release run in flight is no reason to wait: `release.yml` tags the commit it built
+(`target_commitish`), so a landing mid-run cannot move the tag.
 
 ```
 git push origin <FULL-SHA>:refs/heads/main
