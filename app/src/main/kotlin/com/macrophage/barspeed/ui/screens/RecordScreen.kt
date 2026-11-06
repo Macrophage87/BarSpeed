@@ -112,6 +112,7 @@ import com.macrophage.barspeed.model.ScreenOnPolicy
 import com.macrophage.barspeed.model.SensorAdvice
 import com.macrophage.barspeed.model.SensorAdvicePolicy
 import com.macrophage.barspeed.model.SensorCapturePolicy
+import com.macrophage.barspeed.model.SensorLossPolicy
 import com.macrophage.barspeed.model.SensorRoster
 import com.macrophage.barspeed.model.SessionFinishedCopy
 import com.macrophage.barspeed.model.SessionNotClosedCopy
@@ -2737,6 +2738,21 @@ private fun SensorCountedSetStage(state: RecordState, viewModel: RecordViewModel
     var lastRepTapAtMs by remember { mutableStateOf<Long?>(null) }
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         InSetHeader(state, slot)
+        // The only (or both) bar sensor has stopped delivering, so the count
+        // below has frozen; said once out loud and drawn large enough to read
+        // from the bench (UX review 2026-11-06, BLE F1). SensorLossPolicy.
+        if (state.sensorLoss.lost) {
+            Spacer(Modifier.height(10.dp))
+            Card(Modifier.fillMaxWidth()) {
+                Text(
+                    SensorLossPolicy.BANNER,
+                    Modifier.padding(12.dp),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = BarColors.Amber,
+                )
+            }
+        }
         Spacer(Modifier.height(10.dp))
         // The count. The SAME field the voice was handed, so the number on
         // screen is the number that was spoken (#252).

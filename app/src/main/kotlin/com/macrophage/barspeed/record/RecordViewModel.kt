@@ -100,6 +100,8 @@ import com.macrophage.barspeed.model.RestControlPolicy
 import com.macrophage.barspeed.model.ResumeLanding
 import com.macrophage.barspeed.model.SecondaryCapture
 import com.macrophage.barspeed.model.SensorCapturePolicy
+import com.macrophage.barspeed.model.SensorLossPolicy
+import com.macrophage.barspeed.model.SensorLossWatch
 import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.model.SensorRoster
 import com.macrophage.barspeed.model.SessionCloseState
@@ -1628,6 +1630,26 @@ private fun RecordState.nextSetPhrase(): String? {
 }
 
 /**
+ * One second of the in-set sensor watch (UX review 2026-11-06, BLE F1): moves
+ * [RecordState.sensorLoss] and returns the word to speak now, or null.
+ *
+ * Asked from the set's own elapsed-time tick, so there is no new clock; the
+ * reading is `ArmedSilencePolicy.deliveryOf` over the last-frame instants
+ * `mirrorLinkStates` already keeps, for the analysed link and, when the set
+ * armed one, the second. The rule -- only a sensor-counted set, only when
+ * every armed unit is quiet, each word once a set -- is
+ * [SensorLossPolicy.step]'s. The word is returned only with the voice on;
+ * the banner stands either way. Free for [liveFeedOf]'s reason.
+ */
+private fun sensorLossTick(stateFlow: MutableStateFlow<RecordState>, counter: RepCounter, dual: Boolean): String? {
+    val s = stateFlow.value
+    val deliveries = SensorLossPolicy.deliveries(s.armedLinks(), dual, System.currentTimeMillis())
+    val step = SensorLossPolicy.step(s.sensorLoss, counter == RepCounter.SENSOR, deliveries)
+    if (step.watch != s.sensorLoss) stateFlow.value = stateFlow.value.copy(sensorLoss = step.watch)
+    return step.cue?.takeIf { s.audioCues }
+}
+
+/**
  * The four instants [mirrorLinkStates] mirrors in one write (#213).
  *
  * A named carrier rather than a `List<Any>` out of `combine`, for
@@ -2597,6 +2619,7 @@ private fun inSetState(
     // not start the NEXT one with a blank ring (#280).
     liveCountWithheld = false,
     liveTrackerDropped = false,
+    sensorLoss = SensorLossWatch(),
     guidedSet = guidedSet,
     guidedLabel = "",
     guidedCountdown = 0,
@@ -3728,6 +3751,12 @@ data class RecordState(
      * (UX review 2026-11-06, dsp-core F1).
      */
     val sensorRepFigures: List<RepFigure?> = emptyList(),
+    /**
+     * What this set has said about its bar sensors going quiet, and whether
+     * they are quiet now -- [SensorLossWatch.lost] draws the in-set banner
+     * (UX review 2026-11-06, BLE F1). Cleared only at the start of a set.
+     */
+    val sensorLoss: SensorLossWatch = SensorLossWatch(),
     /** Active guided-cadence set: the app calls the tempo and counts the reps. */
     val guidedSet: Boolean = false,
     val guidedLabel: String = "",
@@ -5475,6 +5504,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     delay(1_000)
                     seconds++
                     stateFlow.value = stateFlow.value.copy(setElapsedS = seconds)
+                    sensorLossTick(stateFlow, setCounter, armedSecondaryRole != null)?.let { speakCue(it) }
                     val remainingS = TimedSetEndPolicy.remainingS(seconds, timedTargetS)
                     if (remainingS != null && LeadInPolicy.speaks(prepCaseForSet, stateFlow.value.audioCues)) {
                         TimedSetVoice.cueFor(remainingS)?.let { speakCue(it) }
