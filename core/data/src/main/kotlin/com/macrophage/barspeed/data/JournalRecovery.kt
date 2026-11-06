@@ -14,6 +14,7 @@ import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.JournalRecoveryPolicy
 import com.macrophage.barspeed.model.PrepCase
 import com.macrophage.barspeed.model.PrepWindowPolicy
+import com.macrophage.barspeed.model.RecordingHold
 import com.macrophage.barspeed.model.RecoveryRefusal
 import com.macrophage.barspeed.model.RecoveryTarget
 import com.macrophage.barspeed.model.SensorCapturePolicy
@@ -29,8 +30,12 @@ sealed interface RecoveryOutcome {
     /** The capture cannot become a row; it stays on disk, offered as a zip or a discard. */
     data class Refused(val refusal: RecoveryRefusal) : RecoveryOutcome
 
-    /** A recording write is outstanding; nothing was written and the capture stays. */
-    data object Waiting : RecoveryOutcome
+    /**
+     * A recording write is outstanding; nothing was written and the capture
+     * stays. [held] is what was held when that was decided, for the note
+     * that names it (`JournalRecoveryPolicy.waitNote`).
+     */
+    data class Waiting(val held: Set<RecordingHold>) : RecoveryOutcome
 
     /** The set was already a row; nothing was written and the capture was removed. */
     data object AlreadyStored : RecoveryOutcome
@@ -114,8 +119,9 @@ class JournalRecovery(
     /**
      * Put [orphan] back into History, or say why not.
      *
-     * [writeOutstanding] is whether any recording hold is held; while one is,
-     * nothing is decided (`JournalRecoveryPolicy.target`).
+     * [holds] reads the recording holds; while `JournalRecoveryPolicy.mustWait`
+     * says one is outstanding, nothing is decided
+     * (`JournalRecoveryPolicy.target`).
      *
      * WHERE IT GOES is `JournalRecoveryPolicy.target`'s answer, asked with the
      * newest session over `SessionResumePolicy.LOOKBACK_MS` -- the read the
@@ -149,7 +155,9 @@ class JournalRecovery(
      * the AlreadyStored path would need a session-level write this class
      * does not otherwise make, and that has not been designed.
      */
-    suspend fun recover(orphan: OrphanedSet, writeOutstanding: Boolean): RecoveryOutcome {
+    suspend fun recover(orphan: OrphanedSet, holds: () -> Set<RecordingHold>): RecoveryOutcome {
+        val held = holds()
+        val writeOutstanding = JournalRecoveryPolicy.mustWait(held)
         val header = orphan.header
         // Asked before the re-analysis can refuse (#100 review round 3,
         // Lens A N2): a capture whose set is already a row is that row's
@@ -171,7 +179,7 @@ class JournalRecovery(
         val latest = repository.latestSession(now - SessionResumePolicy.LOOKBACK_MS, now)
         val target = JournalRecoveryPolicy.target(header.sessionId, latest, now, writeOutstanding, stored)
         return when (target) {
-            RecoveryTarget.Wait -> RecoveryOutcome.Waiting
+            RecoveryTarget.Wait -> RecoveryOutcome.Waiting(JournalRecoveryPolicy.outstanding(held))
             RecoveryTarget.AlreadyStored -> {
                 store.discard(orphan)
                 RecoveryOutcome.AlreadyStored

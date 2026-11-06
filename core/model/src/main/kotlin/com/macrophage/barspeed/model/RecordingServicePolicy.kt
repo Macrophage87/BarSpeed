@@ -70,6 +70,28 @@ enum class RecordingHold(val armsService: Boolean) {
      * `SetWriteState` and `SessionCloseState` apart.
      */
     SESSION_CLOSE(armsService = false),
+
+    /**
+     * An interrupted set is being put back into History from its capture
+     * (#100; whole-branch review of 0.2.0, round 1, CAP-B1).
+     *
+     * A set write of its own: it decodes and re-analyses the capture and
+     * writes a set row at a position it chose, so for as long as it runs no
+     * other writer may choose a position in the same session and the process
+     * may not be ended under it. A separate member rather than a second
+     * [SET_WRITE], because the held set is a set: a recovery and a live
+     * set-end write overlapping would share one member, and whichever
+     * finished first would release the other's hold with it.
+     *
+     * Not arming: the capture it reads stays on disk until the row it writes
+     * has landed, so a process ended under it loses nothing, and the service
+     * has no stream to protect from Home. The hold exists to keep the resume
+     * offer, the other writers' positions and the restore off it, not to keep
+     * the process alive.
+     *
+     * DECLARED AHEAD OF ITS HOLDER: nothing acquires it yet.
+     */
+    RECOVERY_WRITE(armsService = false),
 }
 
 /** What the holder must do to the service, or [NONE] to leave it as it is. */
@@ -161,4 +183,15 @@ object RecordingServicePolicy {
      * loses nothing.
      */
     fun mayEndProcess(held: Set<RecordingHold>): Boolean = held.isEmpty()
+
+    /**
+     * Whether a write that finishes on its own is outstanding in [held]: a
+     * set-end write or a session close. The one reading of "still saving"
+     * the resume offer (#48), the rescued card's restore note (#112) and the
+     * recovery's wait note (#100) share, so the three cannot name the same
+     * hold two ways (whole-branch review of 0.2.0, round 1, UI-B2, CAP-B1).
+     * [RecordingHold.SESSION] alone is not a write.
+     */
+    fun writing(held: Set<RecordingHold>): Boolean =
+        RecordingHold.SET_WRITE in held || RecordingHold.SESSION_CLOSE in held
 }

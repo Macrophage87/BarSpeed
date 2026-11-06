@@ -111,15 +111,18 @@ class RescuedCardTest {
 
     @Test
     fun `send is offered on every state that has files, and not on the empty one`() {
-        assertTrue(rescuedCardButtons(complete, emptySet()).showSend)
-        assertTrue(rescuedCardButtons(fragment, emptySet()).showSend)
-        assertFalse(rescuedCardButtons(nothing, emptySet()).showSend, "an empty rescue offered SEND: a 22-byte zip")
+        assertTrue(rescuedCardButtons(complete, emptySet(), null, emptySet()).showSend)
+        assertTrue(rescuedCardButtons(fragment, emptySet(), null, emptySet()).showSend)
+        assertFalse(
+            rescuedCardButtons(nothing, emptySet(), null, emptySet()).showSend,
+            "an empty rescue offered SEND: a 22-byte zip",
+        )
     }
 
     @Test
     fun `an idle card has both buttons live`() {
         for (card in listOf(complete, fragment, nothing)) {
-            val buttons = rescuedCardButtons(card, emptySet())
+            val buttons = rescuedCardButtons(card, emptySet(), null, emptySet())
             assertTrue(
                 buttons.sendEnabled && buttons.discardEnabled,
                 "idle ${card.completeness} card disabled: $buttons",
@@ -130,7 +133,7 @@ class RescuedCardTest {
     /** #111's race: DISCARD live while SEND's archive streams deletes the corpus mid-copy. */
     @Test
     fun `a busy card has both buttons dead`() {
-        val buttons = rescuedCardButtons(complete, setOf(complete.directory))
+        val buttons = rescuedCardButtons(complete, setOf(complete.directory), null, emptySet())
         assertFalse(buttons.sendEnabled, "SEND live while this rescue is busy")
         assertFalse(buttons.discardEnabled, "DISCARD live while this rescue is busy")
     }
@@ -138,7 +141,7 @@ class RescuedCardTest {
     @Test
     fun `one busy rescue does not disable another`() {
         val other = item(listOf(DATABASE_NAME), dir = "db-1")
-        val buttons = rescuedCardButtons(complete, setOf(other.directory))
+        val buttons = rescuedCardButtons(complete, setOf(other.directory), null, emptySet())
         assertTrue(buttons.sendEnabled && buttons.discardEnabled, "an unrelated busy key disabled this card")
     }
 
@@ -236,7 +239,7 @@ class RescuedCardTest {
     @Test
     fun `a refused or uncomputed rescue offers no restore`() {
         for (verdict in listOf(null, RestoreVerdict.Refused(RestoreRefusal.NEWER_THAN_THIS_BUILD, 21))) {
-            val buttons = rescuedCardButtons(complete, emptySet(), verdict)
+            val buttons = rescuedCardButtons(complete, emptySet(), verdict, emptySet())
             assertFalse(buttons.showRestore || buttons.restoreEnabled, "restore offered on $verdict")
         }
     }
@@ -245,14 +248,14 @@ class RescuedCardTest {
 
     @Test
     fun `a restorable rescue offers restore`() {
-        val buttons = rescuedCardButtons(complete, emptySet(), RestoreVerdict.Restorable(19))
+        val buttons = rescuedCardButtons(complete, emptySet(), RestoreVerdict.Restorable(19), emptySet())
         assertTrue(buttons.showRestore, "a rescue this build can open is not offered back")
         assertTrue(buttons.restoreEnabled, "an idle restorable card's RESTORE is dead")
     }
 
     @Test
     fun `a busy restorable rescue draws restore but cannot start it`() {
-        val buttons = rescuedCardButtons(complete, setOf(complete.directory), RestoreVerdict.Restorable(19))
+        val buttons = rescuedCardButtons(complete, setOf(complete.directory), RestoreVerdict.Restorable(19), emptySet())
         assertTrue(buttons.showRestore, "busy hid the button rather than disabling it")
         assertFalse(buttons.restoreEnabled, "RESTORE live while a share or discard is in flight")
     }

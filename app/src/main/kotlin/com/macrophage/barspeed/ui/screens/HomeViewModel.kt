@@ -511,9 +511,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             busyInterruptedFlow.update { it + orphan.directory }
             try {
                 val held = container.recordingHolds.held.value
-                val outcome =
-                    withContext(Dispatchers.IO) { container.journalRecovery.recover(orphan, held.isNotEmpty()) }
-                toast(recoveryToast(outcome, held))
+                val outcome = withContext(Dispatchers.IO) { container.journalRecovery.recover(orphan) { held } }
+                toast(recoveryToast(outcome))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -820,11 +819,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
  * answer. [held] is the recording holds the answer was asked under, which is
  * what a wait is waiting for.
  */
-private fun recoveryToast(outcome: RecoveryOutcome, held: Set<RecordingHold>): String = when (outcome) {
+private fun recoveryToast(outcome: RecoveryOutcome): String = when (outcome) {
     is RecoveryOutcome.Stored ->
         if (outcome.newSession) "Saved to History as a session of its own" else "Saved to History in its session"
     RecoveryOutcome.AlreadyStored -> "Already in History -- the capture was removed"
-    RecoveryOutcome.Waiting -> JournalRecoveryPolicy.waitNote(held)
+    is RecoveryOutcome.Waiting -> JournalRecoveryPolicy.waitNote(outcome.held)
     is RecoveryOutcome.Refused -> JournalRecoveryPolicy.refusalNote(outcome.refusal)
 }
 

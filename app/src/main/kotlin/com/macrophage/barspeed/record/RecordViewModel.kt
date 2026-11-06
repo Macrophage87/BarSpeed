@@ -77,6 +77,7 @@ import com.macrophage.barspeed.model.ProgressionKind
 import com.macrophage.barspeed.model.RecordedSensors
 import com.macrophage.barspeed.model.RecordedTimeZone
 import com.macrophage.barspeed.model.RecordingHold
+import com.macrophage.barspeed.model.RecordingServicePolicy
 import com.macrophage.barspeed.model.RemoveSetControl
 import com.macrophage.barspeed.model.RemoveSetTarget
 import com.macrophage.barspeed.model.RepAnalysisPolicy
@@ -3109,7 +3110,7 @@ private fun CoroutineScope.offerResume(
     state: MutableStateFlow<RecordState>,
 ) = launch {
     val nowMs = System.currentTimeMillis()
-    val writing = holds.isHeld(RecordingHold.SET_WRITE) || holds.isHeld(RecordingHold.SESSION_CLOSE)
+    val writing = RecordingServicePolicy.writing(holds.held.value)
     val latest = repository.latestSession(nowMs - SessionResumePolicy.LOOKBACK_MS, nowMs)
     val offer = SessionResumePolicy.offer(latest, nowMs, writing) ?: return@launch
     if (state.value.stage == Stage.SETUP) state.value = state.value.copy(resumeOffer = offer)

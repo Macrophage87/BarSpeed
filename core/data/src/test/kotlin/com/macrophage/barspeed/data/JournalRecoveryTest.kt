@@ -14,6 +14,7 @@ import com.macrophage.barspeed.model.JournalSetFacts
 import com.macrophage.barspeed.model.PrepCase
 import com.macrophage.barspeed.model.PrepWindow
 import com.macrophage.barspeed.model.RecordedSensors
+import com.macrophage.barspeed.model.RecordingHold
 import com.macrophage.barspeed.model.RecoveryRefusal
 import com.macrophage.barspeed.model.RepCounter
 import com.macrophage.barspeed.model.SensorRole
@@ -265,6 +266,12 @@ class JournalRecoveryTest {
 
     private val now = startedAtMs + 300_000L
 
+    /** What `recover` reads the recording holds as: nothing held. */
+    private val nothingHeld: () -> Set<RecordingHold> = { emptySet() }
+
+    /** What `recover` reads the recording holds as: a set-end write running. */
+    private val setWriteHeld: () -> Set<RecordingHold> = { setOf(RecordingHold.SET_WRITE) }
+
     private fun TestScope.recovery(dao: FakeSessionDao) =
         JournalRecovery(SessionRepository(dao, FakeExerciseDao()), store(), nowMs = { now })
 
@@ -387,7 +394,7 @@ class JournalRecoveryTest {
         val dao = ownSession(endedAtMs = startedAtMs - 30_000L)
         val repository = SessionRepository(dao, FakeExerciseDao())
         val recovery = JournalRecovery(repository, store(), nowMs = { now })
-        val outcome = assertIs<RecoveryOutcome.Stored>(recovery.recover(journaled(), writeOutstanding = false))
+        val outcome = assertIs<RecoveryOutcome.Stored>(recovery.recover(journaled(), nothingHeld))
         val export = assertNotNull(SessionExporter(repository).buildExport(outcome.sessionId, false))
         val set = export.exercises.single().sets.single()
         assertEquals("metronome", set.repsSource)
@@ -505,7 +512,7 @@ class JournalRecoveryTest {
         val orphan = journaled(header = header(facts = null))
         val recovery = recovery(FakeSessionDao())
         assertEquals(RecoveryRefusal.NOT_JOURNALED, recovery.refusal(orphan))
-        assertEquals(RecoveryOutcome.Refused(RecoveryRefusal.NOT_JOURNALED), recovery.recover(orphan, false))
+        assertEquals(RecoveryOutcome.Refused(RecoveryRefusal.NOT_JOURNALED), recovery.recover(orphan, nothingHeld))
     }
 
     @Test
@@ -540,7 +547,7 @@ class JournalRecoveryTest {
         assertNull(recovery.refusal(orphan), "the listing refused a set it cannot yet judge")
         assertEquals(
             RecoveryOutcome.Refused(RecoveryRefusal.NOTHING_TO_COUNT),
-            recovery.recover(orphan, writeOutstanding = false),
+            recovery.recover(orphan, nothingHeld),
         )
         assertEquals(2, dao.sets.size, "a set nobody counted was written")
         assertTrue(orphan.directory.exists(), "the capture went with nothing written")
@@ -567,7 +574,7 @@ class JournalRecoveryTest {
         val dao = ownSession(endedAtMs = null)
         dao.sets += row(3, 7, 2, startedAtMs, startedAtMs + 50_000L)
         val orphan = journaled(header = header(facts = sensorFacts), marks = emptyList())
-        assertEquals(RecoveryOutcome.AlreadyStored, recovery(dao).recover(orphan, writeOutstanding = false))
+        assertEquals(RecoveryOutcome.AlreadyStored, recovery(dao).recover(orphan, nothingHeld))
         assertEquals(3, dao.sets.size, "a stored set was written again")
         assertFalse(orphan.directory.exists(), "the capture of a stored set was kept")
     }
@@ -589,7 +596,7 @@ class JournalRecoveryTest {
     fun `nothing is written while a recording write is outstanding`() = runTest {
         val dao = ownSession(endedAtMs = null)
         val orphan = journaled()
-        assertEquals(RecoveryOutcome.Waiting, recovery(dao).recover(orphan, writeOutstanding = true))
+        assertIs<RecoveryOutcome.Waiting>(recovery(dao).recover(orphan, setWriteHeld))
         assertEquals(2, dao.sets.size)
         assertTrue(orphan.directory.exists(), "the capture went with nothing written")
     }
@@ -603,7 +610,7 @@ class JournalRecoveryTest {
     fun `a capture whose session is closed goes into a session of its own, closed at its end`() = runTest {
         val dao = ownSession(endedAtMs = startedAtMs - 30_000L)
         val orphan = journaled()
-        val outcome = assertIs<RecoveryOutcome.Stored>(recovery(dao).recover(orphan, writeOutstanding = false))
+        val outcome = assertIs<RecoveryOutcome.Stored>(recovery(dao).recover(orphan, nothingHeld))
         assertTrue(outcome.newSession)
         val written = dao.sets.single { it.recovered }
         assertEquals(outcome.sessionId, written.sessionId)
@@ -620,7 +627,7 @@ class JournalRecoveryTest {
     fun `a capture whose session is open and current rejoins it at the next free position`() = runTest {
         val dao = ownSession(endedAtMs = null)
         val orphan = journaled()
-        val outcome = assertIs<RecoveryOutcome.Stored>(recovery(dao).recover(orphan, writeOutstanding = false))
+        val outcome = assertIs<RecoveryOutcome.Stored>(recovery(dao).recover(orphan, nothingHeld))
         assertEquals(RecoveryOutcome.Stored(7L, outcome.setId, newSession = false), outcome)
         val written = dao.sets.single { it.recovered }
         assertEquals(7L, written.sessionId)
@@ -636,7 +643,7 @@ class JournalRecoveryTest {
         val dao = ownSession(endedAtMs = null)
         dao.sets += row(3, 7, 2, startedAtMs, startedAtMs + 50_000L)
         val orphan = journaled()
-        assertEquals(RecoveryOutcome.AlreadyStored, recovery(dao).recover(orphan, writeOutstanding = false))
+        assertEquals(RecoveryOutcome.AlreadyStored, recovery(dao).recover(orphan, nothingHeld))
         assertEquals(3, dao.sets.size)
         assertFalse(orphan.directory.exists(), "the capture of a stored set was kept")
     }
@@ -651,7 +658,7 @@ class JournalRecoveryTest {
         val dao = ownSession(endedAtMs = null)
         dao.sets += row(3, 7, 2, startedAtMs, startedAtMs + 50_000L)
         val orphan = journaled()
-        assertEquals(RecoveryOutcome.Waiting, recovery(dao).recover(orphan, writeOutstanding = true))
+        assertIs<RecoveryOutcome.Waiting>(recovery(dao).recover(orphan, setWriteHeld))
         assertEquals(3, dao.sets.size)
         assertTrue(orphan.directory.exists(), "the capture went while a write was outstanding")
     }
@@ -665,7 +672,7 @@ class JournalRecoveryTest {
                 failInsert = true,
             )
         val orphan = journaled()
-        assertFailsWith<IllegalStateException> { recovery(dao).recover(orphan, writeOutstanding = false) }
+        assertFailsWith<IllegalStateException> { recovery(dao).recover(orphan, nothingHeld) }
         assertTrue(orphan.directory.exists(), "the only copy of the set went with the write that failed")
     }
 }

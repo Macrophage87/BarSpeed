@@ -340,7 +340,13 @@ object JournalRecoveryPolicy {
      * not observed.
      */
     fun waitNote(held: Set<RecordingHold>): String =
-        if (RecordingHold.SET_WRITE in held || RecordingHold.SESSION_CLOSE in held) SAVING_NOTE else RECORDING_NOTE
+        if (RecordingServicePolicy.writing(held)) SAVING_NOTE else RECORDING_NOTE
+
+    /** The holds in [held] a recovery must wait for: every one held. */
+    fun outstanding(held: Set<RecordingHold>): Set<RecordingHold> = held
+
+    /** Whether [outstanding] leaves anything to wait for. */
+    fun mustWait(held: Set<RecordingHold>): Boolean = outstanding(held).isNotEmpty()
 
     /** [waitNote] while a set-end write or a session close, which finishes on its own, is held. */
     const val SAVING_NOTE = "A set is still being saved -- try again in a moment"

@@ -73,12 +73,17 @@ internal data class RescuedCardButtons(
  * process, so it is dead while [RecordingServicePolicy.mayEndProcess] says
  * no -- a set-end write or a session close would be cut short (round 1
  * review of #112, A2/B4). SEND and DISCARD end nothing and ignore it.
+ *
+ * No default for [held] or [restore], for [rescuedRestoreNote]'s reason and
+ * more sharply: a caller that left [held] out would be handed a live
+ * RESTORE, which ends the process, while a write is held (L9 round 4, A-N3
+ * and B-R4-N2).
  */
 internal fun rescuedCardButtons(
     item: RescuedDatabase,
     busy: Set<File>,
-    restore: RestoreVerdict? = null,
-    held: Set<RecordingHold> = emptySet(),
+    restore: RestoreVerdict?,
+    held: Set<RecordingHold>,
 ): RescuedCardButtons {
     val allowed = rescuedActionAllowed(item, busy)
     return RescuedCardButtons(
@@ -162,8 +167,7 @@ internal fun rescuedTapEffect(tap: RescuedTap, item: RescuedDatabase): RescuedTa
  */
 internal fun rescuedRestoreNote(restore: RestoreVerdict?, compiledVersion: Int, held: Set<RecordingHold>): String? {
     if (restore is RestoreVerdict.Restorable && !RecordingServicePolicy.mayEndProcess(held)) {
-        val saving = RecordingHold.SET_WRITE in held || RecordingHold.SESSION_CLOSE in held
-        return if (saving) {
+        return if (RecordingServicePolicy.writing(held)) {
             "Can't restore yet: a set or session is still saving. RESTORE works again once it has finished."
         } else {
             "Can't restore yet: BarSpeed still counts a recording as running. If you are not recording, " +
