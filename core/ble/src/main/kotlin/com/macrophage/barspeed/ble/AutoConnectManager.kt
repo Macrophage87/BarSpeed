@@ -1,6 +1,11 @@
 package com.macrophage.barspeed.ble
 
+import android.bluetooth.BluetoothAdapter
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import androidx.core.content.ContextCompat
 import com.macrophage.barspeed.model.ConnectionState
 import com.macrophage.barspeed.model.DeviceLinkRole
 import com.macrophage.barspeed.model.DevicePairingPolicy
@@ -15,8 +20,11 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
 import kotlin.math.min
 
@@ -139,6 +147,36 @@ class AutoConnectManager(
     private var livenessJob: Job? = null
     private var batteryJob: Job? = null
 
+    private val appContext: Context = context.applicationContext
+
+    /**
+     * Counters the reconnect loops watch so they can stop waiting out their
+     * backoff (UX review 2026-11-06, ble-devices F5 and F7).
+     *
+     * [retryGeneration] moves when the lifter taps Retry on Devices;
+     * [adapterOnGeneration] when the phone's Bluetooth reports STATE_ON.
+     * Before these, a few failed connects with Bluetooth off pushed each
+     * loop's backoff to its 30 s cap, so the dot could stay red for up to
+     * 30 s after Bluetooth came back. Counters rather than events, so a loop
+     * that was busy at the moment of the tap still sees it on its next wait.
+     */
+    private val retryGeneration = MutableStateFlow(0L)
+    private val adapterOnGeneration = MutableStateFlow(0L)
+    private var adapterReceiver: BroadcastReceiver? = null
+
+    private data class Kicks(val retry: Long, val adapterOn: Long)
+
+    private fun kicksNow() = Kicks(retryGeneration.value, adapterOnGeneration.value)
+
+    /**
+     * Try every link that is down again now, instead of after its backoff,
+     * and start each one's backoff over. A link that is connected, or still
+     * connecting, is left alone.
+     */
+    fun retryNow() {
+        retryGeneration.update { it + 1 }
+    }
+
     /**
      * Which device the second link maintains, or null to leave it down.
      *
@@ -255,7 +293,48 @@ class AutoConnectManager(
                     }
                 }
         }
+        if (adapterReceiver == null) registerAdapterReceiver()
     }
+
+    /**
+     * Wake every reconnect loop the moment the phone's Bluetooth comes on
+     * (UX review 2026-11-06, ble-devices F5).
+     *
+     * NOT_EXPORTED because nothing outside the system should be able to
+     * drive this; protected system broadcasts such as this one are delivered
+     * to such receivers. From API 31 the broadcast is gated on
+     * BLUETOOTH_CONNECT, which the app needs for any link at all; without it
+     * the receiver simply hears nothing and the loops keep their backoff, as
+     * before. That it is delivered, and how soon after the tile is tapped,
+     * has not been watched on a device: [Field]. Compile-gated only; no test
+     * in this repository runs `:core:ble`.
+     */
+    private fun registerAdapterReceiver() {
+        val receiver =
+            object : BroadcastReceiver() {
+                override fun onReceive(c: Context, intent: Intent) {
+                    val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
+                    if (state == BluetoothAdapter.STATE_ON) adapterOnGeneration.update { it + 1 }
+                }
+            }
+        ContextCompat.registerReceiver(
+            appContext,
+            receiver,
+            IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        adapterReceiver = receiver
+    }
+
+    /**
+     * Wait up to [ms] for a kick newer than [seen]: any kick, or only the
+     * adapter coming on when [adapterOnOnly]. True if one came.
+     */
+    private suspend fun kickedWithin(ms: Long, seen: Kicks, adapterOnOnly: Boolean): Boolean =
+        withTimeoutOrNull(ms) {
+            combine(retryGeneration, adapterOnGeneration) { r, a -> Kicks(r, a) }
+                .first { if (adapterOnOnly) it.adapterOn != seen.adapterOn else it != seen }
+        } != null
 
     /**
      * Advance a link's last-frame instant, at most once per
@@ -318,6 +397,8 @@ class AutoConnectManager(
         hrmJob = null
         livenessJob = null
         batteryJob = null
+        adapterReceiver?.let { runCatching { appContext.unregisterReceiver(it) } }
+        adapterReceiver = null
         imuClient.disconnect()
         imuClientB.disconnect()
         hrmClient.disconnect()
@@ -474,6 +555,7 @@ class AutoConnectManager(
      */
     private suspend fun maintain(client: GattClient, addressOf: suspend () -> String?) {
         var backoffS = 1L
+        var seen = kicksNow()
         while (true) {
             try {
                 val address = addressOf()
@@ -492,12 +574,28 @@ class AutoConnectManager(
                         backoffS = 1L
                         // Wait until the connection drops before doing anything else.
                         client.connectionState.first { it !is ConnectionState.Connected }
+                        seen = kicksNow()
                     }
-                    ReconnectStep.WAIT_FOR_CONNECT -> delay(2_000)
+                    // A Connecting link is left alone by Retry: it may be
+                    // mid-handshake. Only the adapter coming back on re-issues
+                    // its connect, because a pending connect opened while the
+                    // radio went down is not known to survive it ([Field]).
+                    ReconnectStep.WAIT_FOR_CONNECT ->
+                        if (kickedWithin(2_000, seen, adapterOnOnly = true)) {
+                            seen = kicksNow()
+                            client.connect(address, autoConnect = true)
+                        }
                     ReconnectStep.CONNECT -> {
+                        seen = kicksNow()
                         client.connect(address, autoConnect = true)
-                        delay(backoffS * 1_000)
-                        backoffS = min(backoffS * 2, 30L)
+                        // Retry or Bluetooth coming on ends the wait early
+                        // and starts the backoff over (ble-devices F5, F7).
+                        if (kickedWithin(backoffS * 1_000, seen, adapterOnOnly = false)) {
+                            seen = kicksNow()
+                            backoffS = 1L
+                        } else {
+                            backoffS = min(backoffS * 2, 30L)
+                        }
                     }
                 }
             } catch (e: Exception) {
