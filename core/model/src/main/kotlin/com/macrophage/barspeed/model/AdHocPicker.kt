@@ -137,14 +137,18 @@ object AdHocPicker {
      * put his body weight on the bar twice, so it is null and the picker uses
      * its default.
      */
-    fun addedKg(exerciseId: String, loadKg: Double, bodyWeightKg: Double?): Double? =
-        loadKg - (bodyWeightKg ?: 0.0)
+    fun addedKg(exerciseId: String, loadKg: Double, bodyWeightKg: Double?): Double? = when {
+        bodyWeightKg != null -> loadKg - bodyWeightKg
+        ExerciseDef.resolvedById(exerciseId).bodyweight -> null
+        else -> loadKg
+    }
 
     /**
      * What "Different exercise..." offers: the picker's list without the lift
      * of the block in progress, which ADD SET already adds a set of.
      */
-    fun offPlanChoices(options: List<ExerciseDef>, inProgressExerciseId: String?): List<ExerciseDef> = options
+    fun offPlanChoices(options: List<ExerciseDef>, inProgressExerciseId: String?): List<ExerciseDef> =
+        options.filterNot { it.id == inProgressExerciseId }
 
     /** The active plan's first declaration of [exerciseId], or null when the plan does not list it. */
     fun planDeclaration(exerciseId: String, plan: List<PlanSessionDef>): PlanExerciseDef? =
