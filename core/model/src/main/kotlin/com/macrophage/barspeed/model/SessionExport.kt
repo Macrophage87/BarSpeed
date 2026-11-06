@@ -3170,6 +3170,19 @@ data class SessionExport(
          * marker in the published log, the voiceCues sentence, the tip
          * literal and the example's version.
          *
+         * FURTHER 1.27 ENTRY (off-plan set) NO KEY CHANGES: inside a plan
+         * session SWITCH EXERCISE's "Different exercise..." records one set
+         * of a lift the plan does not have next (UX review 2026-11-06,
+         * record-setup F2). It is published like an appended set, with
+         * [SetExport.added] true and no prescription, and that key's
+         * description now covers it: where it lands in `exercises[]`, a null
+         * `rest_s`, where `plannedPrep_s` comes from, and what its load, reps
+         * and tempo were filled from. Under 1.27 and not a mint: 1.27 is
+         * unreleased. NOT RETROACTIVE: no earlier build could record such a
+         * set. `DATABASE_VERSION` does NOT move; the set uses the existing
+         * `added` column. `SchemaOffPlanSetContractTest` pins this marker and
+         * the `added` sentence.
+         *
          * FURTHER 1.27 ENTRY (tempo notation): `tempoCompliance.prescribed`
          * is written so it parses back (core-model review 2026-11-06, F5).
          * `Tempo.notation()` is its sole producer (`Exporters.kt`). A tempo
@@ -4021,6 +4034,22 @@ data class SetExport(
      * so on those sessions an appended set is indistinguishable from a
      * prescribed one. A missing key means "prescribed, or recorded before the
      * app could tell".
+     *
+     * AN OFF-PLAN SET is also `added` (1.27, record-setup F2): inside a plan
+     * session, SWITCH EXERCISE's "Different exercise..." records one set of a
+     * lift chosen from a picker, next, without taking a planned slot. It
+     * publishes no planned load, reps or hold either. Because `exercises[]`
+     * groups by exercise id in order of first appearance, it either forms a
+     * group of its own holding only added sets, or -- when the session also
+     * has that lift -- joins that lift's group at its own `orderIdx`, which
+     * can put it BEFORE that lift's prescribed sets. Its `rest_s` is null (no
+     * block gave it one; the app rests it on its default). Where it plays a
+     * prep, its `plannedPrep_s` is the plan's first declaration of that
+     * lift's prep anywhere in the plan, else the default.
+     * Its `load_kg`, `reps` and tempo were filled in from the lifter's last
+     * recorded set of that lift, else the picker's defaults (0 added for a
+     * body-weight lift or a hold, 60 in the lifter's unit otherwise, 5 reps),
+     * then whatever the lifter changed.
      */
     val added: Boolean = false,
     /**
