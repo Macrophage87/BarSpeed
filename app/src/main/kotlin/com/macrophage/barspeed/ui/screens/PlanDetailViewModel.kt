@@ -9,8 +9,11 @@ import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.data.PlanEntity
 import com.macrophage.barspeed.model.PlanFile
 import com.macrophage.barspeed.model.PlanLifecycle
+import com.macrophage.barspeed.model.PlanSessionLastDone
 import com.macrophage.barspeed.model.PlanStartDecision
 import com.macrophage.barspeed.model.PlanStartPolicy
+import com.macrophage.barspeed.model.PlanWarningLine
+import com.macrophage.barspeed.model.RecordedPlanSession
 import com.macrophage.barspeed.model.WeightUnit
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -39,9 +42,16 @@ data class PlanDetailState(
      * A STAGED plan's import warnings, recomputed from its stored text
      * (`PlanRepository.reviewSummary`), and empty on any other row (#58). The
      * import dialog that first showed them can be dismissed, and this screen
-     * is the other place a staged plan is made active from.
+     * is the other place a staged plan is made active from. Tiered and
+     * worded for the lifter by `PlanWarningDisplay` (UX review 2026-11-06,
+     * plans F3/F5); each line keeps the author's raw text for Copy.
      */
-    val stagedWarnings: List<String> = emptyList(),
+    val stagedWarnings: List<PlanWarningLine> = emptyList(),
+    /**
+     * Session name to when it was last recorded, from History (UX review
+     * 2026-11-06, plans F7). Sessions never done are absent.
+     */
+    val lastDone: Map<String, Long> = emptyMap(),
     /** True while MAKE ACTIVE on a staged plan waits for the lifter's approval (#58). */
     val reviewing: Boolean = false,
 )
@@ -73,8 +83,14 @@ class PlanDetailViewModel(app: Application, private val planId: Long) : AndroidV
      * against the plan the lifter chose. See `PlansViewModel.recordRequests`
      * for why this is an event rather than a flag in state.
      */
-    private val startRequests = Channel<Unit>(Channel.CONFLATED)
-    val recordRequests: Flow<Unit> = startRequests.receiveAsFlow()
+    private val startRequests = Channel<Int?>(Channel.CONFLATED)
+
+    /**
+     * The index of the plan session to open on Record, or null to open
+     * Record's session picker. A session's own START skips the second pick
+     * (UX review 2026-11-06, plans F7).
+     */
+    val recordRequests: Flow<Int?> = startRequests.receiveAsFlow()
 
     init {
         viewModelScope.launch {
@@ -98,6 +114,19 @@ class PlanDetailViewModel(app: Application, private val planId: Long) : AndroidV
                 decide()
             }
         }
+        viewModelScope.launch {
+            val planName = repository.planFile(planId)?.planName ?: return@launch
+            container.sessionRepository.sessions.collect { rows ->
+                stateFlow.value =
+                    stateFlow.value.copy(
+                        lastDone =
+                        PlanSessionLastDone.of(
+                            planName,
+                            rows.map { RecordedPlanSession(it.planName, it.planSessionName, it.startedAtMs) },
+                        ),
+                    )
+            }
+        }
     }
 
     private fun decide() {
@@ -115,9 +144,9 @@ class PlanDetailViewModel(app: Application, private val planId: Long) : AndroidV
             )
     }
 
-    private fun stagedWarnings(entity: PlanEntity?): List<String> =
+    private fun stagedWarnings(entity: PlanEntity?): List<PlanWarningLine> =
         if (entity != null && entity.status == PlanEntity.STATUS_STAGED) {
-            repository.reviewSummary(entity)?.warnings.orEmpty()
+            repository.reviewSummary(entity)?.warningLines.orEmpty()
         } else {
             emptyList()
         }
@@ -161,9 +190,10 @@ class PlanDetailViewModel(app: Application, private val planId: Long) : AndroidV
     /**
      * Start a session from this plan, making it active first when
      * [activateFirst]. The activation is awaited before the event, for the
-     * reason `PlansViewModel.start` gives.
+     * reason `PlansViewModel.start` gives. [sessionIndex] is the plan
+     * session to open on Record, or null for Record's picker.
      */
-    fun start(activateFirst: Boolean) {
+    fun start(activateFirst: Boolean, sessionIndex: Int? = null) {
         viewModelScope.launch {
             if (activateFirst) {
                 repository.activate(planId)
@@ -172,7 +202,7 @@ class PlanDetailViewModel(app: Application, private val planId: Long) : AndroidV
                     stateFlow.value.copy(entity = entity, stagedWarnings = stagedWarnings(entity))
                 decide()
             }
-            startRequests.send(Unit)
+            startRequests.send(sessionIndex)
         }
     }
 

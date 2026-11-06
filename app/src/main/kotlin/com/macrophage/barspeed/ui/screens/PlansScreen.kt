@@ -46,10 +46,12 @@ import com.macrophage.barspeed.data.PlanEntity
 import com.macrophage.barspeed.data.PlanImportResult
 import com.macrophage.barspeed.model.BodyWeightPromptPolicy.BarColorRole
 import com.macrophage.barspeed.model.PlanBodyWeightPolicy
+import com.macrophage.barspeed.model.PlanLifecycle
 import com.macrophage.barspeed.model.PlanStartDecision
 import com.macrophage.barspeed.model.PlanStartPolicy
 import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.BodyWeightDialog
+import com.macrophage.barspeed.ui.components.PlanWarnings
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -105,9 +107,10 @@ fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewMo
                 Text("Import plan from file")
             }
             Spacer(Modifier.height(4.dp))
+            // No pointers to repo files the lifter cannot open on a phone
+            // (UX review 2026-11-06, plans F10).
             Text(
-                "Paste or pick a .json plan from Claude or any LLM. See PROMPTS.md in the repo " +
-                    "for ready-made prompts; plans must match plan.schema.json.",
+                "Ask robocoach for a plan file and open it here.",
                 style = MaterialTheme.typography.bodySmall,
             )
             Spacer(Modifier.height(12.dp))
@@ -228,21 +231,13 @@ fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewMo
                                 color = BarColors.Volt,
                             )
                         }
-                        summary.warnings.take(WARNINGS_SHOWN).forEach {
-                            Spacer(Modifier.height(4.dp))
-                            Text("⚠ $it", style = MaterialTheme.typography.bodySmall, color = BarColors.Amber)
-                        }
-                        MoreLine(summary.warnings.size, WARNINGS_SHOWN)
-                        if (summary.warnings.isNotEmpty()) {
-                            CopyForTheAuthor(
-                                label = "Copy warnings",
-                                text = relayText(
-                                    "BarSpeed flagged these while importing \"${summary.planName}\"",
-                                    summary.warnings,
-                                ),
-                                clipboard = clipboard,
-                            )
-                        }
+                        // Two tiers, every line, and the author's text on Copy
+                        // (UX review 2026-11-06, plans F3): shared with Plan
+                        // detail's approval so the two cannot drift apart.
+                        PlanWarnings(
+                            lines = summary.warningLines,
+                            copyHeading = "BarSpeed flagged these while importing \"${summary.planName}\"",
+                        )
                         Spacer(Modifier.height(6.dp))
                         Text(
                             "Approving makes this the active plan for new sessions.",
@@ -397,7 +392,13 @@ private fun PlanCard(
     Card(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
             Text(plan.name, style = MaterialTheme.typography.titleSmall)
-            Text("${plan.status} · tap to view", style = MaterialTheme.typography.bodySmall)
+            // What the status means, never the database word (UX review
+            // 2026-11-06, plans F6): "staged" was printed raw.
+            val status = PlanLifecycle.of(plan.status).label
+            Text(
+                listOfNotNull(status, "tap to view").joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 when (val start = row.start) {
                     // The refusal is drawn where the control would have been. A
@@ -423,7 +424,7 @@ private fun PlanCard(
                                 }
                             },
                             contentPadding = ButtonDefaults.TextButtonContentPadding,
-                        ) { Text("Start", color = BarColors.Volt) }
+                        ) { Text("START", color = BarColors.Volt) }
                 }
                 if (plan.status != PlanEntity.STATUS_ACTIVE) {
                     OutlinedButton(

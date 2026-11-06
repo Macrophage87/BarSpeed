@@ -3,6 +3,8 @@ package com.macrophage.barspeed.data
 import com.macrophage.barspeed.model.PlanBodyWeightPolicy
 import com.macrophage.barspeed.model.PlanFile
 import com.macrophage.barspeed.model.PlanImport
+import com.macrophage.barspeed.model.PlanWarningDisplay
+import com.macrophage.barspeed.model.PlanWarningLine
 import kotlinx.coroutines.flow.Flow
 
 /** Human-readable summary of a staged plan, shown in the approval gate. */
@@ -14,6 +16,12 @@ data class PlanImportSummary(
     val exerciseNames: List<String>,
     /** Non-blocking notes from validation, shown at the approval gate. */
     val warnings: List<String> = emptyList(),
+    /**
+     * [warnings] as the lifter reads them: tiered, 1-based, display names
+     * (UX review 2026-11-06, plans F3). Built from the plan in [PlanRepository.summaryOf];
+     * [warnings] stays the author's text for the clipboard.
+     */
+    val warningLines: List<PlanWarningLine> = emptyList(),
     /** Exercises the plan marks droppable when the session runs long. */
     val optionalExercises: List<String> = emptyList(),
     /**
@@ -126,6 +134,7 @@ class PlanRepository(
         totalSets = plan.sessions.sumOf { s -> s.exercises.sumOf { it.sets.size } },
         exerciseNames = plan.sessions.flatMap { s -> s.exercises.map { it.exercise } }.distinct(),
         warnings = warnings,
+        warningLines = PlanWarningDisplay.lines(warnings, plan),
         optionalExercises =
         plan.sessions.flatMap { s -> s.exercises.filter { it.optional }.map { it.exercise } }.distinct(),
         bodyWeightKg = PlanBodyWeightPolicy.acceptedKg(plan),

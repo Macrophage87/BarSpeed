@@ -372,7 +372,7 @@ private fun HeroCard(state: HomeState, onNavigate: (String) -> Unit) {
             )
             if (hero == HomeHero.NoPlan) {
                 Text(
-                    "Import a JSON plan from Claude on the Plans screen.",
+                    "Ask robocoach for a plan file and open it on the Plans screen.",
                     style = MaterialTheme.typography.bodySmall,
                     color = BarColors.Sub,
                 )

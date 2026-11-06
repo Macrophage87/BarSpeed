@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.ui.screens
 
 import android.app.Application
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -15,12 +16,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -45,17 +50,22 @@ import com.macrophage.barspeed.model.BodyweightLoadDisplay
 import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.PlanExerciseDef
+import com.macrophage.barspeed.model.PlanLifecycle
 import com.macrophage.barspeed.model.PlanNoteDisplay
 import com.macrophage.barspeed.model.PlanSessionDef
+import com.macrophage.barspeed.model.PlanSessionLastDone
 import com.macrophage.barspeed.model.PlanSetDef
 import com.macrophage.barspeed.model.PlanStartDecision
+import com.macrophage.barspeed.model.PlanWarningLine
 import com.macrophage.barspeed.model.ProgressionKind
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.ChipTone
 import com.macrophage.barspeed.ui.components.ExpandableNote
+import com.macrophage.barspeed.ui.components.PlanWarnings
 import com.macrophage.barspeed.ui.components.SectionCaption
 import com.macrophage.barspeed.ui.components.VerdictChip
+import java.time.ZoneId
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -73,11 +83,34 @@ fun PlanDetailScreen(navController: NavController, planId: Long) {
     val state by viewModel.state.collectAsState()
     val weightUnit by viewModel.weightUnit.collectAsState()
     var confirming by rememberSaveable { mutableStateOf(false) }
+    // Which session a START that needs the switch prompt was pressed on; null
+    // for the hero's START, which opens Record's picker.
+    var confirmingSession by rememberSaveable { mutableStateOf<Int?>(null) }
 
     // The ViewModel says when to navigate, not the tap: the activation has to
     // land before the record screen reads which plan is active.
     LaunchedEffect(Unit) {
-        viewModel.recordRequests.collect { navController.navigate("record") }
+        viewModel.recordRequests.collect { session ->
+            // A session's START opens it the way Home's hero opens the next
+            // session: Record's PREVIEW entry, which waits for the resume check.
+            val name = session?.let { state.plan?.sessions?.getOrNull(it)?.name }
+            navController.navigate(
+                if (name == null) "record" else "record?entry=preview&planSession=${Uri.encode(name)}",
+            )
+        }
+    }
+    // One start path for the hero and every session header: start now when
+    // this plan is already active, else ask first.
+    val onStart: (Int?) -> Unit = { session ->
+        val start = state.start
+        if (start is PlanStartDecision.Startable) {
+            if (start.switch == null) {
+                viewModel.start(activateFirst = false, sessionIndex = session)
+            } else {
+                confirmingSession = session
+                confirming = true
+            }
+        }
     }
 
     Scaffold(
@@ -114,11 +147,18 @@ fun PlanDetailScreen(navController: NavController, planId: Long) {
                             viewModel = viewModel,
                             sessions = plan.sessions,
                             start = state.start,
-                            onConfirmSwitch = { confirming = true },
+                            onStart = { onStart(null) },
                         )
                     }
-                    plan.sessions.forEach { session ->
-                        item { SessionHeader(session) }
+                    plan.sessions.forEachIndexed { index, session ->
+                        item {
+                            SessionHeader(
+                                session = session,
+                                lastDoneMs = state.lastDone[session.name],
+                                startable = state.start is PlanStartDecision.Startable,
+                                onStart = { onStart(index) },
+                            )
+                        }
                         items(session.exercises.size) { i ->
                             ExerciseCard(session.exercises[i], weightUnit)
                         }
@@ -129,7 +169,10 @@ fun PlanDetailScreen(navController: NavController, planId: Long) {
     }
 
     if (confirming) {
-        ConfirmSwitchDialog(state.start, viewModel) { confirming = false }
+        ConfirmSwitchDialog(state.start, viewModel, confirmingSession) {
+            confirming = false
+            confirmingSession = null
+        }
     }
     if (state.reviewing) {
         ApproveStagedDialog(state.stagedWarnings, viewModel)
@@ -144,7 +187,7 @@ private fun PlanHero(
     viewModel: PlanDetailViewModel,
     sessions: List<PlanSessionDef>,
     start: PlanStartDecision?,
-    onConfirmSwitch: () -> Unit,
+    onStart: () -> Unit,
 ) {
     val shape = RoundedCornerShape(16.dp)
     val active = entity?.status == PlanEntity.STATUS_ACTIVE
@@ -155,13 +198,9 @@ private fun PlanHero(
             .border(1.dp, BarColors.Volt.copy(alpha = 0.2f), shape)
             .padding(14.dp),
     ) {
+        // The same status words as the plan cards (UX review 2026-11-06, plans F6).
         SectionCaption(
-            when (entity?.status) {
-                PlanEntity.STATUS_ACTIVE -> "Active plan"
-                PlanEntity.STATUS_STAGED -> "Staged — not yet active"
-                PlanEntity.STATUS_ARCHIVED -> "Archived plan"
-                else -> "Plan"
-            },
+            PlanLifecycle.of(entity?.status).label ?: "Plan",
             color = BarColors.Volt,
         )
         Text(name, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(vertical = 4.dp))
@@ -192,17 +231,11 @@ private fun PlanHero(
             }
             is PlanStartDecision.Startable -> {
                 Spacer(Modifier.height(12.dp))
-                Button(
-                    onClick = {
-                        if (start.switch == null) {
-                            viewModel.start(activateFirst = false)
-                        } else {
-                            onConfirmSwitch()
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth().height(44.dp),
-                ) {
-                    Text("START WORKOUT", style = MaterialTheme.typography.titleSmall)
+                // "START", the one word for starting from a plan screen (UX
+                // review 2026-11-06, copy F6). This one opens Record's session
+                // picker; each session below has its own.
+                Button(onClick = onStart, modifier = Modifier.fillMaxWidth().height(44.dp)) {
+                    Text("START", style = MaterialTheme.typography.titleSmall)
                 }
             }
         }
@@ -221,7 +254,12 @@ private fun PlanHero(
  * cannot describe one write differently.
  */
 @Composable
-private fun ConfirmSwitchDialog(start: PlanStartDecision?, viewModel: PlanDetailViewModel, onDismiss: () -> Unit) {
+private fun ConfirmSwitchDialog(
+    start: PlanStartDecision?,
+    viewModel: PlanDetailViewModel,
+    sessionIndex: Int?,
+    onDismiss: () -> Unit,
+) {
     val switch = (start as? PlanStartDecision.Startable)?.switch ?: return
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -233,7 +271,7 @@ private fun ConfirmSwitchDialog(start: PlanStartDecision?, viewModel: PlanDetail
             TextButton(
                 onClick = {
                     onDismiss()
-                    viewModel.start(activateFirst = true)
+                    viewModel.start(activateFirst = true, sessionIndex = sessionIndex)
                 },
             ) { Text(switch.confirmLabel) }
         },
@@ -246,10 +284,14 @@ private fun ConfirmSwitchDialog(start: PlanStartDecision?, viewModel: PlanDetail
 /**
  * MAKE ACTIVE on a staged plan (#58): the plan has not been approved, and its
  * import warnings may only have been shown in a dialog the lifter dismissed,
- * so they are named here before APPROVE makes it the active plan.
+ * so they are named here before "Make active" makes it the active plan.
+ *
+ * Every warning, in a scrolling column, in the import gate's two tiers and
+ * with its Copy button (UX review 2026-11-06, plans F5): this used to cap at
+ * six in a column that did not scroll, with no way to send them back.
  */
 @Composable
-private fun ApproveStagedDialog(warnings: List<String>, viewModel: PlanDetailViewModel) {
+private fun ApproveStagedDialog(warnings: List<PlanWarningLine>, viewModel: PlanDetailViewModel) {
     val raised =
         when (warnings.size) {
             0 -> "Its import raised no warnings."
@@ -258,29 +300,20 @@ private fun ApproveStagedDialog(warnings: List<String>, viewModel: PlanDetailVie
         }
     AlertDialog(
         onDismissRequest = viewModel::dismissReview,
-        title = { Text("Approve this plan?") },
+        title = { Text("Make this plan active?") },
         text = {
-            Column {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text(
-                    "Approving makes this staged plan the active one. $raised",
+                    "New sessions will follow this plan. $raised",
                     style = MaterialTheme.typography.bodySmall,
                 )
-                warnings.take(STAGED_WARNINGS_SHOWN).forEach {
-                    Spacer(Modifier.height(4.dp))
-                    Text("⚠ $it", style = MaterialTheme.typography.bodySmall, color = BarColors.Amber)
-                }
-                if (warnings.size > STAGED_WARNINGS_SHOWN) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "+${warnings.size - STAGED_WARNINGS_SHOWN} more",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = BarColors.Sub,
-                    )
-                }
+                PlanWarnings(lines = warnings, copyHeading = "BarSpeed flagged these in this plan")
             }
         },
+        // Kept TextButtons (#201): this dialog's two actions; the dialog's frame already marks them
+        // as its answers.
         confirmButton = {
-            TextButton(onClick = viewModel::approve) { Text("Approve") }
+            TextButton(onClick = viewModel::approve) { Text("Make active") }
         },
         dismissButton = {
             TextButton(onClick = viewModel::dismissReview) { Text("Cancel") }
@@ -288,10 +321,14 @@ private fun ApproveStagedDialog(warnings: List<String>, viewModel: PlanDetailVie
     )
 }
 
-private const val STAGED_WARNINGS_SHOWN = 6
-
+/**
+ * A session's name, its set count, when History last recorded it, and a START
+ * that opens THIS session on Record rather than the picker (UX review
+ * 2026-11-06, plans F7). The date is recorded data, not a suggestion of what
+ * to do next.
+ */
 @Composable
-private fun SessionHeader(session: PlanSessionDef) {
+private fun SessionHeader(session: PlanSessionDef, lastDoneMs: Long?, startable: Boolean, onStart: () -> Unit) {
     Column(Modifier.padding(top = 10.dp)) {
         Row(
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -300,8 +337,22 @@ private fun SessionHeader(session: PlanSessionDef) {
         ) {
             SectionCaption(session.name, color = BarColors.Volt)
             val sets = session.exercises.sumOf { it.sets.size }
-            Text("$sets sets", style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("$sets sets", style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+                if (startable && sets > 0) {
+                    Spacer(Modifier.width(8.dp))
+                    OutlinedButton(onClick = onStart, contentPadding = ButtonDefaults.TextButtonContentPadding) {
+                        Text("START", color = BarColors.Volt)
+                    }
+                }
+            }
         }
+        Text(
+            lastDoneMs?.let { PlanSessionLastDone.label(it, ZoneId.systemDefault(), Locale.getDefault()) }
+                ?: "Not done yet",
+            style = MaterialTheme.typography.bodySmall,
+            color = BarColors.Sub,
+        )
         session.notes?.let {
             Text(it, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
         }
