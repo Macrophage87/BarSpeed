@@ -163,6 +163,7 @@ import com.macrophage.barspeed.ui.components.SideArrow
 import com.macrophage.barspeed.ui.components.TargetLineBars
 import com.macrophage.barspeed.ui.components.VerdictChip
 import com.macrophage.barspeed.ui.components.VoiceWarningBanner
+import com.macrophage.barspeed.ui.components.confirmTap
 import com.macrophage.barspeed.ui.components.rememberArmedDelivery
 import com.macrophage.barspeed.ui.components.velocityLossColor
 import kotlinx.coroutines.delay
@@ -1147,7 +1148,7 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
     // so a close can be asked for here; beginSet asks the same question, so a
     // tap that reaches it anyway starts nothing.
     if (RestControlPolicy.readyMayStartSet(state.sessionClose)) {
-        Button(onClick = viewModel::beginSet, modifier = Modifier.fillMaxWidth().height(56.dp)) {
+        Button(onClick = confirmTap(viewModel::beginSet), modifier = Modifier.fillMaxWidth().height(56.dp)) {
             Text(CountingPolicy.startSetLabel(counter), fontWeight = FontWeight.Bold)
         }
     }
@@ -2554,7 +2555,7 @@ private fun SensorCountedSetStage(state: RecordState, viewModel: RecordViewModel
         // from that moment, so a live-looking 72dp target would do nothing.
         if (state.setWrite == SetWriteState.NONE) {
             OutlinedButton(
-                onClick = viewModel::addManualRep,
+                onClick = confirmTap(viewModel::addManualRep),
                 modifier = Modifier.fillMaxWidth().height(56.dp),
             ) {
                 Text("+1 REP THE SENSOR MISSED", style = MaterialTheme.typography.titleMedium)
@@ -2767,7 +2768,7 @@ private fun ManualSetStage(state: RecordState, viewModel: RecordViewModel, slot:
         // moment, so leaving the button drawn would be a 72dp target that
         // silently does nothing, right where the lifter's thumb already is.
         if (state.setWrite == SetWriteState.NONE) {
-            Button(onClick = viewModel::addManualRep, modifier = Modifier.fillMaxWidth().height(72.dp)) {
+            Button(onClick = confirmTap(viewModel::addManualRep), modifier = Modifier.fillMaxWidth().height(72.dp)) {
                 Text("+1 REP", style = MaterialTheme.typography.titleLarge)
             }
             Spacer(Modifier.height(10.dp))
@@ -3306,7 +3307,7 @@ private fun FailSetButton(state: RecordState, viewModel: RecordViewModel) {
             EffortScale.askFor(state.currentIsTimed, state.currentSlot?.progression),
         ).first { it.failed }.description
     Button(
-        onClick = { viewModel.endSet(SetRating(null, failed = true)) },
+        onClick = confirmTap { viewModel.endSet(SetRating(null, failed = true)) },
         modifier = Modifier.fillMaxWidth().height(64.dp),
         colors = ButtonDefaults.buttonColors(containerColor = BarColors.Red),
     ) {
@@ -3339,7 +3340,7 @@ private fun FailSetButton(state: RecordState, viewModel: RecordViewModel) {
 @Composable
 internal fun EndSetEarlyButton(viewModel: RecordViewModel) {
     OutlinedButton(
-        onClick = { viewModel.endSet() },
+        onClick = confirmTap { viewModel.endSet() },
         modifier = Modifier.fillMaxWidth().height(64.dp),
     ) {
         Text("END SET EARLY", style = MaterialTheme.typography.titleLarge, color = BarColors.Red)
@@ -3674,7 +3675,7 @@ private fun restControls(state: RecordState): RestControls = RestControlPolicy.r
 private fun StartNextSetButton(state: RecordState, viewModel: RecordViewModel) {
     if (RestControl.START_NEXT_SET !in restControls(state).controls) return
     Button(
-        onClick = viewModel::startNextSet,
+        onClick = confirmTap(viewModel::startNextSet),
         modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
     ) { Text("START NEXT SET", textAlign = TextAlign.Center) }
 }
