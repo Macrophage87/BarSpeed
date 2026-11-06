@@ -90,6 +90,13 @@ data class HomeState(
     val weekVolumeKg: Double = 0.0,
     val weekSessions: Int = 0,
     val history: List<HistoryRow> = emptyList(),
+    /**
+     * Every session past the first [HomeViewModel.HISTORY_LIMIT], newest
+     * first, as stored rows only: nothing is read or decoded for them, so
+     * Home costs the same with 20 sessions or 500 (history-export F5). Drawn
+     * only when the lifter asks for them.
+     */
+    val olderSessions: List<SessionEntity> = emptyList(),
     val weightUnit: WeightUnit = WeightUnit.KG,
     /** Base load for bodyweight work (pull-ups, dips); null until set. */
     val bodyWeightKg: Double? = null,
@@ -829,6 +836,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             weekVolumeKg = weekVolumeKg,
             weekSessions = weekSessions,
             history = history,
+            olderSessions = sessions.drop(HISTORY_LIMIT),
             weightUnit = unit,
             bodyWeightKg = bodyWeightKg,
         )

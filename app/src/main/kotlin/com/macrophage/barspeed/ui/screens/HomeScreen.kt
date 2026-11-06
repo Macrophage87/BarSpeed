@@ -33,6 +33,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +47,7 @@ import com.macrophage.barspeed.data.DATABASE_VERSION
 import com.macrophage.barspeed.data.InterruptedSetSummary
 import com.macrophage.barspeed.data.OrphanedSet
 import com.macrophage.barspeed.data.RescuedDatabase
+import com.macrophage.barspeed.data.SessionEntity
 import com.macrophage.barspeed.model.ArmedDelivery
 import com.macrophage.barspeed.model.ByteSize
 import com.macrophage.barspeed.model.ConnectionState
@@ -86,6 +88,9 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
     val recoveryRefusals by viewModel.recoveryRefusals.collectAsState()
     val busyCrashReports by viewModel.busyCrashReports.collectAsState()
     val crashReports by viewModel.crashReports.collectAsState()
+    // Older sessions are drawn only on request, and the choice survives a
+    // rotation; Home's own figures never read them.
+    var showOlder by rememberSaveable { mutableStateOf(false) }
     // Re-scanned every time this screen is composed, not only on first launch:
     // a set interrupted by a crash that left the process alive would otherwise
     // stay invisible until the app was killed and started again. The same
@@ -206,6 +211,25 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
                 items(state.history) { row ->
                     HistoryCard(row) { navController.navigate("session/${row.session.id}") }
                 }
+                // History beyond the first 20 (history-export F5): opened on
+                // request so a session of any age can be opened and exported.
+                if (state.olderSessions.isNotEmpty()) {
+                    if (showOlder) {
+                        items(state.olderSessions) { session ->
+                            OlderSessionCard(session) { navController.navigate("session/${session.id}") }
+                        }
+                    } else {
+                        item {
+                            TextButton(onClick = { showOlder = true }, modifier = Modifier.fillMaxWidth()) {
+                                val count = state.olderSessions.size
+                                Text(
+                                    if (count == 1) "Show 1 older session" else "Show $count older sessions",
+                                    color = BarColors.Sub,
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -291,6 +315,23 @@ private fun HeroCard(state: HomeState, onStart: () -> Unit) {
         Spacer(Modifier.height(12.dp))
         Button(onClick = onStart, modifier = Modifier.fillMaxWidth().height(48.dp)) {
             Text("START SESSION", style = MaterialTheme.typography.titleMedium)
+        }
+    }
+}
+
+/**
+ * A session past the first 20: name and start only. Nothing about its sets is
+ * read, which is what keeps Home's launch cost at the first 20 however long
+ * the history is; its detail screen shows the rest and exports it.
+ */
+@Composable
+private fun OlderSessionCard(session: SessionEntity, onClick: () -> Unit) {
+    val formatter = DateTimeFormatter.ofPattern("EEE d MMM yyyy, HH:mm")
+    val started = Instant.ofEpochMilli(session.startedAtMs).atZone(ZoneId.systemDefault())
+    Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.fillMaxWidth().padding(14.dp)) {
+            Text(session.planSessionName ?: "Ad-hoc session", style = MaterialTheme.typography.titleSmall)
+            Text(formatter.format(started), style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
         }
     }
 }
