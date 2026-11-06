@@ -3337,18 +3337,20 @@ private fun UnsavedSetNotice(viewModel: RecordViewModel) {
 }
 
 /**
- * The one control a guided or timed set that is UNDER WAY offers before it is
- * complete (#186).
+ * The standalone failure control of a guided or timed set that is UNDER WAY:
+ * alone before the set is complete (#186), and above the effort grid once it
+ * is ([gridBelow], below).
  *
- * The effort grid is not drawn yet, because how the set went is not a fact
- * until the set is over -- the owner's "earlier than that the only option
- * available should be fail". So once the set is running this is the whole
- * exit, and it stores the lifter's own TAPPED failure: [SetRating] with no
- * RPE and `failed = true`, the same value the grid's failure tile writes.
+ * Before completion the grid is not drawn, because how the set went is not a
+ * fact until the set is over -- the owner's "earlier than that the only option
+ * available should be fail". So until then this is the whole exit, and it
+ * stores the lifter's own TAPPED failure: [SetRating] with no RPE and
+ * `failed = true`, the value the grid's failure tile writes elsewhere.
  *
  * WHAT IT COSTS, and it is not hidden from the lifter: every early exit on a
  * set that is UNDER WAY now records a failure, including the ones that are not
- * -- a rack taken, a cramp. The caption says the set is rateable afterwards,
+ * -- a rack taken, a cramp. The caption (drawn while it stands alone) says
+ * the set is rateable afterwards,
  * because that is the half that keeps #137 from coming back: the rest screen's
  * row for a Fail-ended set reads EFFORT -- FAILED and carries a Change action,
  * and re-rating overwrites the tapped verdict. (EFFORT -- NOT RATED with a
@@ -3361,21 +3363,22 @@ private fun UnsavedSetNotice(viewModel: RecordViewModel) {
  * [EndSetEarlyButton] instead (#186).
  *
  * Deliberately not the shape of [EndSetEarlyButton]. That one ends a set with
- * no verdict at all and is the SKIP beside a grid; this one is the only way
- * out of a set that is already running, and it states a verdict, so it is a
- * filled button rather than an outlined afterthought.
+ * no verdict at all and is the SKIP beside a grid; this one states a verdict
+ * on a set that is already running, so it is a filled button rather than an
+ * outlined afterthought.
  *
  * [gridBelow] is the completed set (UX review 2026-11-06, record-live F3).
  * This button used to be REPLACED at "Done" by the grid, whose first row of
  * headroom tiles then sat where it had been, so a lifter grinding a last rep
  * that failed and reaching for the red button stored "Could have added much
  * more". It now stays put, the same size and in the same place, and the grid
- * opens under it without its own failure tile; only the caption changes.
+ * opens under it without its own failure tile; the caption gives way to a
+ * spacer, since the grid's own caption follows.
  */
 @Composable
 private fun FailSetButton(state: RecordState, viewModel: RecordViewModel, gridBelow: Boolean) {
-    // The failure wording of the set's own ladder, so the button and the tile
-    // that replaces it after completion say the same word. A hold breaks
+    // The failure wording of the set's own ladder, so this button says the
+    // same word as the failure tile other sets' grids draw. A hold breaks
     // early; a snatch is missed.
     //
     // Named, never counted to. `.last()` was right only because EffortScale
