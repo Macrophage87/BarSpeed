@@ -18,7 +18,7 @@ data class ResumedStatements(val inputs: NextSetInputs, val side: String?)
  * What the lifter said about a block survives an off-plan set run in the
  * middle of it (whole-release review, off-plan set mid-block).
  *
- * "Different exercise..." puts one set of another lift next ([isOffPlan]).
+ * "Different exercise..." puts one set of another lift next.
  * Every route past it asked [NextSetInputs.of] about (off-plan set, the
  * block's next slot): two exercises, so no block, so every statement dropped
  * and the slot re-seeded from the plan -- a load he corrected from 90 to 100
@@ -32,15 +32,39 @@ data class ResumedStatements(val inputs: NextSetInputs, val side: String?)
  * across a block boundary; the boxes show them ahead of the slot's own values,
  * the rule [NextSetInputs] keeps everywhere else. SWITCH EXERCISE moving a
  * whole block is not this and still clears.
+ *
+ * "Add another" of that lift does the same thing a second time: AddSetControl
+ * puts its set in front of the block's next slot. So the hold is taken on
+ * EVERY displacement ([holdOnDisplace]), and it is given back when any added
+ * set of another lift than the held slot's leaves ([departs]) -- not only the
+ * one-set off-plan slot, since the added second set is set 1 of its lift
+ * (review of fullrev-fix-data).
  */
 object OffPlanHold {
     /**
-     * Whether a slot is an OFF-PLAN set: an added set that is its own one-set
-     * block. ADD SET's appended set is added too but continues its block
-     * (`setIndexInExercise` above 0), and carries statements the usual way.
+     * Whether the slot now leaving the queue's front -- run, skipped or
+     * removed -- hands [held] back: an added set ([isAddedSet]) of another
+     * lift than the held slot's. An added set of the held slot's own lift is
+     * ADD SET continuing that block, which carries statements the usual way;
+     * a planned slot leaving is the plan's own order.
      */
-    fun isOffPlan(isAddedSet: Boolean, setIndexInExercise: Int, setsInExercise: Int): Boolean =
-        isAddedSet && setIndexInExercise == 0 && setsInExercise == 1
+    fun departs(isAddedSet: Boolean, departingExerciseId: String, held: HeldStatements?): Boolean =
+        isAddedSet && held != null && held.slot.exerciseId != departingExerciseId
+
+    /**
+     * The hold after an added set is put in front of [displaced]: when
+     * [displaced] is itself an added set (a second off-plan pick, or another
+     * set of the off-plan lift in front of the first), the hold [standing]
+     * already names the block's slot and is kept; otherwise what stood for
+     * [displaced] is held ([hold]).
+     */
+    fun holdOnDisplace(
+        displaced: NextSetSlot?,
+        displacedIsAdded: Boolean,
+        stated: NextSetStatements,
+        side: String?,
+        standing: HeldStatements?,
+    ): HeldStatements? = if (displaced == null || displacedIsAdded) standing else hold(displaced, stated, side)
 
     /** What to hold when an off-plan set displaces [displaced], or null when nothing was said for it. */
     fun hold(displaced: NextSetSlot?, stated: NextSetStatements, side: String?): HeldStatements? =

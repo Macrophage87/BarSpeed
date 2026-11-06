@@ -150,7 +150,7 @@ internal fun prefilledState(s: RecordState, exerciseId: String): RecordState {
  * What the lifter had said for the displaced slot -- a corrected load, reps,
  * hold, tempo or side -- is held aside rather than lost ([OffPlanHold],
  * whole-release review): the rest after the off-plan set, or removing it, gives
- * it back to that slot. Where the displaced slot is itself an off-plan set the
+ * it back to that slot. Where the displaced slot is itself an added set the
  * hold already standing is kept, so two off-plan sets in a row still hand the
  * block's statements back.
  */
@@ -187,16 +187,9 @@ internal fun offPlanAddedState(s: RecordState, exerciseId: String): RecordState?
         queue[at] = displaced.copy(isExerciseChange = displaced.exercise.id != exerciseId)
     }
     queue.add(at, slot)
-    val displaced = s.queue.getOrNull(at)
-    val held =
-        if (displaced == null || displaced.isOffPlan) {
-            s.heldStatements
-        } else {
-            OffPlanHold.hold(displaced.nextSetSlot(), s.nextSetStatements, s.statedSide)
-        }
     return s.copy(
         queue = queue,
-        heldStatements = held,
+        heldStatements = s.heldOnDisplacing(s.queue.getOrNull(at)),
         loadInput = s.weightUnit.inputValue(fill.addedKg),
         statedLoadKg = null,
         statedTempo = null,

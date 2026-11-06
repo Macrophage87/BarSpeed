@@ -2468,6 +2468,8 @@ internal fun appendedState(s: RecordState): RecordState? {
     // behaviour on that screen is untouched.
     // The statements are cleared (NONE) for [jumpedState]'s reason: they were
     // statements about the set that is no longer coming up.
+    // They are not lost: what stood for the displaced slot is held and given
+    // back when it comes up again (OffPlanHold), as for an off-plan set.
     val inputs = NextSetInputs.of(last = null, next = appended.nextSetSlot(), stated = NextSetStatements.NONE)
     return s.withNextInputs(inputs).copy(
         queue = queue,
@@ -2475,6 +2477,7 @@ internal fun appendedState(s: RecordState): RecordState? {
         // next rest transition anyway: a side stated for the set that has just
         // been displaced is not a statement about the one now coming up.
         statedSide = null,
+        heldStatements = s.heldOnDisplacing(s.queue.getOrNull(at)),
     )
 }
 
@@ -2547,14 +2550,25 @@ internal fun removedState(s: RecordState): RecordState? {
  * run, skipped or removed -- was an off-plan set, else null.
  */
 internal fun RecordState.heldStatementsAfter(left: PlannedSlot?, next: PlannedSlot?) =
-    if (left?.isOffPlan == true) OffPlanHold.resumed(heldStatements, next?.nextSetSlot()) else null
+    if (departsHold(left)) OffPlanHold.resumed(heldStatements, next?.nextSetSlot()) else null
 
-/** The hold once [left] has gone: spent when [left] was the off-plan set, else kept. */
-internal fun RecordState.heldStatementsLeft(left: PlannedSlot?) = heldStatements.takeUnless { left?.isOffPlan == true }
+/** The hold once [left] has gone: spent when [left] handed it back ([OffPlanHold.departs]), else kept. */
+internal fun RecordState.heldStatementsLeft(left: PlannedSlot?) = heldStatements.takeUnless { departsHold(left) }
 
-/** [OffPlanHold.isOffPlan] of this slot. */
-internal val PlannedSlot.isOffPlan: Boolean
-    get() = OffPlanHold.isOffPlan(isAddedSet, setIndexInExercise, setsInExercise)
+private fun RecordState.departsHold(left: PlannedSlot?) =
+    left != null && OffPlanHold.departs(left.isAddedSet, left.exercise.id, heldStatements)
+
+/**
+ * [OffPlanHold.holdOnDisplace] for an added set put in front of [displaced]:
+ * by "Different exercise..." or by "Add another" landing ahead of the block.
+ */
+internal fun RecordState.heldOnDisplacing(displaced: PlannedSlot?) = OffPlanHold.holdOnDisplace(
+    displaced = displaced?.nextSetSlot(),
+    displacedIsAdded = displaced?.isAddedSet == true,
+    stated = nextSetStatements,
+    side = statedSide,
+    standing = heldStatements,
+)
 
 /**
  * The state dropping an upcoming PRESCRIBED set leaves behind, or null when
