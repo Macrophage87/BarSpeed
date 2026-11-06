@@ -2,6 +2,8 @@ package com.macrophage.barspeed.model
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import java.math.BigDecimal
+import kotlin.math.abs
 
 /**
  * Standard 4-digit tempo prescription, each digit in seconds.
@@ -74,14 +76,32 @@ data class Tempo(
      */
     val hasZeroStroke: Boolean get() = downS == 0.0 || upS == 0.0
 
+    /**
+     * The tempo as [parse] reads it back: the compact `"30X1"` when every
+     * component is a whole 0-9 or X, otherwise the dash form `"3-0-1.5-0"`,
+     * because the compact form reads one character per component. Exported
+     * as `tempoCompliance.prescribed`, so it must round-trip (core-model
+     * review 2026-11-06, F5; pinned over a grid in `TempoTest`).
+     */
     fun notation(): String {
-        val down = downS?.let { formatDigit(it) } ?: "X"
-        val up = upS?.let { formatDigit(it) } ?: "X"
-        return "$down${formatDigit(bottomPauseS)}$up${formatDigit(topPauseS)}"
+        val components = listOf(downS, bottomPauseS, upS, topPauseS)
+        val compact = components.all { it == null || isSingleDigit(it) }
+        val written = components.map { it?.let(::formatComponent) ?: "X" }
+        return if (compact) written.joinToString("") else written.joinToString("-")
     }
 
-    private fun formatDigit(value: Double): String =
-        if (value == Math.floor(value) && value < 10) value.toInt().toString() else value.toString()
+    private fun isSingleDigit(value: Double): Boolean = value == Math.floor(value) && value in 0.0..9.0
+
+    private fun formatComponent(value: Double): String =
+        if (value == Math.floor(value) && abs(value) < 1e15) {
+            value.toLong().toString()
+        } else if (value.isFinite()) {
+            // Plain decimal digits: Double.toString would write 1.0E-5, and
+            // the dash in its exponent would split it in parse.
+            BigDecimal(value.toString()).stripTrailingZeros().toPlainString()
+        } else {
+            value.toString()
+        }
 
     companion object {
         fun parse(text: String): Tempo {
