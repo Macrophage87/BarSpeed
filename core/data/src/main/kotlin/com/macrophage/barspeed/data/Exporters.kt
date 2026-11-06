@@ -45,6 +45,7 @@ import com.macrophage.barspeed.model.VelocityLossRegime
 import com.macrophage.barspeed.model.VoidSetPolicy
 import com.macrophage.barspeed.model.WarmupMarkPolicy
 import com.macrophage.barspeed.model.WeightUnit
+import com.macrophage.barspeed.model.WorkStartPolicy
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -374,13 +375,16 @@ class SessionExporter(
             // and derived HERE rather than at each writer: the manifest below
             // asks the same extension, so the two documents cannot come to
             // disagree about who counted a set.
-            repsSource = record.publishedRepsSource(geometry?.kind),
+            repsSource = record.publishedRepsSource(geometry?.kind, streams.guideCalls()),
             // What the sensor counted, beside what the set is recorded as.
             // Published straight off the row and never recomputed: the stored
             // analysis holds the BATCH count, a different detector's answer
             // (#302; the live one reads the acceleration, not a velocity --
             // a drive impulse from #301, a full cycle since #305).
             liveReps = record.liveReps,
+            // The guide's own count beside its word (#336), off the same
+            // stream count `repsSource` read above.
+            guideReps = record.guideRepsOf(geometry?.kind, streams.guideCalls()),
             // The live integrator's latch, frozen into the stored analysis when
             // the set was recorded (#302). Read off the blob and never
             // recomputed; null -- no tracker covered the set's end, or the set
@@ -580,6 +584,12 @@ class SessionExporter(
             // appears only in the detailed export leaves the summary-only
             // reader holding the numbers with the warning removed.
             sensors = sensorsExport(record, streams, roleByAddress, geometry?.kind),
+            // Which contract the build that RECORDED this set analysed it
+            // under (#38), copied from the row and never filled in: null on
+            // every row written before database v21 stays absent, because
+            // this build's version on a set it did not analyse is the very
+            // claim the key exists to stop making.
+            analysisSchemaVersion = record.analysisSchemaVersion,
             repMetrics =
             if (includeRepDetail && reps.isNotEmpty()) {
                 reps.map {
@@ -943,13 +953,22 @@ private val SetRecordEntity.publishedLimiter: String?
  *   [kind] is null on a row with no stored geometry, where the fallback is the
  *   tempo and the collapse is the policy's to state.
  *
+ * - WHAT THE GUIDE CALLED is [guideCalls], the length of the set's archived
+ *   rep-mark stream (#336). On a guided set that stream holds one mark per rep
+ *   the cadence called and nothing else, so it is the guide's own count, kept
+ *   whatever the lifter later corrected `actualReps` to; [guideCalls] the
+ *   function reads it. Null where no such stream is stored.
+ *
  * @param kind the frozen geometry's exercise kind, or null where the row stores
  *   no geometry. Passed rather than looked up: the exercise catalogue at export
  *   time is not what the set was recorded against, `custom_exercises` stores no
  *   kind at all, and `ExerciseDef`'s kind for an id outside the seed list is its
  *   own admitted guess.
+ * @param guideCalls how many reps the cadence guide called, or null. Required
+ *   rather than defaulted, so a caller cannot leave it out and publish a word
+ *   the export would not.
  */
-fun SetRecordEntity.repsSourceOf(kind: ExerciseKind?): RepsSource? = RepsSourcePolicy.published(
+fun SetRecordEntity.repsSourceOf(kind: ExerciseKind?, guideCalls: Int?): RepsSource? = RepsSourcePolicy.published(
     liveReps = liveReps,
     repsManual = repsManual,
     timed = actualDurationS != null,
@@ -959,10 +978,45 @@ fun SetRecordEntity.repsSourceOf(kind: ExerciseKind?): RepsSource? = RepsSourceP
         isTimed = actualDurationS != null,
         kind = kind,
     ),
+    recordedReps = actualReps,
+    guideCalls = guideCalls,
 )
 
+/**
+ * The guide's own called count this row publishes as `guideReps` (1.26,
+ * #336), or null: [RepsSourcePolicy.publishedGuideReps] over the same inputs
+ * [repsSourceOf] reads, so the count beside the word and the word itself are
+ * one derivation's.
+ */
+fun SetRecordEntity.guideRepsOf(kind: ExerciseKind?, guideCalls: Int?): Int? = RepsSourcePolicy.publishedGuideReps(
+    liveReps = liveReps,
+    repsManual = repsManual,
+    timed = actualDurationS != null,
+    guideCounted =
+    RepsSourcePolicy.guideCounted(
+        hasTempo = tempo != null,
+        isTimed = actualDurationS != null,
+        kind = kind,
+    ),
+    guideCalls = guideCalls,
+)
+
+/**
+ * How many rep marks a set's archived rep-mark stream holds, or null where it
+ * stores none or the stream will not parse (#336).
+ *
+ * On a guided set that is the count the cadence guide called; on a set the
+ * lifter tapped it is their taps; a sensor-counted set stores none. Which of
+ * those it is, `RepsSourcePolicy` decides from the set's shape -- this only
+ * counts. `runCatching` for the reason the session document's own rep-mark
+ * decode gives: a mark is the least of what either document carries.
+ */
+fun List<RawStreamEntity>.guideCalls(): Int? = firstOrNull { it.kind == RawStreamEntity.KIND_REPS }
+    ?.let { stream -> runCatching { RepMarkCsv.decode(Gzip.decompress(stream.csvGzip)).size }.getOrNull() }
+
 /** [repsSourceOf] as the word both export writers publish. */
-private fun SetRecordEntity.publishedRepsSource(kind: ExerciseKind?): String? = repsSourceOf(kind)?.wireName
+private fun SetRecordEntity.publishedRepsSource(kind: ExerciseKind?, guideCalls: Int?): String? =
+    repsSourceOf(kind, guideCalls)?.wireName
 
 /**
  * The rep count this row publishes, or null on a timed set (#71).
@@ -1397,6 +1451,9 @@ class RawExporter(
         // the lifter never said so -- and omitting it would lose exactly the
         // half of the record #216 exists to add.
         FailureProvenancePolicy.published(record.failed, record.failedByLifter)?.let { bool("failedByLifter", it) }
+        // The recording build's contract (#38), as session.json publishes it.
+        // Two writers, one fact; [str] drops the null every pre-v21 row holds.
+        str("analysisSchemaVersion", record.analysisSchemaVersion)
         // The reason, in the archive's manifest as well as in the session
         // document. Two writers, one fact: a change wired into only one of
         // them publishes half a record, and which half depends on which file
@@ -1451,7 +1508,7 @@ class RawExporter(
         // manifest publishes are one fact. session.json decodes it once for the
         // same reason, at the top of `setExport`.
         val geometry = sessionRepository.decodeGeometry(record)
-        str("repsSource", record.publishedRepsSource(geometry?.kind))
+        str("repsSource", record.publishedRepsSource(geometry?.kind, streams.guideCalls()))
         num("liveReps", record.liveReps)
         // The prep, both halves. [num] drops a null, which is right -- a set
         // that ran no voice guide has no prep -- and writes a real 0, which is
@@ -1620,10 +1677,17 @@ class RawExporter(
         // are the analysis's, which has the whole set, can filter without phase
         // lag and can re-run when a method turns out wrong; every derived
         // quantity published here is one it could not revise.
-        prepWindow?.let { window ->
-            num("prepStartedAt_ms", window.startedAtMs)
-            num("workStartedAt_ms", window.workStartedAtMs)
-        }
+        //
+        // The work start alone is asked of [WorkStartPolicy] (#337): a set
+        // that ran no prep stores no window, the app let its work begin at the
+        // START SET tap, and the policy owns which instant that is -- a lower
+        // bound on the work, not where lifting began. The prep start is the stored
+        // window's only -- a set with no prep has no prep to have started.
+        prepWindow?.let { window -> num("prepStartedAt_ms", window.startedAtMs) }
+        num(
+            "workStartedAt_ms",
+            WorkStartPolicy.publishedAtMs(prepWindow, record.startedAtMs, record.prepS, record.workBegan),
+        )
         // Parsed from the text buildZip's own loop already inflated -- not
         // re-inflated here, and shared with sampleRate_hz and
         // rollExcursion_deg below besides: decoding a whole IMU capture even

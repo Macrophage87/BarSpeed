@@ -25,11 +25,13 @@ enum class RepsSource(val wireName: String) {
     METRONOME("metronome"),
 
     /**
-     * The sensor counted, and the lifter then disagreed -- in the set with
-     * `+1 REP`, or afterwards from the rest screen.
-     *
-     * `liveReps` is published beside it and holds what the sensor said, so the
-     * correction and the figure it corrected are both readable.
+     * A counter counted, and the lifter then disagreed. On a sensor set: in
+     * the set with `+1 REP`, or afterwards from the rest screen, and
+     * `liveReps` is published beside it holding what the sensor said. On a
+     * guided set (#336): the lifter recorded a count other than the one the
+     * cadence guide called, and `guideReps` (export 1.26) holds the guide's
+     * count, its marks the calls themselves. Either way the correction and
+     * the figure it corrected are both readable.
      */
     CORRECTED("corrected"),
 
@@ -65,13 +67,18 @@ enum class RepsSource(val wireName: String) {
  *
  * ## The three collapses, stated rather than hidden
  *
- * A corrected MANUAL set reads `manual` and a corrected METRONOME set reads
- * `metronome`. Both are honest about whose figure the count is -- a corrected
- * tally is still the lifter's statement -- and neither can be told from an
- * uncorrected one, because nothing on the row records that the rest-screen
- * control was used. A row written before the live count existed reads
+ * The first: a corrected MANUAL set reads `manual`, because a corrected tally
+ * is still the lifter's statement and nothing on the row records that the
+ * rest-screen control was used.
+ *
+ * The second: a corrected METRONOME set reads `corrected` where the set's
+ * archived rep marks say what the guide called and the recorded count
+ * differs from it (#336), but still reads `metronome` where no marks are
+ * stored.
+ *
+ * (Not a collapse: a row written before the live count existed reads
  * `analysis` whenever `repsManual` is false, which is what such a row's
- * `actualReps` was: `set.manualReps ?: set.analysis.reps.size`.
+ * `actualReps` was: `set.manualReps ?: set.analysis.reps.size`.)
  *
  * The third is [guideCounted]'s: a row with NO STORED GEOMETRY cannot say what
  * kind of exercise it was, so its tempo is read as the guide. That is right for
@@ -118,6 +125,62 @@ object RepsSourcePolicy {
      * count.
      */
     fun publishedReps(actualReps: Int, timed: Boolean): Int? = if (timed) null else actualReps
+
+    /**
+     * The word for a row whose CADENCE GUIDE's own count is known beside its
+     * recorded one (#336).
+     *
+     * [recordedReps] is the row's `actualReps`. [guideCalls] is how many reps
+     * the guide called while the set was performed -- the length of the set's
+     * archived rep-mark stream, which on a guided set holds one mark per call
+     * the guide counted and nothing else, since a `+1 REP` tap does nothing
+     * there -- or null where no such stream is stored.
+     *
+     * Where the four-input form would say [RepsSource.METRONOME] and the
+     * guide's count is known and differs from the recorded one, the recorded
+     * figure is the lifter's correction of the guide's count -- field-47 set
+     * 4, stopped at 8 while the guide called 10 -- and the word is
+     * [RepsSource.CORRECTED], as a corrected sensor count is. The guide's
+     * figure stays readable beside it in the archive's rep marks. Every other
+     * row reads as the four-input form says: a guided set at the guide's own
+     * count, a guided row with no stored marks (the collapse that remains),
+     * and every set no guide counted, whose marks are taps or absent.
+     */
+    fun published(
+        liveReps: Int?,
+        repsManual: Boolean,
+        timed: Boolean,
+        guideCounted: Boolean,
+        recordedReps: Int,
+        guideCalls: Int?,
+    ): RepsSource? {
+        val word = published(liveReps, repsManual, timed, guideCounted)
+        val guideOverruled = guideCalls != null && guideCalls != recordedReps
+        return if (word == RepsSource.METRONOME && guideOverruled) RepsSource.CORRECTED else word
+    }
+
+    /**
+     * The guide's own called count, published beside the word as
+     * `guideReps` (export 1.26, #336), or null where none is published.
+     *
+     * The guided twin of `liveReps`: a sensor set the lifter corrected keeps
+     * the sensor's figure beside the corrected one, and a guided set the
+     * lifter corrected -- [published] says `corrected` -- keeps the guide's.
+     * Published on every set the guide counted whose marks are stored, the
+     * uncorrected ones included, so a reader can tell a set the guide called
+     * through from one it was never asked about; null on every set no guide
+     * counted, on a timed set, and where no marks are stored.
+     *
+     * Keyed on the four-input word, before the correction, so a set the
+     * guide counted carries its count whether or not the lifter overruled it.
+     */
+    fun publishedGuideReps(
+        liveReps: Int?,
+        repsManual: Boolean,
+        timed: Boolean,
+        guideCounted: Boolean,
+        guideCalls: Int?,
+    ): Int? = guideCalls.takeIf { published(liveReps, repsManual, timed, guideCounted) == RepsSource.METRONOME }
 
     /** The same answer as the published word, for a caller that wants the string. */
     fun publishedWord(liveReps: Int?, repsManual: Boolean, timed: Boolean, guideCounted: Boolean): String? =

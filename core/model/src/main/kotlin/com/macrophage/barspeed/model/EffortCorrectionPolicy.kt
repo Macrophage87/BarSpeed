@@ -74,25 +74,38 @@ object EffortCorrectionPolicy {
      * [ratedDescription] is the gym-facing wording of whichever tile the
      * lifter's own rating lit, or null when the set carries no rating at all.
      * [failed] is the effective verdict, the lifter's tap OR-ed with the
-     * derived shortfall, which is what the line is coloured by.
-     *
-     * SEAM ONLY at this commit: the unrated case returns the empty string,
-     * which stands for what the screen does today -- draw no line and, with
-     * it, no way into the correction grid. #168 makes that case reachable on
-     * every timed set, because an auto-ended hold is ended by the clock and
-     * not by a tap on the effort grid, so it arrives at rest with no rating
-     * and nothing on screen to give it one. The differential is in the commit
-     * after this.
+     * derived shortfall, which is what the line is coloured by. [tappedFailed]
+     * is the lifter's own half of it (`RecordState.lastSetTappedFailed`), kept
+     * apart for the reason [selection] keeps it apart (#169).
      */
-    fun lineText(ratedDescription: String?, failed: Boolean): String = when {
+    fun lineText(ratedDescription: String?, failed: Boolean, tappedFailed: Boolean): String = when {
         ratedDescription != null && failed -> "$ratedDescription · short of target"
         ratedDescription != null -> ratedDescription
-        failed -> FAILED
+        failed && tappedFailed -> FAILED
+        failed -> SHORT_OF_TARGET
         else -> NOT_RATED
     }
 
-    /** The line's wording for a set carrying only the derived shortfall. */
+    /**
+     * The line's wording for an unrated failure the LIFTER called -- the
+     * word on the tile they tapped.
+     *
+     * It was the wording for every unrated failure, tapped or derived alike:
+     * #139's caution while the state could not tell the two apart. Since #140
+     * it can, and the owner's default for 0.2.0 keeps this word for the
+     * lifter's own statement only (#169 item 2).
+     */
     const val FAILED = "Failed"
+
+    /**
+     * The line's wording for an unrated failure the APP derived from a short
+     * count or hold, with no tap from the lifter (#169 item 2).
+     *
+     * A verdict, not a quotation: printed as "Failed" it read as the lifter's
+     * own word on a set they never called, which is the same reason
+     * [selection] lights no tile for it.
+     */
+    const val SHORT_OF_TARGET = "Short of target"
 
     /**
      * The line's wording for a set that carries no effort statement of any

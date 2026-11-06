@@ -62,7 +62,7 @@ class TempoScoreLabelTest {
 
     @Test
     fun `an unmeasured pause is not a gap in coverage`() {
-        // Pauses are measured and reported but deliberately never scored.
+        // Pauses are reported but deliberately never scored.
         // Naming one here would send a screen to print "bottom pause not
         // measured" on every set that prescribes one.
         assertEquals(emptyList(), assertNotNull(score(4, 4)).ungradedPhases)

@@ -359,7 +359,7 @@ object VelocityEstimator {
      * idle time inside the recording moves them. Appending still samples flips
      * `field-backsquat-99hz-6rep` at 4.54 s, `field-ohp-rotating-8rep` at
      * 8.03 s and `field-ohp-3010-6rep-s37-set02` at 11.80 s. The first of those
-     * is pinned in [GyroGateTest]; how long the lifter left the sensor running
+     * is pinned in `GyroGateTest`; how long the lifter left the sensor running
      * is therefore part of what selects the policy, and nothing here bounds it.
      *
      * That is not a hypothetical margin. The buffer this function is handed is

@@ -31,4 +31,48 @@ object FailureProvenancePolicy {
      * app derived it, and the lifter did not say so.
      */
     fun published(failed: Boolean, failedByLifter: Boolean?): Boolean? = if (failed) failedByLifter else null
+
+    /** The word for a failure the LIFTER called, on History's chip. */
+    const val TAPPED_WORD = "Failed"
+
+    /**
+     * The word for a failure only the app derived -- the set fell short of its
+     * prescription and the lifter never said it failed (#169, owner default
+     * for 0.2.0).
+     */
+    const val DERIVED_WORD = "Short of target"
+
+    /**
+     * The word History's failure chip draws for one stored row, or null when
+     * it draws none (#169 item 1's display half).
+     *
+     * One decision, in `:core:model` where a test reaches it, rather than a
+     * branch in `SessionDetailScreen`, which nothing under `app/src/test`
+     * reaches.
+     *
+     * THREE ANSWERS FOR A FAILED SET, keyed off the stored author:
+     *
+     * - [failedByLifter] true: the lifter called it -- [TAPPED_WORD].
+     * - false: the app derived it from a shortfall and the lifter never said
+     *   so -- [DERIVED_WORD]. Until this split the chip drew the lifter's
+     *   word on a set the lifter never called failed.
+     * - null: the row predates v15 and nobody knows whose verdict it was.
+     *   [TAPPED_WORD], the one word History has always drawn for both, because
+     *   splitting it here would guess an author for a set nobody recorded one
+     *   for; [published] withholds the author in the export for the same row.
+     *
+     * A DISPLAY COMPROMISE, STATED AS ONE. Beside [DERIVED_WORD], [TAPPED_WORD]
+     * now reads as "the lifter called it", so on a pre-v15 row History draws
+     * the tapped word for a failure that may have been derived: an unknown
+     * author shown as the known one, on the chip only. What "Failed" claims on
+     * such a row is that the set failed, nothing about who said so. The
+     * alternative is a third word for an unknown author, which is the owner's
+     * call and is raised rather than chosen here (L2 review round 1); the
+     * affected rows were all recorded on v0.1.49 or earlier.
+     */
+    fun historyWord(failed: Boolean, failedByLifter: Boolean?): String? = when {
+        !failed -> null
+        failedByLifter == false -> DERIVED_WORD
+        else -> TAPPED_WORD
+    }
 }

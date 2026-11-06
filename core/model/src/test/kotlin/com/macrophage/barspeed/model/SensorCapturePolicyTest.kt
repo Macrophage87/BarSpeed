@@ -870,4 +870,54 @@ class SensorCapturePolicyTest {
             "a roleless capture was given a role",
         )
     }
+
+    // ---- what the top bar draws (#171 item 3) --------------------------------
+
+    private fun pairedAs(roles: Map<String, SensorRole>): SensorRoster =
+        SensorCapturePolicy.roster(listOf(a, b), a, roles)
+
+    /**
+     * Between sets the bar draws the LIVE roster, frozen or not: the rest
+     * screen is where the lifter fixes the next set's arming, and the dots
+     * have to show what that fix did.
+     */
+    @Test
+    fun `between sets the bar shows the live roster even with a frozen one held`() {
+        val armed = pairedAs(mapOf(a to SensorRole.A, b to SensorRole.B))
+        val relabelled = pairedAs(mapOf(a to SensorRole.A))
+
+        assertEquals(relabelled, SensorCapturePolicy.shownRoster(relabelled, armed, inSet = false))
+        assertEquals(relabelled, SensorCapturePolicy.shownRoster(relabelled, null, inSet = false))
+    }
+
+    /**
+     * A set with no frozen roster has nothing better to draw than the live
+     * one; a blank bar would claim no sensor at all.
+     */
+    @Test
+    fun `in a set with nothing frozen the bar falls back to the live roster`() {
+        val live = pairedAs(mapOf(a to SensorRole.A, b to SensorRole.B))
+
+        assertEquals(live, SensorCapturePolicy.shownRoster(live, null, inSet = true))
+    }
+
+    /**
+     * DIFFERENTIAL, #171 item 3. During a set the bar draws the roster the set
+     * was ARMED with. Armed dual, then the second unit's label removed mid-set:
+     * the live roster drops to one stream and its second dot, while the set
+     * underneath is still declared as two -- `beginSet` froze that. Its second
+     * link is not frozen: the relabel nulls the live `secondaryAddress` and
+     * `setSecondaryImuAddress` disconnects it, so the B dot is kept to show
+     * that link going down rather than vanishing.
+     */
+    @Test
+    fun `during a set the bar keeps the roster the set was armed with`() {
+        val armed = pairedAs(mapOf(a to SensorRole.A, b to SensorRole.B))
+        val relabelled = pairedAs(mapOf(a to SensorRole.A))
+
+        val shown = SensorCapturePolicy.shownRoster(relabelled, armed, inSet = true)
+
+        assertEquals(armed, shown, "the bar followed a relabel the recording set never saw")
+        assertEquals(SensorRole.B, shown.secondary, "the second dot vanished mid-set")
+    }
 }

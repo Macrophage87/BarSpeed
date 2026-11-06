@@ -350,7 +350,11 @@ class SessionExportRepMarksTest {
             SessionExporter(SessionRepository(dao, FakeExerciseDao()), dispatcher = Dispatchers.Default)
         val set = exporter.buildExport(1L, includeRepDetail = true)!!.exercises.single().sets.single()
         assertEquals(4, set.reps, "the recorded count moved")
-        assertEquals("metronome", set.repsSource, "the fixture is not a guided set")
+        // A guided set recorded at fewer reps than the guide called reads
+        // `corrected` since #336: the 4 is the lifter's figure, and the 8
+        // marks beside it are the guide's. Still the check that the fixture
+        // is read as guided -- a hand-counted shape reads `manual`.
+        assertEquals("corrected", set.repsSource, "the fixture is not read as a guided set the lifter corrected")
         assertEquals(grid, set.repMarks, "the guide's cycle marks were dropped or trimmed to the count")
     }
 

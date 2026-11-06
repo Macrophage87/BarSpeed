@@ -57,6 +57,7 @@ class RepsSourcePublishedTest {
     private class FakeSessionDao(
         private val session: SessionEntity,
         private val rows: List<SetRecordEntity>,
+        private val streams: List<RawStreamEntity> = emptyList(),
     ) : SessionDao {
         override suspend fun insertSession(session: SessionEntity): Long = 1L
 
@@ -76,7 +77,7 @@ class RepsSourcePublishedTest {
 
         override fun observeSetsForSession(sessionId: Long): Flow<List<SetRecordEntity>> = flowOf(rows)
 
-        override suspend fun rawStreamsForSet(setId: Long): List<RawStreamEntity> = emptyList()
+        override suspend fun rawStreamsForSet(setId: Long): List<RawStreamEntity> = streams.filter { it.setId == setId }
 
         override suspend fun updateRpe(
             setId: Long,
@@ -196,14 +197,25 @@ class RepsSourcePublishedTest {
         geometryJson = geometryKind?.let(::geometryJson),
     )
 
-    private fun repositoryFor(row: SetRecordEntity): SessionRepository {
+    private fun repositoryFor(row: SetRecordEntity, streams: List<RawStreamEntity> = emptyList()): SessionRepository {
         val session = SessionEntity(id = 1L, startedAtMs = 1_788_342_000_000L, endedAtMs = 1_788_343_100_000L)
-        return SessionRepository(FakeSessionDao(session = session, rows = listOf(row)), FakeExerciseDao())
+        return SessionRepository(FakeSessionDao(session = session, rows = listOf(row), streams), FakeExerciseDao())
     }
 
+    /**
+     * The set's archived rep-mark stream holding [count] marks, one a second
+     * from the row's start: on a guided set, one per rep the guide called.
+     */
+    private fun repMarks(row: SetRecordEntity, count: Int) = RawStreamEntity(
+        id = 30L,
+        setId = row.id,
+        kind = RawStreamEntity.KIND_REPS,
+        csvGzip = Gzip.compress(RepMarkCsv.encode(List(count) { row.startedAtMs + 1_000L * (it + 1) })),
+    )
+
     /** The one set of the SESSION DOCUMENT. */
-    private suspend fun setObject(row: SetRecordEntity): JsonObject {
-        val exporter = SessionExporter(repositoryFor(row), dispatcher = Dispatchers.Default)
+    private suspend fun setObject(row: SetRecordEntity, streams: List<RawStreamEntity> = emptyList()): JsonObject {
+        val exporter = SessionExporter(repositoryFor(row, streams), dispatcher = Dispatchers.Default)
         val text = exporter.exportJson(1L, includeRepDetail = false)!!
         return Json.parseToJsonElement(text)
             .jsonObject.getValue("exercises").jsonArray.single()
@@ -211,8 +223,8 @@ class RepsSourcePublishedTest {
     }
 
     /** The one set of the RAW ARCHIVE'S manifest. */
-    private suspend fun manifestSet(row: SetRecordEntity): JsonObject {
-        val repo = repositoryFor(row)
+    private suspend fun manifestSet(row: SetRecordEntity, streams: List<RawStreamEntity> = emptyList()): JsonObject {
+        val repo = repositoryFor(row, streams)
         val bytes = RawExporter(repo, SessionExporter(repo), appVersion = "0.1.53").buildZip(1L)!!
         val entries = mutableMapOf<String, String>()
         ZipInputStream(ByteArrayInputStream(bytes)).use { zin ->
@@ -228,6 +240,8 @@ class RepsSourcePublishedTest {
     private fun JsonObject.word(): String? = this["repsSource"]?.jsonPrimitive?.content
 
     private fun JsonObject.live(): Int? = this["liveReps"]?.jsonPrimitive?.content?.toInt()
+
+    private fun JsonObject.guide(): Int? = this["guideReps"]?.jsonPrimitive?.content?.toInt()
 
     /** The case the issue exists for: a straight-reps set the sensor counted. */
     @Test
@@ -277,6 +291,55 @@ class RepsSourcePublishedTest {
         val row = row(repsManual = true, tempo = "3010", geometryKind = ExerciseKind.DYNAMIC)
         assertEquals("metronome", setObject(row).word())
         assertEquals("metronome", manifestSet(row).word())
+    }
+
+    /**
+     * A guided set the lifter left at the guide's own count is the
+     * metronome's, with its marks read: the count the guide called is the
+     * count recorded (#336).
+     */
+    @Test
+    fun `a guided set recorded at the guide's own count stays the metronome's in both writers`() = runTest {
+        val row = row(repsManual = true, tempo = "3010", geometryKind = ExerciseKind.DYNAMIC, actualReps = 10)
+        val marks = listOf(repMarks(row, 10))
+        assertEquals("metronome", setObject(row, marks).word())
+        assertEquals("metronome", manifestSet(row, marks).word())
+    }
+
+    /**
+     * field-47 set 4 in miniature (#336): a guided set the lifter stopped at
+     * 8 while the guide called 10. Both writers name the 8 a correction, so
+     * no reader credits the metronome with a count it never made.
+     */
+    @Test
+    fun `a guided set stopped short of the guide's count publishes corrected in both writers`() = runTest {
+        val row = row(repsManual = true, tempo = "3010", geometryKind = ExerciseKind.DYNAMIC, actualReps = 8)
+        val marks = listOf(repMarks(row, 10))
+        assertEquals("corrected", setObject(row, marks).word())
+        assertEquals("corrected", manifestSet(row, marks).word())
+    }
+
+    /**
+     * #336, export 1.26: beside the guided `corrected`, the session document
+     * keeps the guide's own count, as a corrected sensor set keeps
+     * `liveReps` -- and in a summary export too, which carries no marks.
+     */
+    @Test
+    fun `a guided set stopped short publishes the guide's count beside the correction`() = runTest {
+        val row = row(repsManual = true, tempo = "3010", geometryKind = ExerciseKind.DYNAMIC, actualReps = 8)
+        val set = setObject(row, listOf(repMarks(row, 10)))
+        assertEquals(10, set.guide(), "the guide's count is not beside the corrected figure")
+        assertNull(set.live(), "a guided set published a sensor count")
+    }
+
+    /**
+     * `guideReps` (1.26, #336) is the guided twin of `liveReps`: a sensor
+     * set carries none, even with marks stored beside it.
+     */
+    @Test
+    fun `a sensor set publishes no guide count`() = runTest {
+        val row = row(liveReps = 5, geometryKind = ExerciseKind.DYNAMIC)
+        assertNull(setObject(row, listOf(repMarks(row, 5))).guide(), "a sensor set was given a guide's count")
     }
 
     /**

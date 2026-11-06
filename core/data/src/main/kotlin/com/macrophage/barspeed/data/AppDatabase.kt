@@ -23,41 +23,43 @@ import java.io.File
  * rescued-database card -- three tiers, their titles, the discard dialog and
  * the share path -- had never been reachable outside a test. Ten was the first
  * value that could make that card appear; every value above it, this build's
- * twenty included, is simply the next such value, and the first-time claim
+ * twenty-one included, is simply the next such value, and the first-time claim
  * that used to stand here is history rather than something these bumps repeat.
  * The sentence here named "this build's seventeen" while the constant below
  * read 19; it was false and is deleted.
  *
- * REACHABLE IS NOT SHOWN. It takes a rollback: a build carrying 20 writes the
- * file, then any build carrying 19 or less opens it. A forward install runs
+ * REACHABLE IS NOT SHOWN. It takes a rollback: a build carrying 21 writes the
+ * file, then any build carrying 20 or less opens it. A forward install runs
  * the migration chain and never enters the rescue at all, so an ordinary
  * upgrade sees none of it.
  *
- * THE ROLLBACK BOUNDARY THIS BUILD SETS (#157). Once a phone has opened a
- * build carrying 20, installing any build carrying 19 or less -- v0.1.55 or
- * older -- enters [DatabaseRescue] at that build's first open. The database
+ * THE ROLLBACK BOUNDARY THIS BUILD SETS (#38, moved from #157's). Once a
+ * phone has opened a build carrying 21, installing any build carrying 20 or
+ * less -- v0.1.59 or older -- enters [DatabaseRescue] at that build's first
+ * open. The database
  * file and its sidecars are moved to `files/rescued/`
  * ([DatabaseRescue.RESCUE_DIR]), Room then finds no file and creates an
  * empty one, so History opens empty and Home offers the rescued-database
- * card. v0.1.55 is the newest tag at this commit and
- * `git show v0.1.55:core/data/src/main/kotlin/com/macrophage/barspeed/data/AppDatabase.kt`
- * reads `DATABASE_VERSION = 19`, so installing v0.1.55 over this build enters
- * the rescue. The sentence here named v0.1.54 as the newest tag and left
- * v0.1.55 conditional; v0.1.55 is cut, so that is deleted. All of that
+ * card. v0.1.59 is the newest tag at this commit and
+ * `git show v0.1.59:core/data/src/main/kotlin/com/macrophage/barspeed/data/AppDatabase.kt`
+ * reads `DATABASE_VERSION = 20` (as do v0.1.56, v0.1.57 and v0.1.58), so
+ * installing any of them over this build enters the rescue. The sentence here
+ * named v0.1.55 and 19 as that boundary, which was true while the constant
+ * read 20 and is false at 21, so it is replaced rather than extended. All of that
  * is what the code does, read in source; no device has run this hop or its
  * rollback, and the two-way emulator exercise at the cut is where it is seen.
  *
- * The version has moved before -- eighteen SHIPPED hops, in v0.1.5, v0.1.10,
+ * The version has moved before -- nineteen SHIPPED hops, in v0.1.5, v0.1.10,
  * v0.1.13, v0.1.15, v0.1.16, v0.1.20, twice in v0.1.38, once in v0.1.42,
  * twice in v0.1.44, once each in v0.1.45 and v0.1.49, twice in v0.1.50, and
- * once each in v0.1.51, v0.1.53 and v0.1.54 -- every one read off
+ * once each in v0.1.51, v0.1.53, v0.1.54 and v0.1.56 -- every one read off
  * `git show <tag>:core/data/.../AppDatabase.kt` at this commit rather than
  * remembered. It read "fifteen" and stopped at v0.1.50, which was false from
  * v0.1.51 on; the count is re-measured here, not extended.
  * What was new at 11 was that a committed baseline existed for the version
  * below it, so for the first time in this repository a migration had a
- * document to be read against; 20 is the tenth such bump, with `19.json` as
- * its baseline.
+ * document to be read against; 21 is the eleventh such bump, with `20.json`
+ * as its baseline.
  *
  * A CORRECTION TO WHAT STOOD HERE, named rather than reworded around. This
  * paragraph read "BOTH bumps of this cluster reach the emulator in the SAME
@@ -86,19 +88,16 @@ import java.io.File
  * exists, and every value it ever held went stale before the next round read
  * it.
  *
- * WHICH HOPS A PHONE RUNS INTO THIS BUILD, re-read at THIS commit. v0.1.55
- * and v0.1.54 both carry 19, so 18 -> 19 HAS shipped and only 19 -> 20 has
- * not. A stock v0.1.55 or v0.1.54 install runs 19 -> 20 alone; one still on
- * v0.1.53 runs
- * 18 -> 19 -> 20 in one open, and one on v0.1.52 runs 17 -> 18 -> 19 -> 20,
- * which is why the emulator exercise installs an older release first and
- * upgrades over it rather than starting empty. Two earlier readings stood
- * here -- v0.1.52 as the newest tag with only 17 -> 18 unshipped, and v0.1.53
- * with only 18 -> 19 unshipped -- and both are false now; they are deleted
- * rather than kept beside this one, as is a third that named v0.1.54 as
- * the newest tag before v0.1.55 was cut.
+ * WHICH HOPS A PHONE RUNS INTO THIS BUILD, re-read at THIS commit. v0.1.56
+ * through v0.1.59 carry 20, so 19 -> 20 HAS shipped and only 20 -> 21 has
+ * not. A stock v0.1.56-v0.1.59 install runs 20 -> 21 alone; one still on
+ * v0.1.55 or v0.1.54 runs 19 -> 20 -> 21 in one open, and older installs run
+ * the longer chain, which is why the emulator exercise installs an older
+ * release first and upgrades over it rather than starting empty. The reading
+ * that stood here -- v0.1.55 as the newest tag with only 19 -> 20 unshipped
+ * -- is false now and is replaced rather than kept beside this one.
  */
-const val DATABASE_VERSION = 20
+const val DATABASE_VERSION = 21
 
 /** The database file name, shared with the downgrade check for the same reason. */
 const val DATABASE_NAME = "accelerometer_lifting.db"
@@ -206,7 +205,7 @@ abstract class AppDatabase : RoomDatabase() {
          *
          * Two ALTER TABLE statements in one migration, as [MIGRATION_1_2]
          * already does. Nothing in this repository executes either of them:
-         * [Migration10To11Test] covers the v10 to v11 step and no other, and
+         * `Migration10To11Test` covers the v10 to v11 step and no other, and
          * there is no androidTest source set at all, so the first time this
          * runs is on the lifter's phone against their real
          * history. This used to add "no committed schema baseline for any
@@ -237,7 +236,7 @@ abstract class AppDatabase : RoomDatabase() {
          *
          * Two ALTER TABLE statements in one migration, as [MIGRATION_1_2] and
          * [MIGRATION_8_9] already do. Nothing in this repository executes
-         * either of them: [Migration10To11Test] covers the v10 to v11 step and
+         * either of them: `Migration10To11Test` covers the v10 to v11 step and
          * no other, and there is no androidTest source set at all, so the
          * first time this runs is on the lifter's phone against their real
          * history. The SQL was read against the entity diff by hand.
@@ -299,7 +298,7 @@ abstract class AppDatabase : RoomDatabase() {
          * affinities and their nullability are checked against the entity by
          * the build, because 11.json in this same commit is Room's own
          * generated description of the schema this build compiles to.
-         * [Migration10To11Test] then runs this migration body -- not a copy of
+         * `Migration10To11Test` then runs this migration body -- not a copy of
          * its SQL -- against a recording SupportSQLiteDatabase and diffs what
          * it executes against the committed 10.json/11.json baselines, so a
          * column added to an entity and forgotten here is caught, and so is
@@ -342,7 +341,7 @@ abstract class AppDatabase : RoomDatabase() {
          *
          * That is a default written by SQLite into existing rows, not a
          * backfill computed from anything -- no UPDATE runs, and
-         * [Migration11To12Test] pins that.
+         * `Migration11To12Test` pins that.
          */
         internal val MIGRATION_11_12 =
             object : Migration(11, 12) {
@@ -388,7 +387,7 @@ abstract class AppDatabase : RoomDatabase() {
          * which reason, and which past sets the lifter would have called
          * warm-ups, is recorded in no artifact this app has ever written --
          * the refusal every migration since v8 has written down.
-         * [Migration12To13Test] pins all of it.
+         * `Migration12To13Test` pins all of it.
          */
         internal val MIGRATION_12_13 =
             object : Migration(12, 13) {
@@ -419,7 +418,7 @@ abstract class AppDatabase : RoomDatabase() {
          * set that the app knew which limb moved, which is exactly the claim
          * #144 was opened to say it could not make.
          *
-         * [Migration13To14Test] pins the statement, the baseline difference
+         * `Migration13To14Test` pins the statement, the baseline difference
          * and the refusal.
          */
         internal val MIGRATION_13_14 =
@@ -459,7 +458,7 @@ abstract class AppDatabase : RoomDatabase() {
          * `SetRatingTracker`'s memory for the life of the rest screen and was
          * discarded.
          *
-         * [Migration14To15Test] pins the statements, the baseline difference
+         * `Migration14To15Test` pins the statements, the baseline difference
          * and the refusals.
          */
         internal val MIGRATION_14_15 =
@@ -503,7 +502,7 @@ abstract class AppDatabase : RoomDatabase() {
          * LIFTER'S statement: a guessed one is indistinguishable in the export
          * from a made one, and would drop real sets out of the volume figure.
          *
-         * [Migration15To16Test] pins the statements, the baseline difference
+         * `Migration15To16Test` pins the statements, the baseline difference
          * and the refusal.
          */
         internal val MIGRATION_15_16 =
@@ -555,7 +554,7 @@ abstract class AppDatabase : RoomDatabase() {
          * recorded. A past set's progression is not recoverable from anything
          * stored, so there is nothing to backfill FROM even if it were wanted.
          *
-         * [Migration16To17Test] pins both statements, the baseline difference
+         * `Migration16To17Test` pins both statements, the baseline difference
          * and the refusal.
          */
         internal val MIGRATION_16_17 =
@@ -589,7 +588,7 @@ abstract class AppDatabase : RoomDatabase() {
          * number over a different velocity estimate, and writing it here would
          * state that the lifter heard a count the app never spoke.
          *
-         * [Migration17To18Test] pins the shape, the single statement, the
+         * `Migration17To18Test` pins the shape, the single statement, the
          * refusal to write into any existing row, and that the hop is in
          * [MIGRATIONS] at all. None of it executes SQLite; a bench run is
          * owed.
@@ -611,8 +610,8 @@ abstract class AppDatabase : RoomDatabase() {
          * second was added: the newest tag then was v0.1.53, whose
          * `AppDatabase.kt` reads `DATABASE_VERSION = 18`, so no installed build
          * had run 18 -> 19 and extending it left no phone behind.
-         * [Migration16To17Test] states the same rule for the same reason and
-         * [Migration18To19Test] pins the count of statements here. 19 HAS
+         * `Migration16To17Test` states the same rule for the same reason and
+         * `Migration18To19Test` pins the count of statements here. 19 HAS
          * SHIPPED since, in v0.1.54, so this hop is closed: a column added now
          * rides a later hop, as #157's five ride [MIGRATION_19_20].
          *
@@ -651,7 +650,7 @@ abstract class AppDatabase : RoomDatabase() {
          * `SetRecordEntity.durationEndedBy` holds the argument for storing it
          * rather than deriving it at export.
          *
-         * [Migration18To19Test] pins the shape, the two statements, the
+         * `Migration18To19Test` pins the shape, the two statements, the
          * refusal to write into any existing row, and that the hop is in
          * [MIGRATIONS] at all. None of it executes SQLite; a bench run is owed.
          */
@@ -696,7 +695,7 @@ abstract class AppDatabase : RoomDatabase() {
          * correction and not the target, and `tempo` into `plannedTempo`
          * would publish the lifter's adjustment as the plan's.
          *
-         * [Migration19To20Test] pins the five statements, the baseline
+         * `Migration19To20Test` pins the five statements, the baseline
          * difference, the refusal to write into any existing row, and that the
          * hop is in [MIGRATIONS]. None of it executes SQLite; the two-way
          * emulator exercise at the cut is owed.
@@ -709,6 +708,47 @@ abstract class AppDatabase : RoomDatabase() {
                     db.execSQL("ALTER TABLE set_records ADD COLUMN workingLoadKg REAL")
                     db.execSQL("ALTER TABLE set_records ADD COLUMN plannedTempo TEXT")
                     db.execSQL("ALTER TABLE set_records ADD COLUMN restStartedAtMs INTEGER")
+                }
+            }
+
+        /**
+         * v21: `analysisSchemaVersion` on set_records -- the session-export
+         * schema version current in the build that computed the row's
+         * `analysisJson` (#38).
+         *
+         * A NEW HOP, NOT AN EXTENSION OF 20. v0.1.56 through v0.1.59 carry
+         * `DATABASE_VERSION = 20`, read by `git show <tag>:...` rather than
+         * assumed, so an installed build has run 19 -> 20 and a column added
+         * to that hop would never reach its phone.
+         *
+         * ONE COLUMN, AND THE OTHER CANDIDATES THIS RELEASE NAMED ARE ALREADY
+         * STORED. #57's effective kind is `ResolvedGeometry.kind` inside
+         * `geometryJson`; #169's tapped-versus-derived failure is
+         * `failedByLifter` (v15); #171's DualShortfall is
+         * `RecordedSensors.shortfall` inside `sensorsJson`. A second column for
+         * any of them would be a second copy of one fact, free to disagree with
+         * the first.
+         *
+         * TEXT, NULLABLE, NO DEFAULT, [MIGRATION_12_13]'s shape. A default
+         * would name a version for every set already recorded, and nothing
+         * stored says which build computed an old set's analysis.
+         * `SetRecordEntity.analysisSchemaVersion` states why null is the honest
+         * "before provenance".
+         *
+         * NO BACKFILL, and the obvious ones are refused: the current constant
+         * would claim today's semantics for figures computed under older ones
+         * (the #38 defect itself), and a version inferred from `startedAtMs`
+         * against release dates reads exactly like a recorded one.
+         *
+         * [Migration20To21Test] pins the statement, the baseline difference,
+         * the refusal to write into any existing row, and that the hop is in
+         * [MIGRATIONS]. None of it executes SQLite; the two-way emulator
+         * exercise at the cut is owed.
+         */
+        internal val MIGRATION_20_21 =
+            object : Migration(20, 21) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE set_records ADD COLUMN analysisSchemaVersion TEXT")
                 }
             }
 
@@ -742,6 +782,7 @@ abstract class AppDatabase : RoomDatabase() {
                 MIGRATION_17_18,
                 MIGRATION_18_19,
                 MIGRATION_19_20,
+                MIGRATION_20_21,
             )
 
         /**
@@ -770,9 +811,9 @@ abstract class AppDatabase : RoomDatabase() {
          * (see [DatabaseRescue.rescue]). A crash with the data recoverable
          * beats a clean start with it gone, and beats an open of half of it.
          *
-         * A ROLLBACK IS WHAT REACHES ANY OF THIS. [DATABASE_VERSION] is 20
+         * A ROLLBACK IS WHAT REACHES ANY OF THIS. [DATABASE_VERSION] is 21
          * here, so once a phone has opened this build, installing any build
-         * carrying 19 or less -- installing v0.1.55 or older -- enters the
+         * carrying 20 or less -- installing v0.1.59 or older -- enters the
          * rescue: the database moves to `files/rescued/`,
          * Room creates an empty one, and History opens empty. The first
          * version at which a rollback could do that to a stock install was
@@ -781,7 +822,7 @@ abstract class AppDatabase : RoomDatabase() {
          * runs the migration chain and never comes near it. The paragraph that
          * stood here said [DATABASE_VERSION] was 18 and named v0.1.52 as the
          * newest tag; both halves were false and are deleted. At this commit
-         * v0.1.55 is the newest tag and reads 19.
+         * v0.1.59 is the newest tag and reads 20.
          *
          * The EXISTING migrations are untouched, and a missing UPGRADE
          * migration still throws exactly as before.

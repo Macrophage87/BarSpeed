@@ -103,9 +103,14 @@ import kotlin.math.abs
  * and any one of them serves as the guard.
  *
  * Nothing here consults the DECLARATION. A unit left still on a bench through
- * a set of curls reads ON_STACK exactly as a unit on a stack does, which is
- * why the only caller asks this question solely on a set that has already
- * declared a stack mount.
+ * a set of curls reads ON_STACK exactly as a unit on a stack does -- and so,
+ * in the committed corpus, do the units on a leg press's sled -- which is why
+ * the end-of-set caller asks this question only where the answer is acted on:
+ * on a set that has already declared a stack mount, and, since #279, on a set
+ * whose analysis fell back off the armed unit, where an ON_STACK verdict under
+ * a mount-free declaration refuses the set rather than moving anything. That
+ * refusal inherits the sled and the bench with the bound; `SetAnalyzer.analyze`
+ * states the cost.
  */
 object StackRollSignature {
     /**
@@ -136,7 +141,10 @@ object StackRollSignature {
      * [RollExcursion.Basis.WHOLE_CAPTURE] already means: that window includes
      * the walk-up and the re-rack, so a stack unit still reads quiet and a
      * handled unit reads moved all the more. The looser window can only refuse
-     * a stack candidate, never invent one.
+     * a stack candidate, never invent one. Under #279 it has a second
+     * consequence of the same sign: on a mount-free fallback it can only let a
+     * stack-clipped partner through to analysis (under-refuse), never refuse a
+     * unit that moved.
      */
     fun of(samples: List<ImuSample>, workStartedAtMs: Long?, end: SetEnd): StackMountSignal {
         val windowed = RollExcursion.inWindow(samples, workStartedAtMs, end)

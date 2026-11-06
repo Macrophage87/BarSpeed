@@ -23,6 +23,7 @@ import com.macrophage.barspeed.dsp.LiveRepCounter
 import com.macrophage.barspeed.dsp.LiveRepCounters
 import com.macrophage.barspeed.dsp.LiveSetState
 import com.macrophage.barspeed.dsp.RepCall
+import com.macrophage.barspeed.dsp.RestStart
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.SetAnalyzer
 import com.macrophage.barspeed.dsp.SetEnd
@@ -586,6 +587,13 @@ private data class PendingSetWrite(
     val exercise: ExerciseDef,
     /** [exercise]'s direction and mounting, frozen with everything else. */
     val geometry: ResolvedGeometry,
+    /**
+     * `ArmedCapture.analysedSignal`: what the analysed unit's own roll said
+     * about riding the load, frozen with the samples it was read from. Handed
+     * to `SetAnalyzer.analyze`, which refuses a mount-free fallback onto a unit
+     * it reads as [StackMountSignal.ON_STACK] (#279). Not stored.
+     */
+    val analysedSignal: StackMountSignal,
     val slot: PlannedSlot?,
     val isTimed: Boolean,
     val loadKg: Double,
@@ -919,10 +927,13 @@ private fun liveStackSignal(feeding: List<ImuSample>, workStartedAtMs: Long?): S
  * is [armedCaptureOf]'s business and deliberately not this function's, so
  * nothing in `:app` can measure one unit's roll and attribute it to the other.
  *
- * A NULL [exercise] OR [prepWindow] IS A SET THAT ASKS NOTHING AND A LOOSER
- * WINDOW, in that order: no declaration means the verdict is never consulted,
- * and no window means it is taken over the whole capture, which can only refuse
- * a stack candidate and never invent one.
+ * A NULL [exercise] OR [prepWindow] IS A LOOSER QUESTION, in that order: no
+ * declaration means the verdict never chooses the unit, though since #279 it is
+ * still measured and acted on where the analysis fell back; no window means it
+ * is taken over the whole capture, which can only refuse a stack candidate and
+ * never invent one. Under #279 the looser window has a second consequence of
+ * the same sign: it can only let a stack-clipped partner through to analysis
+ * (under-refuse), never refuse a unit that moved.
  */
 internal fun RecordState.captureAt(
     armed: RecordedSensors?,
@@ -993,6 +1004,62 @@ internal fun analysedAs(exercise: ExerciseDef, slot: PlannedSlot?, capture: Arme
         stackRuleApplied = slot?.stackRuleApplied == true,
         analysedSignal = capture.analysedSignal,
     )
+
+/**
+ * The batch analysis of a set that captured enough frames to run on, from
+ * everything frozen onto its pending write. A top-level function rather than
+ * an expression inside `RecordViewModel.runSetWrite` for [liveFeedOf]'s
+ * reason: `RecordViewModel` is the class detekt's `LargeClass` counts, and the
+ * argument #279 added would have put it over. Moved unchanged otherwise; the
+ * comments below are the call site's own.
+ *
+ * Compile- and lint-gated only: nothing on the CI path executes this
+ * function. What it hands over is pinned where it is decided --
+ * `FallbackMountGeometryTest` in `:core:dsp` and `FallbackSignalTest` in
+ * `:core:model`.
+ *
+ * The set's own cue track is frozen into the pending write alongside the
+ * samples. It carries the set's terminal cue -- Done where the guide called
+ * the prescription through, Set ended where it did not -- which is the only
+ * thing that says when the app stopped prescribing, and the stream runs on
+ * past it with the sensor being handled, 4.3 to 13.7 s on the eleven sets of
+ * session 32 that carry both a cue and a stream. See SetEnd.
+ */
+private fun analysedSetOf(p: PendingSetWrite): SetAnalysis = SetAnalyzer.analyze(
+    p.samples,
+    p.exercise.liftDirection(),
+    p.loadKg,
+    p.targets,
+    cues = p.cues,
+    // The instant the prep ended, so movement made
+    // during the countdown is not a rep of the set
+    // (#245). Already on the pending write, built by
+    // PrepWindowPolicy, and null on every set that has
+    // no window -- WorkStart is where that means
+    // "bound nothing".
+    workStartedAtMs = p.prepWindow?.workStartedAtMs,
+    // Whether p.samples came off the unit this set
+    // ARMED, which is what decides whether
+    // p.exercise.liftDirection() describes them
+    // (#247). SensorCapturePolicy.analysedStream moves
+    // the analysis onto the partner when the armed
+    // unit delivered too few frames; the geometry it
+    // is handed is the EXERCISE's and, on a cable
+    // machine, belongs to the armed unit's mount.
+    // Read off the same declaration the row and the
+    // export publish, so the three cannot disagree
+    // about whether the analysis moved.
+    analysedUnitFellBack = p.sensors?.analysedFellBack == true,
+    // The fallen-back unit's own roll, read off the
+    // same buffer as p.samples by armedCaptureOf,
+    // which is where it is measured on a fallback
+    // whatever the declaration: a mount-free set
+    // over a partner reading ON_STACK is refused
+    // rather than read under the lifter's geometry
+    // (#279). Compile- and lint-gated only here; the
+    // decision is pinned in :core:dsp and :core:model.
+    analysedSignal = p.analysedSignal,
+)
 
 /**
  * The four link fields THIS STATE is holding, as `:core:model` wants them.
@@ -1601,10 +1668,11 @@ private fun openJournal(
         armedRole = roster.analysed,
         // The second link's state at that same moment, for the reading
         // `imuConnected` is here for -- but only on a set actually armed for
-        // two. The link is kept warm whenever two units are labelled, so an
-        // ungated write would record it on a count-1 set that never opened
-        // `imu-b.csv`, and the interrupted-set card would then report a second
-        // stream missing that nothing ever asked for.
+        // two. Written when the link was held warm on sets armed for one
+        // (#156); since #198 the link follows this same roster's
+        // `secondaryAddress`, so the gate keeps the header from ever
+        // recording a second stream a set was not armed to open `imu-b.csv`
+        // for, and the interrupted-set card from reporting it missing.
         secondaryImuConnected = roster.secondary != null && s.imuConnectedB,
     ),
 )
@@ -2355,6 +2423,10 @@ private fun inSetState(
     leadInRunning: Boolean,
 ): RecordState = s.copy(
     stage = Stage.IN_SET,
+    // The roster `beginSet` armed this set with, read off the same state `s`
+    // it read it from, so the top bar can go on drawing it while the live
+    // roster moves underneath the set (#171 item 3).
+    armedRoster = s.roster,
     setElapsedS = 0,
     live = LiveSetState(),
     manualSet = manualSet,
@@ -2449,6 +2521,30 @@ private fun RecordState.endingCall(clockEnded: Boolean, prepCase: PrepCase, spok
     )
 
 /**
+ * The voice after the audio-cue toggle moved to [enabled] (#340).
+ *
+ * Switched on, a voice is made if there is none, which is what the collector
+ * did alone before. Switched off, the voice that exists is told so, so a set
+ * whose voice has just gone quiet stops holding the lifter's music down for
+ * the rest of it; [guided] says whether a cadence is running, which speaks
+ * whatever the toggle says, and `VoiceFocusPolicy.cuesSwitchedOff` decides
+ * what that changes. Free function and one call site line for the reason the
+ * file's other free functions give: detekt's `LargeClass` counts
+ * [RecordViewModel] against a default of 600 and this paid for its line.
+ *
+ * Compile- and lint-gated only: no test reaches the collector or the voice.
+ */
+private fun cuesToggled(
+    enabled: Boolean,
+    voice: VoiceCounter?,
+    guided: Boolean,
+    make: () -> VoiceCounter,
+): VoiceCounter? = when {
+    enabled -> voice ?: make()
+    else -> voice?.also { it.cuesSwitchedOff(cadenceSpeaks = guided) }
+}
+
+/**
  * Which instant the rest after this set runs from.
  *
  * Free function for [sessionOpeningOf]'s reason, and asked ONCE at the freeze because
@@ -2459,15 +2555,18 @@ private fun RecordState.endingCall(clockEnded: Boolean, prepCase: PrepCase, spok
  *
  * [sensorEndAtMs] is the release, and only where one DECIDED the recorded
  * seconds (#259) -- `TimedEnd.restFromMs`, never a release that was found and
- * refused. The rule and the fallback for a set nothing called over are
- * `RestClockPolicy`'s; what lives here is the wiring.
+ * refused. [guided] is the set's `guidedSet` and [journal]'s rep marks are the
+ * set's own; which cue or mark on the record seeds the instant is
+ * `RestStart`'s (#284), the ordering `RestClockPolicy`'s, and what lives here
+ * is the wiring.
  */
-private fun restStartedFrom(cues: List<VoiceCue>, sensorEndAtMs: Long?, endedAtMs: Long): Long =
-    RestClockPolicy.startedAtMs(
-        setOverCueAtMs = (SetEnd.calledOver(cues) as? SetEnd.Cued)?.atMs,
-        sensorEndAtMs = sensorEndAtMs,
-        endedAtMs = endedAtMs,
-    )
+private fun restStartedFrom(
+    cues: List<VoiceCue>,
+    guided: Boolean,
+    journal: SetJournal?,
+    sensorEndAtMs: Long?,
+    endedAtMs: Long,
+): Long = RestStart.of(cues, guided, journal?.repMarks.orEmpty(), sensorEndAtMs, endedAtMs)
 
 /**
  * What a finished timed set ended at: the seconds recorded, the word saying who
@@ -3601,7 +3700,22 @@ data class RecordState(
      * foreground are two steps, and between them nothing has reported.
      */
     val foregroundFailure: ForegroundStartFailure? = null,
+    /**
+     * The [roster] the set in progress was armed with, frozen by `inSetState`
+     * when it began, or null before the session's first set.
+     *
+     * Not cleared between sets; [barRoster] is the one reader and it asks
+     * whether a set is recording before using it (#171 item 3).
+     */
+    val armedRoster: SensorRoster? = null,
 ) {
+    /**
+     * What the top bar's sensor dots are drawn from: [armedRoster] while a set
+     * records, [roster] otherwise. [SensorCapturePolicy.shownRoster] decides,
+     * in `:core:model` where it is pinned.
+     */
+    val barRoster: SensorRoster get() = SensorCapturePolicy.shownRoster(roster, armedRoster, stage == Stage.IN_SET)
+
     val currentSlot: PlannedSlot? get() = queue.getOrNull(queueIndex)
     val nextSlot: PlannedSlot? get() = queue.getOrNull(queueIndex + 1)
 
@@ -4134,7 +4248,19 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * Read at the moment the set starts and not again, because that is the
      * only moment it is true: the lifter can label a device or forget one
      * mid-session, and a set already recording must be stored as the thing it
-     * was armed as. Null between sets.
+     * was armed as.
+     *
+     * NOT CLEARED BETWEEN SETS (#171). Both fields are assigned at every
+     * [beginSet] and nothing resets them, so from the end of one set to the
+     * start of the next they still hold the set just ended. This KDoc said
+     * "Null between sets." through three review rounds of #156 and it was
+     * never true. What keeps a stale value from deciding anything is that
+     * [endSet] cancels both collectors before anything else, and
+     * [onSample], [onSecondarySample] and [liveFeedNow] -- the readers
+     * besides `endSet`'s own `captureAt` -- run only from those collectors.
+     * [armedSensors] IS null on an ordinary one-sensor set, because
+     * [SensorCapturePolicy.recorded] returns null there; that null is the
+     * set's answer, not the between-sets state.
      */
     private var armedSensors: RecordedSensors? = null
     private var armedSecondaryRole: SensorRole? = null
@@ -4152,8 +4278,13 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * screen's selection says at that instant rather than what this set was
      * armed as.
      *
-     * Null between sets, and null is what makes [applyLiveFallback] a no-op on
-     * a frame that somehow arrives outside a set.
+     * Null only before the session's first set. Like [armedSensors] it is
+     * assigned at every [beginSet] and never reset, so between sets it holds
+     * the set just ended (#171: this KDoc said "Null between sets" and
+     * credited that null with making [applyLiveFallback] a no-op outside a
+     * set; neither was true). What actually keeps a frame from reaching
+     * [applyLiveFallback] between sets is [endSet] cancelling both collectors,
+     * which are the only callers of [liveFeedNow].
      */
     private var liveDirection: LiftDirection? = null
     private var hrJob: Job? = null
@@ -4399,7 +4530,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             container.settings.audioCues.collect { enabled ->
                 stateFlow.value = stateFlow.value.copy(audioCues = enabled)
-                if (enabled && voice == null) voice = VoiceCounter(getApplication())
+                // One line, not two: see [cuesToggled].
+                voice = cuesToggled(enabled, voice, stateFlow.value.guidedSet) { VoiceCounter(getApplication()) }
             }
         }
     }
@@ -5300,7 +5432,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // Where the rest after this set runs from: once, here, carried on the
         // frozen write, and read by both the countdown and the rest-HR window
         // below (#178). [restStartedFrom] holds the argument and the wiring.
-        val restStartedAtMs = restStartedFrom(cueBuffer.toList(), timedEnd?.restFromMs, endedAtMs)
+        val restStartedAtMs = restStartedFrom(cueBuffer.toList(), s.guidedSet, journal, timedEnd?.restFromMs, endedAtMs)
         pendingWrite =
             PendingSetWrite(
                 // The definition SetAnalyzer is handed and the description the
@@ -5310,6 +5442,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 // the same three values cannot disagree with itself.
                 exercise = analysedAs(exercise, slot, capture).exercise,
                 geometry = analysedAs(exercise, slot, capture).geometry,
+                analysedSignal = capture.analysedSignal,
                 slot = slot,
                 isTimed = isTimed,
                 loadKg = loadKg,
@@ -5502,41 +5635,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     !RepAnalysisPolicy.segmentsReps(p.isTimed, p.exercise.kind) ->
                         SetAnalyzer.withheldCarry(p.samples.size)
                     p.samples.size >= SensorCapturePolicy.MIN_ANALYSABLE_FRAMES ->
-                        // The set's own cue track, frozen into the pending
-                        // write alongside the samples. It carries the set's
-                        // terminal cue -- Done where the guide called the
-                        // prescription through, Set ended where it did not
-                        // -- which is the only thing that says when the app
-                        // stopped prescribing, and the stream runs on past it
-                        // with the sensor being handled, 4.3 to 13.7 s on the
-                        // eleven sets of session 32 that carry both a cue and a
-                        // stream. See SetEnd.
-                        SetAnalyzer.analyze(
-                            p.samples,
-                            p.exercise.liftDirection(),
-                            p.loadKg,
-                            p.targets,
-                            cues = p.cues,
-                            // The instant the prep ended, so movement made
-                            // during the countdown is not a rep of the set
-                            // (#245). Already on the pending write, built by
-                            // PrepWindowPolicy, and null on every set that has
-                            // no window -- WorkStart is where that means
-                            // "bound nothing".
-                            workStartedAtMs = p.prepWindow?.workStartedAtMs,
-                            // Whether p.samples came off the unit this set
-                            // ARMED, which is what decides whether
-                            // p.exercise.liftDirection() describes them
-                            // (#247). SensorCapturePolicy.analysedStream moves
-                            // the analysis onto the partner when the armed
-                            // unit delivered too few frames; the geometry it
-                            // is handed is the EXERCISE's and, on a cable
-                            // machine, belongs to the armed unit's mount.
-                            // Read off the same declaration the row and the
-                            // export publish, so the three cannot disagree
-                            // about whether the analysis moved.
-                            analysedUnitFellBack = p.sensors?.analysedFellBack == true,
-                        )
+                        // See analysedSetOf: the set's own cue track, work start,
+                        // fallback flag and roll signal, all frozen on the write.
+                        analysedSetOf(p)
                     p.manualReps != null ->
                         SetAnalysis(emptyList(), 0.0, null, null, listOf("Reps counted manually — no bar sensor."))
                     else -> SetAnalysis(emptyList(), 0.0, null, null, listOf("No sensor data recorded."))
@@ -5603,11 +5704,12 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         val restS = p.slot?.restS ?: DEFAULT_REST_S
         // How much of the rest is left now, against the instant frozen with
         // the write. That instant is a release that decided a hold's seconds
-        // (#259), else the set's own terminal cue -- the stamp SetEnd.calledOver
-        // reads -- and a set nothing called over falls back to the instant the
-        // write froze. #172. Since #141 a guided set the lifter ended early is
-        // not in that group (`endSet` speaks `SetEnd.STOPPED` before freezing
-        // the buffer), since #295 neither is a timed set its clock ended, whose
+        // (#259), else the instant `RestStart.of` reads off the set's record --
+        // a terminal cue `SetEnd.of` admits, or on a set no cadence ran the
+        // lifter's last `+1 REP` tap (#284 H1) -- and a set with none of those
+        // falls back to the instant the write froze. #172. Since #141 a
+        // guided set the lifter ended early is not in that group (`endSet`
+        // speaks `SetEnd.STOPPED` before freezing the buffer), since #295 neither is a timed set its clock ended, whose
         // `Time` is terminal, and since #288 neither is a timed set the lifter
         // ended with the timed voice on, which says `Set ended` at the tap.
         // It is READ here rather than worked out again, because

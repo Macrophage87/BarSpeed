@@ -229,6 +229,28 @@ class LastSetRecordPolicyTest {
         assertEquals("Hard · RPE 8", status(rated = "Hard · RPE 8", declared = true, mark = false))
     }
 
+    /**
+     * #169 item 3: a warm-up the app judged short is reachable -- warm-up is a
+     * declaration about the set's purpose, the shortfall a verdict on its
+     * count, and neither is an input to the other -- and the warm-up word
+     * must not take the effort clause's place. The effort clause is whatever
+     * [EffortCorrectionPolicy.lineText] says of a derive-only failure, read
+     * through the function rather than spelled here, so this pins the
+     * composition and not the wording; the wording has its own differential.
+     */
+    @Test
+    fun `a warm-up the app judged short still says the shortfall first`() {
+        val derived = EffortCorrectionPolicy.lineText(null, failed = true, tappedFailed = false)
+        assertEquals(
+            "$derived · Ended: ${SetLimiterPolicy.NOT_GIVEN} · Warm-up",
+            status(failed = true, tapped = false, declared = true),
+        )
+        assertTrue(
+            EffortCorrectionPolicy.selection(rpe = null, tappedFailed = false, derivedFailed = true).derivedShortfall,
+            "the grid's sentence for the same set; selection takes no warm-up argument since #187",
+        )
+    }
+
     @Test
     fun `a working set says nothing about warming up`() {
         assertFalse(status(rated = "Hard · RPE 8").contains("Warm-up"))
@@ -246,6 +268,7 @@ class LastSetRecordPolicyTest {
         rated: String? = null,
         rpe: Int? = null,
         failed: Boolean = false,
+        tapped: Boolean = failed,
         limiter: SetLimiter? = null,
         note: String? = null,
         timed: Boolean = false,
@@ -255,10 +278,17 @@ class LastSetRecordPolicyTest {
         ratedDescription = rated,
         rpe = rpe,
         failed = failed,
+        tappedFailed = tapped,
         limiter = limiter,
         limiterNote = note,
         timed = timed,
         warmupDeclared = declared,
         warmupMark = mark,
     )
+
+    /** #169 item 2 through the whole box: the derive-only failure's clause and the gap beside it. */
+    @Test
+    fun `a set the app alone judged short says short of target`() {
+        assertEquals("Short of target · Ended: ${SetLimiterPolicy.NOT_GIVEN}", status(failed = true, tapped = false))
+    }
 }

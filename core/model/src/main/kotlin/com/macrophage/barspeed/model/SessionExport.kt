@@ -2823,6 +2823,151 @@ data class SessionExport(
          * [PhaseTallyExport]; `SessionExportTempoByPhaseTest` in `:core:data`
          * is the export differential.
          *
+         * 1.26 FURTHER ENTRY (#38, analysis provenance): ADDS ONE KEY.
+         * [SetExport.analysisSchemaVersion] names the export contract of the
+         * build that RECORDED the set, beside this field's, which names the
+         * build that exported it. The stored analysis is computed once when
+         * the set ends and never re-run, so every figure the export copies out
+         * of it -- each rep's, `ecc_s` among them -- is the recording build's:
+         * a set recorded under 1.0 still publishes `ecc_s` 0.0 for an
+         * unmeasured eccentric inside documents claiming 1.1 and later, with
+         * nothing in the set to say so. `velocityLoss_pct` is not among them:
+         * it has been re-derived from the stored reps at export since 1.10
+         * (#126). NOT RETROACTIVE: read from database v21's
+         * `analysisSchemaVersion` column, null on every row an earlier build
+         * wrote, so every set recorded before this build publishes the key
+         * ABSENT, meaning not recorded -- no value is inferred from a date or
+         * backfilled with this constant. Per set, and no session minimum: one
+         * absent set leaves none that is not a guess. The stored analysis is
+         * NOT re-run on export. The raw archive's `meta.json` carries the
+         * same key per set.
+         *
+         * Under 1.26 and not a mint: 1.26 is unreleased, minted on this
+         * branch for #289 above. ADDITIVE for a reader that ignores unknown
+         * keys; the set object is closed, so a reader validating against an
+         * earlier schema rejects the key, as it already rejects a 1.26
+         * document on its version string. Nothing is renamed or retyped. The
+         * column is `DATABASE_VERSION` 21's, minted with this release; the
+         * plan schema is untouched.
+         *
+         * PINNED. `SchemaAnalysisProvenanceContractTest` asserts this entry's
+         * marker and the key's declaration in both published schemas;
+         * `SchemaExportKeySetContractTest` pins the set's keys to
+         * [SetExport]; `SessionExportAnalysisProvenanceTest` in `:core:data`
+         * is the export differential.
+         *
+         * 1.26 FURTHER ENTRY (#336, whose count a guided set carries): ADDS
+         * ONE KEY and moves one word. `guideReps` publishes how many reps the
+         * cadence guide called -- the length of the set's stored rep-mark
+         * stream -- on every set the guide counted whose marks are stored.
+         * A guided set whose recorded `reps` differ from that count (field-47
+         * set 4: stopped at 8 of the guide's 10) now reads `repsSource`
+         * `corrected`, not `metronome`, with `guideReps` beside it as
+         * `liveReps` sits beside a corrected sensor count; `liveReps` is
+         * absent there. Under 1.26 and not a mint: 1.26 is unreleased.
+         * RETROACTIVE: the marks are stored per set, so an older guided set
+         * re-exported gains the key and, where corrected, the new word; one
+         * with no stored marks reads as before. Nothing is renamed or
+         * retyped, `DATABASE_VERSION` does NOT move, and the plan schema is
+         * untouched. `RepsSourcePolicy.publishedGuideReps` decides the key;
+         * `SchemaExportKeySetContractTest` pins it as declared;
+         * `RepsSourcePublishedTest` in `:core:data` is the export
+         * differential.
+         *
+         * 1.26 DOCUMENTATION ENTRY (#284 H1, where a counted set's rest runs
+         * from): ADDS NO KEY, and no key is renamed or retyped, but
+         * `restMeasured_s` moves for a population. On a set no cadence ran
+         * -- one the lifter counted by tapping -- the rest now runs from the
+         * lifter's last `+1 REP` tap where no terminal cue `SetEnd.of` admits
+         * stands, rather than from the rep-count milestone's `Done` or from
+         * the instant the set's write froze. With the cues off the measured
+         * rest is therefore longer by the walk back to the phone; tapped past
+         * the plan it runs from the last tap rather than the planned one. NOT
+         * RETROACTIVE: the rest instant is stored with the set (database
+         * v20), so a set recorded by an earlier build keeps the instant that
+         * build stored. The raw archive's `rest_before_hrm` window reads the
+         * same instant and moves with it. Guided sets, holds, carries and
+         * sensor-counted sets do not move. `RestStartTest` in `:core:dsp` is
+         * the differential.
+         *
+         * 1.26 (#296, how the heart-rate means round) MINTS NO KEY
+         * and changes no figure: the set `hr.avgBpm` and the session
+         * `heartRate.avgBpm` gain the descriptions they never had, stating the
+         * rounding every build has used. A set's figure is TRUNCATED toward
+         * zero to a whole beat, never rounded -- the mean of its trusted
+         * samples on a set recorded by v0.1.39 or later, of every sample on
+         * one recorded earlier; the session's is the unweighted mean of those
+         * already-truncated figures, truncated again, and NOT A MEAN OVER
+         * SAMPLES. Field-42 (app 0.1.52):
+         * published 99, set figures averaging 99.25, unfloored set means 99.83,
+         * all 1528 in-set samples 100.34; truncation and rounding differed on 9
+         * of 16 sets. KEPT AND DESCRIBED, not redefined: both are frozen when
+         * written, and a new rule would give each key two meanings split by app
+         * version for about one beat. [HrSetSummary.avgBpm] and
+         * [HrSessionSummary.avgBpm] carry the same statement; `HrStreamSummary`
+         * in `:core:hrm` and [SessionHeartRate] are where it is computed.
+         *
+         * PINNED. `SchemaHeartRateMeanContractTest` asserts this entry and both
+         * descriptions; `HrTrustTest > the set's mean is truncated, never
+         * rounded` and `SessionHeartRateTest > the mean is truncated as
+         * endSession truncates it, never rounded` pin the arithmetic.
+         *
+         * 1.26 (#82, the strap's sensor-contact report): every raw
+         * heart-rate CSV -- `hrm`, `rest_before_hrm`, `rest_after_hrm` -- gains a
+         * fourth column, `contact`, and `meta.json`'s `csvHeaderHrm` follows it.
+         * `1` the strap reported skin contact, `0` it reported none, EMPTY it
+         * said nothing (Sensor Contact Support clear). A three-column stream
+         * written before this build decodes as EMPTY, never as either reported
+         * value; [SensorContact.NOT_RECORDED] is that third state. Stored streams
+         * are exported verbatim, so an archive spanning both builds holds both
+         * widths.
+         *
+         * WHAT MOVES HERE: a sample with no R-R interval whose strap reported no
+         * contact is no longer trusted, so it reaches no figure of a set's `hr`
+         * block. No R-R and no report is still trusted on its bpm, and a sample
+         * with possible R-R intervals is never overruled. UNMEASURED: whether
+         * the strap in use sets Sensor Contact Support at all. NOT RETROACTIVE.
+         * No key is added, removed, renamed or retyped, and no database column
+         * moves.
+         *
+         * PINNED. `SchemaSensorContactContractTest` asserts this entry and the
+         * `hr` block's sentence; `HrTrustTest`, `HrCsvTest`, `SetJournalTest` and
+         * `HeartRateMeasurementParserTest` pin the behaviour.
+         *
+         * 1.26 FURTHER ENTRY (#279, a mount-free fallback onto a unit that rode
+         * a load): ADDS NO KEY, and no key moves. `summary.noRepsReason`
+         * `mountNotDeclared` is written on a second shape of set. It fired
+         * only where the analysis fell back off the armed unit under a
+         * geometry naming a MOUNT (#247); a declaration naming none -- written
+         * from the lifter's end -- was analysed over whatever unit the
+         * analysis fell back to, so a partner clipped to the stack of a
+         * drive-down cable lift was read under the lifter's geometry with the
+         * drive and the return swapped, 1.89 s and 0.98 s exchanged on
+         * `FallbackMountGeometryTest`'s synthetic negation pair. It now also
+         * fires where the declaration names no mount and the fallen-back
+         * unit's own `StackRollSignature` read
+         * [StackMountSignal.ON_STACK]. A sled-mounted or still partner, or a
+         * stack partner on a cable whose stack moves with the handle, reads
+         * the same and is refused with it -- the cost of a fitted bound, stated
+         * on the word's description -- while all 53 barbell streams in the
+         * committed corpus read moved (pinned by `StackMountFieldTest`;
+         * measured over each stream's cue- and work-start-bounded window and
+         * over its whole capture; the nearest, field-42 set 5's bench press,
+         * at 5.685 degrees against a 3.0 bound).
+         *
+         * Under 1.26 and not a mint: 1.26 is unreleased, minted on this branch
+         * for #289 above. NOT RETROACTIVE: the roll verdict is taken when the
+         * set is recorded and is not stored, so a set already on disk keeps
+         * the analysis it was given. A reader of any earlier 1.2x schema
+         * accepts the word, which has existed since 1.20, and rejects a 1.26
+         * document on its version string. Nothing is added, renamed or
+         * retyped, `DATABASE_VERSION` does NOT move, and the plan schema is
+         * untouched.
+         *
+         * PINNED. `SchemaMountFreeFallbackContractTest` asserts this entry's
+         * marker and the word's description; `FallbackMountGeometryTest` in
+         * `:core:dsp` and `FallbackSignalTest` are the behaviour pins.
+         *
          * 1.26 FURTHER ENTRY (#246, repMetricsComplete judged against the
          * guide's marks): A VALUE MAY MOVE FROM TRUE TO FALSE, and never the
          * other way. On a `metronome` set whose stored reps carry
@@ -3060,6 +3205,11 @@ data class SessionExport(
 
 @Serializable
 data class HrSessionSummary(
+    /**
+     * The unweighted mean of the sets' already-truncated [HrSetSummary.avgBpm]
+     * figures, truncated again: NOT a mean over samples (1.26, #296).
+     * [SessionHeartRate] states the rule and what it costs.
+     */
     val avgBpm: Int? = null,
     val maxBpm: Int? = null,
     /**
@@ -3294,6 +3444,30 @@ data class SetExport(
      * is a count.
      */
     val liveReps: Int? = null,
+    /**
+     * How many reps the CADENCE GUIDE called on a guided set (1.26, #336):
+     * the length of the set's archived rep-mark stream, which on a guided
+     * set holds one mark per rep the guide counted and nothing else.
+     * `RepsSourcePolicy.publishedGuideReps` decides it.
+     *
+     * The guided twin of [liveReps]. Beside [repsSource] `metronome` it
+     * equals `reps`; beside `corrected` on a guided set -- the lifter
+     * stopped short of the guide's count or went past it, field-47 set 4
+     * stopped at 8 of the guide's 10 -- it is the guide's figure the
+     * recorded one corrects. Published in the summary document too, where
+     * [repMarks] is not.
+     *
+     * [repsSource]'s third collapse reaches this key too: a row with NO
+     * STORED GEOMETRY and a tempo is read as guided, so on an explosive lift
+     * carrying a tempo -- paced by no cadence, its marks the lifter's taps --
+     * this publishes the TAP count as the guide's, and a rest-screen
+     * correction of it reads `corrected` beside it.
+     *
+     * ABSENT on every set no guide counted, on a timed set, and on a guided
+     * set whose marks were never stored (before the stream existed, or a set
+     * whose journal never opened), which still reads `metronome`.
+     */
+    val guideReps: Int? = null,
     /**
      * Whether the LIVE velocity integrator stayed within its displacement
      * bound through this set
@@ -3886,15 +4060,23 @@ data class SetExport(
      * ending in a pause one beat before the cycle ends. The marks are the
      * prescribed grid, spaced at the tempo's sum and kept on the guide's own
      * schedule whether or not the lifter moved with it, so these are NOT
-     * instants anyone observed a rep, and a failed or early-ended set can
-     * carry more marks than [reps]. `RepMarkTrackTest` measures it on the
+     * instants anyone observed a rep. On a `metronome` set that carries
+     * marks there are exactly [reps] of them. A guided set the lifter
+     * recorded at a count other than the guide's reads `corrected` (1.26,
+     * #336): its marks are the guide's cycles, and it can carry more marks
+     * than [reps] -- a set stopped short of the guide's count, field-42 set
+     * 12's shape -- or fewer, on a set carried past it. `RepMarkTrackTest`
+     * measures it on the
      * thirteen committed captures that carry marks, all guided: all 103 marks
      * within 1 ms of a row of the same set's cue track, the guide's next
      * spoken word: a stroke word, a rep call, or `Done`; on eight of the
      * thirteen no mark falls on a rep call. On a
-     * `manual` set they are the lifter's taps, and on a straight-rep set
-     * carrying no tempo the only per-rep instants in the document: [repMetrics]
-     * entries carry no clock and [voiceCues] is what the app SAID.
+     * `manual` set they are the lifter's taps; on a `corrected` set they are
+     * the guide's where a guide counted it, and a set the sensor counted,
+     * corrected or not, writes none. On a straight-rep set carrying no
+     * tempo the lifter's taps are the only per-rep instants in the document:
+     * [repMetrics] entries carry no clock and [voiceCues] is what the app
+     * SAID.
      *
      * NO TRUE REP INSTANT IS STORED on a guided set, which is why the content
      * is kept and described rather than replaced; the name, and the raw
@@ -3993,6 +4175,43 @@ data class SetExport(
      * streamed, taken when the set was recorded (#207).
      */
     val sensors: SetSensorsExport? = null,
+    /**
+     * The export contract current in the build that RECORDED this set and
+     * computed the analysis stored with it (1.26, #38). It is that build's
+     * [SessionExport.SCHEMA_VERSION] and nothing finer: an analysis change
+     * shipped without moving the export contract is not distinguished by it.
+     *
+     * The document's [SessionExport.schemaVersion] names the build that
+     * EXPORTS it. The analysis is computed once, when the set ends, and
+     * stored; no export re-runs the analyzer over the stored samples. What
+     * the export COPIES OUT of it is the recording build's, among them: the
+     * rep list and each rep's figures -- so a set recorded under 1.0 still
+     * publishes `ecc_s` 0.0 for an eccentric 1.0 did not measure -- the
+     * [tempoCompliance] grade (except its `byPhase` tally, whose phases the
+     * exporting build re-filters), [SetSummaryExport.noRepsReason],
+     * [refusedDetections], [refusedDetectionReason],
+     * [detectionsBeforeWorkStart] and [artefactSamples]. What the export
+     * RE-DERIVES from the stored reps follows the exporting build's rules
+     * over the recording build's reps: [velocityLossPct] (since 1.10, #126,
+     * so 1.0's stored best-to-worst figure is never published),
+     * [velocityLossBasis], [velocityLossRegime], and the summary's means,
+     * peaks and range. This key names the version the copied-out figures
+     * were computed under; the re-derived ones answer to the document's,
+     * except that an aggregate of a copied-out figure inherits its meaning:
+     * the summary's `meanEcc_s` averages the reps' copied-out `ecc_s`, so a
+     * 1.0 set's 0.0 there is not a measured 0 s eccentric.
+     *
+     * ABSENT on every set recorded before database v21, the first build that
+     * stored the fact. No stored value names the build that analysed an older
+     * set, so none is published: today's constant would be #38's defect
+     * itself, and a version inferred from the set's date would read exactly
+     * like a recorded one. Absent therefore means "not recorded", never "the
+     * same as the document".
+     *
+     * Per set and not a session minimum: a session can hold sets recorded by
+     * two builds, and one absent set leaves no minimum that is not a guess.
+     */
+    val analysisSchemaVersion: String? = null,
     /** Always-included summary across reps. */
     val summary: SetSummaryExport,
 ) {
@@ -4576,7 +4795,10 @@ data class RepMetricsExport(
      */
     @SerialName("bottomPause_s") val bottomPauseS: Double? = null,
     @SerialName("con_s") val conS: Double,
-    /** Seconds still at the TOP turnaround, on the same rule as [bottomPauseS]. */
+    /**
+     * Seconds still at the TOP turnaround, on the same rule as [bottomPauseS]:
+     * the segmenter's gap between the two phases, not a measured dwell (#92).
+     */
     @SerialName("topPause_s") val topPauseS: Double? = null,
     /** Mean drive velocity, positive in the direction the drive moves. */
     @SerialName("meanConVel_mps") val meanConVelMps: Double,
@@ -4660,7 +4882,9 @@ data class TempoComplianceExport(
      * Reps within tolerance on every scored phase THAT REP RESOLVED, out of
      * [of], the reps that resolved at least one (every rep, on a set
      * analysed before v0.1.36). Pauses are reported but
-     * never scored (on a set analysed by v0.1.31 or later). A phase the
+     * never scored (on a set analysed by v0.1.31 or later), and a reported
+     * pause is the segmenter's gap between the phases, not a measured dwell
+     * (#92). A phase the
      * sensor did not measure is not counted against the lifter (on a set
      * analysed by v0.1.36 or later) and does not appear in [scoredPhases], so read that field to
      * know what this ratio covers: on a slow concentric-first lift it is
@@ -4746,6 +4970,12 @@ data class PhaseTallyExport(
 @Serializable
 data class HrSetSummary(
     val endOfSetBpm: Int? = null,
+    /**
+     * The set's mean TRUNCATED toward zero to a whole beat, never rounded
+     * (1.26, #296): 120 and 121 publish 120. Over the trusted samples on a set
+     * recorded by v0.1.39 or later, over every sample before. Frozen at set end;
+     * `HrStreamSummary.avgBpm` in `:core:hrm` computes it.
+     */
     val avgBpm: Int? = null,
     val maxBpm: Int? = null,
     /**

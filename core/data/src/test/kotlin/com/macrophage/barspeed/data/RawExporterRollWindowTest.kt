@@ -119,7 +119,7 @@ class RawExporterRollWindowTest {
 
     private val json = Json { encodeDefaults = true }
 
-    private fun row(tempo: String? = "3010") = SetRecordEntity(
+    private fun row(tempo: String? = "3010", workBegan: Boolean? = null) = SetRecordEntity(
         id = 5L,
         sessionId = 1L,
         orderIdx = 0,
@@ -136,6 +136,7 @@ class RawExporterRollWindowTest {
         // `Set ended` bounds either way, which is why the early-stop case
         // below needs no tempo to hold.
         tempo = tempo,
+        workBegan = workBegan,
         analysisJson =
         json.encodeToString(SetAnalysis.serializer(), SetAnalysis(emptyList(), 0.0, null, null, emptyList())),
     )
@@ -176,8 +177,12 @@ class RawExporterRollWindowTest {
         csvGzip = Gzip.compress(PrepWindowCsv.encode(PrepWindow(startedAtMs, workStartedAtMs))),
     )
 
-    private suspend fun meta(streams: List<RawStreamEntity>, tempo: String? = "3010"): JsonObject {
-        val dao = FakeSessionDao(listOf(row(tempo)), mapOf(5L to streams))
+    private suspend fun meta(
+        streams: List<RawStreamEntity>,
+        tempo: String? = "3010",
+        workBegan: Boolean? = null,
+    ): JsonObject {
+        val dao = FakeSessionDao(listOf(row(tempo, workBegan)), mapOf(5L to streams))
         val repo = SessionRepository(dao, FakeExerciseDao())
         val bytes = RawExporter(repo, SessionExporter(repo), appVersion = "0.1.50").buildZip(1L)!!
         var metaText: String? = null
@@ -430,6 +435,40 @@ class RawExporterRollWindowTest {
             RawMetaSchema.unmetInSet(JsonObject(set + ("sensors" to JsonArray(rebased)))),
             "the check reported nothing for a whole-capture sensor entry on a set that carries a work start",
         )
+    }
+
+    /**
+     * #337 meeting #326: a straight set that ran no prep publishes its START
+     * SET tap as `workStartedAt_ms`, and that instant is its capture's own
+     * start, so its roll is still measured over the capture and named so.
+     * The published raw-meta schema must take the pair -- on the set and on
+     * each `sensors` entry -- rather than demand a working-window word that
+     * would be false here.
+     */
+    @Test
+    fun `a no-prep set's work start leaves its roll named over the capture, and the schema takes it`() = runTest {
+        // One stream: the set-level figure and basis (allOf[0] and [1]).
+        val set =
+            meta(listOf(imuStream(samples(1_000L, sweep(0.0, 12.0, 20)))), tempo = null, workBegan = true)
+        assertEquals(1_000.0, set.num("workStartedAt_ms"), "the no-prep set published no work start")
+        assertTrue("prepStartedAt_ms" !in set, "a set with no prep published a prep start")
+        assertEquals("wholeCapture", set.text("rollExcursionBasis"))
+        assertEquals(emptyList(), RawMetaSchema.unmetInSet(set), "the schema refuses what the writer wrote")
+        // Two roles: each `sensors` entry's basis (allOf[2] and [3]). Two
+        // roles with nothing armed publish no set-level figure, so the
+        // set-level word is asserted on the one-stream set above only.
+        val dual =
+            meta(
+                listOf(
+                    imuStream(samples(1_000L, sweep(0.0, 12.0, 20)), role = "a", id = 1L),
+                    imuStream(samples(1_000L, sweep(0.0, 6.0, 20)), role = "b", id = 2L),
+                ),
+                tempo = null,
+                workBegan = true,
+            )
+        assertEquals(1_000.0, dual.num("workStartedAt_ms"), "the two-role no-prep set published no work start")
+        assertEquals("wholeCapture", dual.sensor("a").text("rollExcursionBasis"))
+        assertEquals(emptyList(), RawMetaSchema.unmetInSet(dual), "the schema refuses the sensor entries")
     }
 
     // ---- what must not change ----------------------------------------------

@@ -2,6 +2,7 @@ package com.macrophage.barspeed.dsp
 
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.PhaseCoverage
+import com.macrophage.barspeed.model.StackMountSignal
 import com.macrophage.barspeed.model.RepAnalysisPolicy
 import com.macrophage.barspeed.model.SensorCapturePolicy
 import com.macrophage.barspeed.model.StartPhase
@@ -22,9 +23,10 @@ data class RepAnalysis(
      */
     val eccS: Double?,
     /**
-     * Seconds the bar was still at the BOTTOM turnaround of this rep, between
-     * the rep's own two movement phases -- and null when this rep has no
-     * bottom turnaround inside it to measure.
+     * Seconds between the end of this rep's first detected movement phase and
+     * the start of its second, at the BOTTOM turnaround -- the segmenter's
+     * gap, not a measured dwell (#92, see `repMetrics`) -- and null when this
+     * rep has no bottom turnaround inside it to measure.
      *
      * On a lift that starts at the top, the bottom is between the two phases
      * and this carries it. On a lift that starts at the bottom, the bottom is
@@ -37,7 +39,10 @@ data class RepAnalysis(
      */
     val bottomPauseS: Double?,
     val conS: Double,
-    /** Seconds still at the TOP turnaround, on the same rule as [bottomPauseS]. */
+    /**
+     * Seconds still at the TOP turnaround, on the same rule as [bottomPauseS]:
+     * the segmenter's gap between the two phases, not a measured dwell (#92).
+     */
     val topPauseS: Double?,
     /** Mean drive velocity, positive in the direction the drive moves. */
     val meanConVelMps: Double,
@@ -463,10 +468,50 @@ object SetAnalyzer {
      * declaration with different second-unit mounts, so the adjustment is a
      * coin flip and half its outcomes publish an inverted record silently.
      *
+     * EVEN WHERE THE ROLL SAYS THE UNIT RODE THE STACK, and that is a
+     * decision, not an oversight (#318, kept by the owner's default for
+     * 0.2.0). [analysedSignal] can say the unit the analysis fell back to read
+     * [StackMountSignal.ON_STACK], and on a declaration whose ONLY mount term
+     * is `sensorOnStack` it would then be tempting to read it under the
+     * declaration. It is not done, for three reasons: the signature is a
+     * fitted bound that a unit lying still reads as readily as one on a stack
+     * (`StackRollSignature`'s own KDoc), so it is at most consistent with the
+     * stack term, and says nothing about the inversion or the ratio; the
+     * inversion that rides with a drive-down stack
+     * declaration is exactly the term no stream can measure
+     * ([LiftDirection.mountSpecificBesidesStack]); and the narrowing was
+     * argued from archived captures only, with no field set having hit the
+     * refusal since v0.1.54. The cost is stated: a stack-declared set whose
+     * armed unit dropped frames publishes no figures even where its partner
+     * could have been read. Its capture is archived either way.
+     * `FallbackMountGeometryTest` pins the refusal under all three signals.
+     *
      * FALSE IS EVERY ORDINARY SET, single-sensor ones included, and nothing
      * about them changes. So is a dual set whose armed unit delivered: the
      * declaration describes the unit the figures came from, which is what it
      * has always meant.
+     *
+     * [analysedSignal] is `ArmedCapture.analysedSignal`: what the ANALYSED
+     * stream's own roll says about riding the load, from `StackRollSignature`
+     * in this module. [StackMountSignal.UNMEASURED] where nothing asked, which
+     * is every caller that passes nothing.
+     *
+     * TRUE, MOUNT-FREE AND [StackMountSignal.ON_STACK] IS REFUSED TOO (#279),
+     * the mirror of the case above. A declaration naming no mount says the
+     * ARMED unit was at the lifter's end, and says nothing about the partner;
+     * a partner whose own roll reads as riding a load that does not roll may
+     * be on the stack, where a drive-down cable lift moves it opposite to the
+     * lifter and the same swapped record is published. The signature cannot
+     * tell a stack from a sled or from a unit lying still, so a fallback onto
+     * a sled-mounted partner -- a leg press -- or onto a stack partner on a
+     * cable whose stack moves with the handle -- a low-pulley curl -- is
+     * refused with it. Neither publishes a swap; either would be read at a
+     * travel ratio and in a plane nobody declared for that unit. That is the
+     * rule's cost, chosen over publishing a swap nobody can see. Over the
+     * committed corpus every barbell stream -- 53, pinned by
+     * `StackMountFieldTest` -- reads [StackMountSignal.NOT_ON_STACK], so a
+     * barbell fallback is analysed as before; so is any fallback whose
+     * partner nothing measured.
      */
     fun analyze(
         samples: List<ImuSample>,
@@ -477,6 +522,7 @@ object SetAnalyzer {
         cues: List<VoiceCue> = emptyList(),
         workStartedAtMs: Long? = null,
         analysedUnitFellBack: Boolean = false,
+        analysedSignal: StackMountSignal = StackMountSignal.UNMEASURED,
     ): SetAnalysis {
         val raw = VelocityEstimator.estimate(samples, config, direction.measuredPlane)
         // The analysis moved onto a unit the set did not arm, and [direction]
@@ -494,7 +540,15 @@ object SetAnalyzer {
         // RawStreamEntity.sampleRateHz, and a placeholder 0.0 there would leave
         // the archive publishing "sampleRate_hz": 0.0 over a capture that has a
         // rate. Everything below this line reads `direction`.
-        if (analysedUnitFellBack && direction.mountSpecific) {
+        //
+        // And the mirror (#279): a declaration naming NO mount describes the
+        // lifter's end, so a fallback onto a unit whose own roll reads as
+        // riding a load may be reading a stack the declaration does not
+        // describe. ON_STACK only -- a partner that moved, or that nothing
+        // measured, is not evidence of a mount and is analysed as before.
+        if (analysedUnitFellBack &&
+            (direction.mountSpecific || analysedSignal == StackMountSignal.ON_STACK)
+        ) {
             return SetAnalysis(
                 reps = emptyList(),
                 sampleRateHz = raw.sampleRateHz,
@@ -736,15 +790,48 @@ object SetAnalyzer {
         val meanEcc = if (span.hasEccentric) eccRange.map { v[it] * sign }.average() else null
         val peakEcc = if (span.hasEccentric) eccRange.minOf { v[it] * sign } else null
         val rom = RepSegmenter.displacement(series, span.conStartIdx, span.conEndIdx)
-        // Bar power P = m(g + a)v over the drive. Only defensible when the drive
-        // lifts the load against gravity — a cammed machine whose drive goes
-        // down carries no such relationship, so leave power unreported there.
+        // Bar power P = m(g + a)v over the drive, with m the declared load and
+        // a, v the series' motion divided back to the frame that load is in
+        // (below). The gate decides WHETHER that product is published, and it
+        // is kept as it stands -- kept by the owner's default for 0.2.0 on
+        // issue #116. Each clause
+        // was re-examined against the frame handling #26 corrected, and each
+        // excludes a figure this formula would get WRONG, not one it would get
+        // right; PowerGateTest pins all three.
         //
-        // The second clause excludes SIGN-INVERTED setups, not cable ones. An
-        // earlier comment here said it kept power off cable machines; it does
-        // not, and a low pulley with sensorInverted = false has always passed
-        // it. Whether a stack-mounted setup should publish power at all is
-        // issue 116; on the conservation argument below it now can.
+        // - `loadKg > 0`: no declared mass, no product. Absent stays absent;
+        //   a 0 here would be a figure for a load nobody named.
+        // - `concentricUp`: the formula is the work done raising m against g,
+        //   so it needs the drive to move the series UP. Where the drive moves
+        //   down the series' drive velocity is negative, so m(g + a)v is
+        //   negative wherever g + a is positive: a product with no reading as
+        //   the lifter's output.
+        //   That holds on a stack-mounted pushdown, pulldown or leg curl too.
+        //   There the stack DOES rise on the drive, and by #26's conservation
+        //   argument m(g + a_stack)v_stack would be the lifter's output -- but
+        //   this series is mapped into the lifter's frame by `sensorToLifter`,
+        //   so a and v are the handle's, moving opposite to the stack. Reading
+        //   power there needs the product taken in the stack's own frame, which
+        //   is a different formula and a published-figure change, not a
+        //   narrower gate; it is not made here.
+        // - `!sensorInverted`: the load moves OPPOSITE to the series. With the
+        //   drive up, that is a load being LOWERED as the lifter drives -- an
+        //   assisted machine's counterweight is the shape -- so m(g + a)v
+        //   multiplies the mass of one body by the motion of another, the
+        //   pair #26 exists to stop. #26 does not repair it: it divides a and
+        //   v back by travelRatio, which is positive, so the inversion
+        //   `sensorToLifter` applied is not undone and the product still reads
+        //   the handle's direction against the stack's mass.
+        //
+        // What the gate does NOT exclude, stated so it is not mistaken for
+        // coverage: a stack mount that moves WITH the drive (sensorOnStack and
+        // not inverted -- a low pulley) and any travelRatio both pass, and on
+        // the conservation argument below both publish the lifter's output
+        // measured at the stack. Nor does it read the PLANE: a horizontal
+        // declaration with a drive-up flag passes, and the product is then
+        // m(g + a)v over horizontal motion, which equals the stack's power
+        // through a 1:1 cable and is not otherwise derived. Pulley friction
+        // is unmeasured and left as the known understatement stated below.
         val effectiveLoad = loadKg?.takeIf { it > 0 && direction.concentricUp && !direction.sensorInverted }
         // The series was mapped into the LIFTER's frame at analyze(), scaling
         // both velocity and acceleration by travelRatio. loadKg was not: it is
@@ -778,6 +865,38 @@ object SetAnalyzer {
         // there belongs to the next rep's approach and to rest, and the
         // segmenter cannot separate the two. Publishing it as a pause is what
         // issue #93 measured at 22.73 s.
+        //
+        // IT IS THE GAP BETWEEN THE REP'S TWO DETECTED MOVEMENT RUNS, NOT A
+        // MEASURED DWELL, AND NOT THE LOAD COMING OFF (#92). It is the time
+        // the segmenter found THIS STREAM still between the two phases -- the
+        // motion of what the sensor rode, not the force on the limb -- so it
+        // says nothing about whether the load came off at the turnaround.
+        // Nothing in this pipeline assumes a turnaround unloads: the
+        // segmenter pairs a movement run with the next opposite one across
+        // whatever still runs lie between, and on a reversal with no dwell
+        // that is only the dead-band crossing, so it publishes a pause near
+        // zero rather than missing the boundary (TurnaroundPauseTest, which
+        // bounds that zero-dwell figure only at 0.15 s or under). The
+        // converse does not hold: a figure near zero does not show the
+        // reversal was dwell-free. On session 29 the owner's estimator,
+        // independent of segmentation, put turnaround dwell at 0.10-0.14 s on
+        // leg press, single-leg press and seated leg curl alike (0.13 s on the
+        // leg curl, n=33), where this figure's session-29 medians were 1.18 s
+        // (single-leg press), 0.16 s (leg press) and 0.04 s (leg curl) --
+        // #92's table: over on the presses, under on the leg curl -- so it
+        // neither tracks nor bounds the dwell.
+        //
+        // Measured at 9eaae8a2 by a scratch run over the committed captures
+        // with SetAnalyzer's own defaults, NOT committed and NOT pinned: every
+        // median is under 0.1 s -- 0.04-0.05 s on the four field-legcurl-1030
+        // captures and 0.07-0.08 s on the three leg-press ones; the leg curl
+        // reads lower, on four captures against three, but nothing like the
+        // 40x spread #92 was filed on, and nothing a "load stays on" rule
+        // could key on. So no declared "load stays on" property is added: a
+        // declaration with nothing measured for it to change would be
+        // consumed by a rule nobody can check. Whether a pause under the
+        // segmenter's resolution should be published at all is put to the
+        // owner, not decided here.
         val bottomPause = if (direction.startsAtTop) span.turnaroundPauseS else null
         val topPause = if (direction.startsAtTop) null else span.turnaroundPauseS
         return RepAnalysis(

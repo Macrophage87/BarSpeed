@@ -89,6 +89,7 @@
           "plannedReps": 5,
           "failed": true,
           "failedByLifter": true,
+          "analysisSchemaVersion": "1.26",
           "limiter": "grip",
           "rest_s": 180,
           "sensors": {
@@ -120,6 +121,7 @@
           "load_lb": 242.5,
           "reps": 6,
           "repsSource": "metronome",
+          "guideReps": 6,
           "repsManual": true,
           "plannedReps": 6,
           "rpe": 4,
@@ -235,6 +237,7 @@
           "load_lb": 99.2,
           "reps": 10,
           "repsSource": "metronome",
+          "guideReps": 10,
           "warmup": true,
           "rpe": 1,
           "rpeScale": "load",

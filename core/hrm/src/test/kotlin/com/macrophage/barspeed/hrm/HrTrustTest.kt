@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.hrm
 
 import com.macrophage.barspeed.model.HrSample
+import com.macrophage.barspeed.model.SensorContact
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -36,6 +37,53 @@ class HrTrustTest {
     @Test
     fun `a sample carrying no R-R interval is trusted on its bpm alone`() {
         assertTrue(HrTrust.isTrusted(sample(46)))
+    }
+
+    /**
+     * DIFFERENTIAL, #82. A sample with no R-R interval was trusted on its bpm
+     * alone because `all` over an empty list is true, and the strap's own
+     * contact report was the only other evidence the notification carried.
+     * Where the strap SAYS it has no skin contact and the R-R field is
+     * silent, nothing supports the bpm.
+     */
+    @Test
+    fun `no R-R and a reported loss of contact is not a measurement`() {
+        assertFalse(HrTrust.isTrusted(sample(72).copy(contact = SensorContact.NOT_DETECTED)))
+    }
+
+    /** The stream-level consequence: such a stream publishes no heart rate at all. */
+    @Test
+    fun `a stream reporting no contact and no R-R publishes no heart rate`() {
+        val offSkin = List(5) { sample(72, at = it * 1_000L).copy(contact = SensorContact.NOT_DETECTED) }
+        val summary = HrTrust.summarize(offSkin)
+        assertNull(summary.avgBpm)
+        assertNull(summary.maxBpm)
+        assertEquals(0, summary.trustedSamples)
+        assertEquals(5, summary.totalSamples)
+    }
+
+    /**
+     * Contact is consulted only where the R-R field is silent (#82), so a
+     * sample whose own reported intervals are possible is not overruled by
+     * the contact bit. That is the scope the change was written to, kept
+     * narrow because no capture held here has ever carried the bits.
+     */
+    @Test
+    fun `a sample with possible R-R intervals is trusted whatever the contact bit says`() {
+        assertTrue(HrTrust.isTrusted(sample(72, 830.0).copy(contact = SensorContact.NOT_DETECTED)))
+        assertTrue(HrTrust.isTrusted(sample(72, 830.0).copy(contact = SensorContact.DETECTED)))
+    }
+
+    /**
+     * A strap that says nothing about contact keeps the old behaviour, and so
+     * does every capture written before the column existed: silencing on
+     * missing evidence would withhold heart rate from a compliant strap on
+     * every set, which #82's own ruling refuses.
+     */
+    @Test
+    fun `no R-R and no contact report is still trusted on its bpm`() {
+        assertTrue(HrTrust.isTrusted(sample(72).copy(contact = SensorContact.NOT_RECORDED)))
+        assertTrue(HrTrust.isTrusted(sample(72).copy(contact = SensorContact.DETECTED)))
     }
 
     /**
@@ -97,6 +145,23 @@ class HrTrustTest {
         assertEquals(110, summary.avgBpm)
         assertEquals(2, summary.trustedSamples)
         assertEquals(3, summary.totalSamples)
+    }
+
+    /**
+     * The set's mean is TRUNCATED to a whole beat, never rounded (#296).
+     * 120 and 121 average to 120.5, and 120, 121 and 121 to 120.67; both
+     * store 120. Half-up rounding stores 121 for both; half-even passes the
+     * first and fails the second, which every round-to-nearest rule fails.
+     * The same pair of cases `SessionHeartRateTest` pins for the session
+     * figure, because the session truncates these values again.
+     */
+    @Test
+    fun `the set's mean is truncated, never rounded`() {
+        assertEquals(120, HrTrust.summarize(listOf(sample(120, 500.0), sample(121, 496.0))).avgBpm)
+        assertEquals(
+            120,
+            HrTrust.summarize(listOf(sample(120, 500.0), sample(121, 496.0), sample(121, 496.0))).avgBpm,
+        )
     }
 
     @Test

@@ -570,9 +570,11 @@ data class SetRecordEntity(
      * and the countdown and the next set's rest-HR window already read that
      * one value (#178). Stored so a measured rest can be computed from two
      * stored instants -- this and the next set's [startedAtMs] -- rather than
-     * assumed to be [endedAtMs]: the rule prefers a release that decided a
-     * hold's seconds, then the set's terminal cue, and falls back to the
-     * write instant only when neither exists.
+     * assumed to be [endedAtMs]: the rule, `RestStart.of`'s, prefers a
+     * release that decided a hold's seconds, then a terminal cue `SetEnd.of`
+     * admits (a cadence's `Done`, `Set ended`, `Time`), then on a set no
+     * cadence ran the lifter's last `+1 REP` tap, and falls back to the write
+     * instant only when none of those exists.
      *
      * NULL on every row written before v20. Nothing backfills it; the
      * migration re-derives nothing.
@@ -629,6 +631,37 @@ data class SetRecordEntity(
     val endedAtMs: Long,
     /** kotlinx-serialized [com.macrophage.barspeed.dsp.SetAnalysis]. */
     val analysisJson: String,
+    /**
+     * The session-export schema version current in the build that computed
+     * [analysisJson], or null when the row predates the column (v21, #38).
+     *
+     * WHY IT IS STORED. The blob is computed once, at record time, and no
+     * export re-runs the analyzer over the stored samples. Every figure an
+     * export copies out of the blob -- the rep list and each rep's figures,
+     * the tempo grade -- is therefore the RECORDING build's, while every
+     * export document stamps the `schemaVersion` of the build that EXPORTS
+     * it. Export 1.1 made an unmeasured `ecc_s` null instead of 0.0, and a
+     * set recorded under 1.0 still publishes its stored 0.0. (1.1 also moved
+     * `velocityLoss_pct` to best-to-last, but that figure is not copied out:
+     * the exporter re-derives it from the stored reps, since 1.10, #126, so the
+     * blob's `velocityLossPct` is read by no export.) This column is what
+     * lets the document say which contract each set's copied-out figures
+     * were computed under.
+     *
+     * WHAT IT IS AND IS NOT. It is the EXPORT contract's version constant,
+     * `SessionExport.SCHEMA_VERSION`, read at the write -- the only version
+     * label this app has for what its analysis means. Most bumps of that
+     * constant are additive keys and leave the analysis unchanged, so two
+     * sets carrying different values here may well have identical semantics;
+     * what one value guarantees is the build's contract, not a difference.
+     *
+     * NULL ON EVERY ROW WRITTEN BEFORE v21, and nothing backfills it. The
+     * analysis of such a set was computed by whatever build recorded it, and
+     * no stored fact names that build: guessing from `startedAtMs` against
+     * release dates would publish a version nobody recorded. Null is "before
+     * provenance", which is the truth.
+     */
+    val analysisSchemaVersion: String? = null,
     /**
      * kotlinx-serialized [com.macrophage.barspeed.model.ResolvedGeometry] — the
      * direction and sensor mounting this set was analysed against.

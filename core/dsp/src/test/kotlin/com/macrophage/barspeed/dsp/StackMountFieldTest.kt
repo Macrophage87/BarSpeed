@@ -424,4 +424,46 @@ class StackMountFieldTest {
         assertTrue(all.none { it.choice().fellBack }, "a signature verdict set the frame-count flag")
         all.forEach { assertFalse(it.analysis(it.choice().role!!).reps.isEmpty(), "${it.name} published no reps") }
     }
+
+    /**
+     * Every barbell stream in the committed corpus reads
+     * [StackMountSignal.NOT_ON_STACK], over its cue- and work-start-bounded
+     * window and over its whole capture. #279 refuses a mount-free fallback
+     * onto a unit that reads [StackMountSignal.ON_STACK], and the published
+     * text (`SetAnalyzer.analyze`'s KDoc, export 1.26's #279 entry and the
+     * schema's version log) says a barbell fallback is NOT refused on this
+     * corpus because of this measurement. Before this pin it rested on a
+     * scratch census; a barbell fixture added later that reads ON_STACK, or
+     * a change to the signature's bounds that turns one, now goes red here
+     * instead of leaving that text false.
+     *
+     * The count is pinned too, so the "53" the text publishes moves with the
+     * corpus: a new barbell fixture reds this until the number is restated.
+     * Barbell is by fixture name, the families the corpus files barbell work
+     * under; `field-seated-ohp-2rep` is a seated barbell press.
+     */
+    @Test
+    fun `every committed barbell stream reads as moved, on both windows`() {
+        val families = listOf("backsquat", "bench", "deadlift", "inclinepress", "ohp", "rdl", "seated-ohp")
+        val barbell = (FieldCorpus.onClasspath() + FieldCorpus.partnersOnClasspath())
+            .filter { name -> families.any { name.startsWith("field-$it-") } }
+        assertEquals(53, barbell.size, "the committed barbell corpus changed size; restate the published count")
+        barbell.forEach { name ->
+            val samples = load(name)
+            val base = name.removeSuffix("-imu-b")
+            val cues = if (javaClass.getResource("/$base-cues.csv") != null) cues(base) else emptyList()
+            val workAt = javaClass.getResource("/$base-prep.csv")?.let { work(base) }
+            val end = SetEnd.of(cues, cadenceGuided = true)
+            assertEquals(
+                StackMountSignal.NOT_ON_STACK,
+                StackRollSignature.of(samples, workAt, end),
+                "$name, work window",
+            )
+            assertEquals(
+                StackMountSignal.NOT_ON_STACK,
+                StackRollSignature.of(samples, null, SetEnd.NotCued),
+                "$name, whole capture",
+            )
+        }
+    }
 }

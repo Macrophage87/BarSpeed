@@ -45,6 +45,8 @@ import com.macrophage.barspeed.model.EffortCorrectionPolicy
 import com.macrophage.barspeed.model.HoldEndPolicy
 import com.macrophage.barspeed.model.HoldEndSource
 import com.macrophage.barspeed.model.LastSetRecordPolicy
+import com.macrophage.barspeed.model.RepQualityCardPolicy
+import com.macrophage.barspeed.model.RepQualityLayout
 import com.macrophage.barspeed.model.SetLimiter
 import com.macrophage.barspeed.model.SetLimiterGroup
 import com.macrophage.barspeed.model.SetLimiterPolicy
@@ -173,6 +175,7 @@ private fun LastSetCard(state: RecordState, feedback: SetFeedback) {
             ratedDescription = rated,
             rpe = state.lastSetRpe,
             failed = state.lastSetFailed,
+            tappedFailed = state.lastSetTappedFailed,
             limiter = state.lastSetLimiter,
             limiterNote = state.lastSetLimiterNote,
             timed = feedback.actualDurationS != null,
@@ -748,32 +751,37 @@ private fun RepQualityCard(feedback: SetFeedback) {
             frozenVerdicts = analysis.verdicts,
             velocityLossRegime = feedback.velocityLossRegime,
         )
-    // Timed sets have no reps; surface the hold verdicts instead of a chart.
-    if (feedback.actualDurationS != null) {
-        if (verdicts.isEmpty()) return
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(14.dp)) {
-                verdicts.forEach {
-                    Text("• $it", style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
-                }
-            }
-        }
-        return
-    }
-    if (analysis.reps.isEmpty()) return
     // The prescription this set's eccentric was GRADED against, read off the
     // analysis rather than resolved from the digits a second time, so the chart
     // cannot state a target the compliance chip beside it was not scored on.
     // Null means the set carried no prescription or its eccentric stroke was
     // explosive, and neither has a target line to draw -- #56.
     val targetEccS = analysis.tempoCompliance?.eccentricPrescribedS
+    // Which of the card's shapes to draw is RepQualityCardPolicy's, in
+    // :core:model where a test runs (#281). This only renders the answer.
+    val layout =
+        RepQualityCardPolicy.layout(
+            timed = feedback.actualDurationS != null,
+            hasReps = analysis.reps.isNotEmpty(),
+            hasVerdicts = verdicts.isNotEmpty(),
+            explosive = feedback.explosive,
+            gradedEccentric = targetEccS != null,
+        )
+    if (layout == RepQualityLayout.NONE) return
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp)) {
-            when {
-                feedback.explosive -> PeakVelocityChart(analysis, verdicts)
-                targetEccS != null -> EccTempoChart(analysis, targetEccS, verdicts)
+            when (layout) {
+                RepQualityLayout.NONE -> Unit
+                RepQualityLayout.VERDICTS ->
+                    verdicts.forEach {
+                        Text("• $it", style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+                    }
+                RepQualityLayout.PEAK_VELOCITY_CHART -> PeakVelocityChart(analysis, verdicts)
+                // The layout is ECC_TEMPO_CHART only where targetEccS is not null.
+                RepQualityLayout.ECC_TEMPO_CHART -> targetEccS?.let { EccTempoChart(analysis, it, verdicts) }
                 // Null stays true -- not decidable, same as before #250.
-                else -> ConVelocityChart(analysis, verdicts, feedback.velocityLossRegime?.readsVelocityLoss != false)
+                RepQualityLayout.CON_VELOCITY_CHART ->
+                    ConVelocityChart(analysis, verdicts, feedback.velocityLossRegime?.readsVelocityLoss != false)
             }
         }
     }

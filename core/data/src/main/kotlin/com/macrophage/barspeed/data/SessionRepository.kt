@@ -17,6 +17,7 @@ import com.macrophage.barspeed.model.RecordedTimeZone
 import com.macrophage.barspeed.model.ResolvedGeometry
 import com.macrophage.barspeed.model.SecondaryCapture
 import com.macrophage.barspeed.model.SensorCapturePolicy
+import com.macrophage.barspeed.model.SessionExport
 import com.macrophage.barspeed.model.SessionHeartRate
 import com.macrophage.barspeed.model.SessionRpe
 import com.macrophage.barspeed.model.SkippedSet
@@ -602,6 +603,11 @@ class SessionRepository(
                 SetAnalysis.serializer(),
                 set.analysis.copy(liveCountTrusted = set.liveCountTrusted),
             ),
+            // Which contract the blob above was computed under (#38): this
+            // build's, because this build computed it and no later export
+            // re-runs the analyzer. Read here, beside the blob, never by an
+            // exporter, whose constant describes the DOCUMENT it writes.
+            analysisSchemaVersion = SessionExport.SCHEMA_VERSION,
             // Written only when the caller states one. There is no default
             // to fall back on: an invented geometry reads exactly like a
             // measured one and would be believed.

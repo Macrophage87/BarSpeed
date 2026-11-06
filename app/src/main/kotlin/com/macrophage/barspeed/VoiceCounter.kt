@@ -10,6 +10,7 @@ import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.TtsSpan
 import com.macrophage.barspeed.model.SpokenRepCall
+import com.macrophage.barspeed.model.VoiceFocusChange
 import com.macrophage.barspeed.model.VoiceFocusPolicy
 import com.macrophage.barspeed.model.VoiceFocusState
 import com.macrophage.barspeed.model.VoiceFocusStep
@@ -47,17 +48,22 @@ class VoiceCounter(context: Context) {
     private var focusHeld = false
     private var utterances = 0L
 
-    // A loss means another app took focus outright: nothing is held any more,
-    // and the next word that wants focus asks for it again.
+    // What each platform change means for the request is
+    // VoiceFocusPolicy.heldAfter's (#340); this maps the integers and then
+    // moves to what is wanted, so a change that leaves the request standing
+    // while nothing wants it is abandoned rather than left holding the music
+    // down. Moving after every change also means a permanent loss mid-set
+    // is answered by asking again at once, where the listener before #340
+    // waited for the set's next word. Any other integer is not one this
+    // request can be sent, and is ignored.
     private val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
         .setAudioAttributes(attributes)
-        .setOnAudioFocusChangeListener { change ->
-            if (change == AudioManager.AUDIOFOCUS_LOSS) synchronized(lock) { focusHeld = false }
-        }
+        .setOnAudioFocusChangeListener { change -> focusChanged(change) }
         .build()
 
     private val progress = object : UtteranceProgressListener() {
-        override fun onStart(utteranceId: String?) = Unit
+        override fun onStart(utteranceId: String?) =
+            synchronized(lock) { move(VoiceFocusPolicy.started(focus, utteranceId)) }
 
         override fun onDone(utteranceId: String?) = finished(utteranceId)
 
@@ -90,6 +96,14 @@ class VoiceCounter(context: Context) {
     /** The set is over; focus goes once the word playing now has finished. */
     fun setEnded() = synchronized(lock) { move(VoiceFocusPolicy.setEnded(focus)) }
 
+    /**
+     * The audio cues were switched off; [cadenceSpeaks] is whether a cadence
+     * guide is running, which speaks regardless. See
+     * [VoiceFocusPolicy.cuesSwitchedOff].
+     */
+    fun cuesSwitchedOff(cadenceSpeaks: Boolean) =
+        synchronized(lock) { move(VoiceFocusPolicy.cuesSwitchedOff(focus, cadenceSpeaks)) }
+
     fun shutdown() {
         ready = false
         synchronized(lock) { move(VoiceFocusState()) }
@@ -97,6 +111,20 @@ class VoiceCounter(context: Context) {
     }
 
     private fun finished(id: String?) = synchronized(lock) { move(VoiceFocusPolicy.finished(focus, id)) }
+
+    private fun focusChanged(change: Int) {
+        val named = when (change) {
+            AudioManager.AUDIOFOCUS_GAIN -> VoiceFocusChange.GAIN
+            AudioManager.AUDIOFOCUS_LOSS -> VoiceFocusChange.LOSS
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> VoiceFocusChange.LOSS_TRANSIENT
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> VoiceFocusChange.LOSS_TRANSIENT_CAN_DUCK
+            else -> return
+        }
+        synchronized(lock) {
+            focusHeld = VoiceFocusPolicy.heldAfter(focusHeld, named)
+            move(focus)
+        }
+    }
 
     /** Caller holds [lock]. */
     private fun move(next: VoiceFocusState) {

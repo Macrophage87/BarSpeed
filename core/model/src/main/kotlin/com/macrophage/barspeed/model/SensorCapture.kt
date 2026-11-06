@@ -651,6 +651,45 @@ object SensorCapturePolicy {
     }
 
     /**
+     * Which roster the record screen's top bar draws its sensor dots from.
+     *
+     * [live] is what a set beginning right now would be armed with, recomputed
+     * from the paired list, the labels and the preferred address whenever any
+     * of them moves. [armedAtBegin] is the roster `beginSet` read, frozen with
+     * the set's state, or null where no set has begun. [inSet] is whether a
+     * set is recording.
+     *
+     * Between sets the live roster is the right one to draw: it is what the
+     * next set will be armed with, and the rest screen is where the lifter
+     * fixes it. During a set it is the wrong one (#171 item 3). The lifter can
+     * relabel or forget a unit mid-set, and the set already recording is
+     * STORED as the roster it was armed with -- `beginSet` freezes it for
+     * exactly that reason. The capture underneath is not frozen with it.
+     * Removing the second unit's label, or forgetting it, nulls the live
+     * roster's `secondaryAddress`, and `AutoConnectManager.setSecondaryImuAddress`
+     * then disconnects the second link with no in-set guard, so that unit's
+     * stream can stop mid-set. Swapping the two labels drops it too, though it
+     * ends with both addresses where they were: [SensorRole] is A or B only and
+     * the Devices screen writes one label per tap, so a swap passes through a
+     * collision or an unlabelled unit, whose roster has no `secondaryAddress`.
+     * Link B is disconnected at the first tap and re-pointed at the same
+     * address after the second, so B's stream has a gap rather than an end --
+     * read from source; whether the set's still-open collector picks up the
+     * reconnected link's samples has not been watched on a device. A set armed
+     * for one opens no second collector, so a unit labelled mid-set adds no
+     * stream. A bar drawn from the live roster would drop or rename the dot of
+     * a unit the set is still declared to capture; the frozen roster keeps
+     * that dot, and its link state then shows the stream going quiet.
+     *
+     * So in a set the frozen roster wins, and only there. A set with nothing
+     * frozen -- which no set reaching `inSetState` can be, and is answered
+     * anyway -- draws the live roster rather than a blank bar, since a blank
+     * bar would claim no sensor at all.
+     */
+    fun shownRoster(live: SensorRoster, armedAtBegin: SensorRoster?, inSet: Boolean): SensorRoster =
+        if (inSet && armedAtBegin != null) armedAtBegin else live
+
+    /**
      * What to store on a set the record flow has just finished arming, or null
      * when there is nothing to say.
      *

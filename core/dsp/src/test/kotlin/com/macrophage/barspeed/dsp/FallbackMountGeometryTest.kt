@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.dsp
 
 import com.macrophage.barspeed.model.ImuSample
+import com.macrophage.barspeed.model.StackMountSignal
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.Tempo
 import kotlin.math.PI
@@ -390,18 +391,19 @@ class FallbackMountGeometryTest {
     }
 
     /**
-     * AND A FALLBACK UNDER A MOUNT-FREE DECLARATION IS UNCHANGED: the gate
-     * does not fire and the analysis proceeds.
+     * AND A FALLBACK UNDER A MOUNT-FREE DECLARATION, WITH NOTHING SAID ABOUT
+     * THE PARTNER'S ROLL, IS UNCHANGED: the gate does not fire and the
+     * analysis proceeds.
      *
      * "THE DECLARATION NAMES NO MOUNT, SO EITHER UNIT'S STREAM IS DESCRIBED
      * BY IT" STOOD HERE AND IS DELETED. It does not follow.
      * [LiftDirection.mountSpecific] reads the ARMED unit's declaration and
      * nothing else, so false is a fact about that declaration and carries no
      * information about where a partner was clipped. What this pins is the
-     * gate's condition -- a mount-free declaration is not refused -- and the
-     * case it leaves open, a mount-free declaration over a partner that IS
-     * mount-specific, is named at [LiftDirection.mountSpecific] as an
-     * unfixed remainder.
+     * gate's condition with the signal left at its default -- a mount-free
+     * declaration is not refused on that alone. The case it used to leave
+     * open, a mount-free declaration over a partner whose roll says it rode
+     * a load, is #279 and is the differential below.
      */
     @Test
     fun `a fallback under a mount-free declaration is analysed as before`() {
@@ -416,6 +418,88 @@ class FallbackMountGeometryTest {
         assertTrue(
             SetAnalyzer.analyze(samples, freeWeight, analysedUnitFellBack = true).reps.isNotEmpty(),
             "the mount-free fallback published nothing",
+        )
+    }
+
+    /**
+     * #318, KEPT: the refusal does not narrow when the roll signature says the
+     * unit the analysis fell back to rode the stack. Pinned under all three
+     * signals so a narrowing that keys off any one of them reds here. See
+     * `SetAnalyzer.analyze`'s KDoc for why it is kept and what it costs.
+     */
+    @Test
+    fun `a fallback under a mount-specific declaration is refused whatever the roll says`() {
+        val stack = stream(handleTrack(), inverted = true)
+        StackMountSignal.entries.forEach { signal ->
+            val refused = SetAnalyzer.analyze(stack, declared, analysedUnitFellBack = true, analysedSignal = signal)
+            assertTrue(refused.reps.isEmpty(), "$signal: figures published under a mount the partner may not share")
+            assertEquals(
+                NoRepsReason.MOUNT_NOT_DECLARED,
+                refused.noRepsReason,
+                "$signal: the blank set does not say why",
+            )
+        }
+    }
+
+    /**
+     * A mount-free declaration over a unit whose roll says it MOVED, or that
+     * nothing measured, is analysed exactly as it was: the signature cannot
+     * place that unit on a stack, so there is no evidence the declaration
+     * fails to describe it. Over-refusal is the defect a refusal invites,
+     * and every barbell stream in the corpus reads moved
+     * (`StackMountFieldTest`, all 53 on both windows).
+     */
+    @Test
+    fun `a fallback under a mount-free declaration onto a unit not read as riding a load is analysed`() {
+        val samples = stream(handleTrack(), inverted = false)
+        listOf(StackMountSignal.NOT_ON_STACK, StackMountSignal.UNMEASURED).forEach { signal ->
+            assertEquals(
+                SetAnalyzer.analyze(samples, lifterSide),
+                SetAnalyzer.analyze(samples, lifterSide, analysedUnitFellBack = true, analysedSignal = signal),
+                "$signal: a mount-free fallback changed",
+            )
+        }
+        assertEquals(5, SetAnalyzer.analyze(samples, lifterSide, analysedUnitFellBack = true).reps.size)
+    }
+
+    // ---------------------------------------------------------------------
+    // #279: the mirrored case. Red until SetAnalyzer reads `analysedSignal`.
+    // ---------------------------------------------------------------------
+
+    /**
+     * A mount-free declaration -- the lifter's end of a pulldown -- over a
+     * fallback onto the unit on the STACK. Before the fix this was analysed
+     * under the lifter-side geometry and published the stack's 1 s return as
+     * the drive and its 2 s drive as the return: the swap the tests above
+     * measure in the other direction, at the same rep count.
+     *
+     * The synthetic stream's roll is flat by construction, so the signal is
+     * handed in rather than measured; `StackRollSignature` is pinned on real
+     * streams in `StackMountFieldTest`.
+     */
+    @Test
+    fun `a fallback under a mount-free declaration onto a unit that rode a load is refused`() {
+        val stack = stream(handleTrack(), inverted = true)
+        val refused = SetAnalyzer.analyze(
+            stack,
+            lifterSide,
+            targets = pulldownTargets,
+            analysedUnitFellBack = true,
+            analysedSignal = StackMountSignal.ON_STACK,
+        )
+
+        assertTrue(
+            refused.reps.isEmpty(),
+            "the stack partner was read under the lifter's geometry: con ${refused.reps.firstOrNull()?.conS} s, " +
+                "ecc ${refused.reps.firstOrNull()?.eccS} s",
+        )
+        assertEquals(NoRepsReason.MOUNT_NOT_DECLARED, refused.noRepsReason, "the blank set does not say why")
+        assertNull(refused.velocityLossPct, "velocity loss survived the refusal")
+        assertNull(refused.tempoCompliance, "the tempo was graded against a stroke nothing identified")
+        assertEquals(
+            SetAnalyzer.analyze(stack, lifterSide).sampleRateHz,
+            refused.sampleRateHz,
+            "the refusal must still publish the rate it measured",
         )
     }
 }

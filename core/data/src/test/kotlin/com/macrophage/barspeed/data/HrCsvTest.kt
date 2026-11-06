@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.data
 
 import com.macrophage.barspeed.model.HrSample
+import com.macrophage.barspeed.model.SensorContact
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -29,11 +30,44 @@ class HrCsvTest {
                 HrSample(timestampMs = 2L, bpm = 50, rrIntervalsMs = listOf(0.0)),
             )
         val text = HrCsv.encode(samples)
-        assertEquals("timestamp_ms,hr_bpm,rr_ms\n1,50,\n2,50,0.0\n", text)
+        assertEquals("timestamp_ms,hr_bpm,rr_ms,contact\n1,50,,\n2,50,0.0,\n", text)
 
         val decoded = HrCsv.decode(text)
         assertEquals(emptyList(), decoded[0].rrIntervalsMs, "an absent R-R field decoded as a value")
         assertEquals(listOf(0.0), decoded[1].rrIntervalsMs, "a reported zero decoded as absence")
+    }
+
+    /**
+     * DIFFERENTIAL, #82 (export 1.26). The strap's contact report is a fourth
+     * column, `1`, `0` or empty, and all three survive a round trip as
+     * themselves. Empty is NOT_RECORDED: the strap said nothing, which is a
+     * different statement from `0`, "no contact".
+     */
+    @Test
+    fun `the contact report survives a round trip as its own column`() {
+        val samples =
+            listOf(
+                HrSample(timestampMs = 1L, bpm = 72, contact = SensorContact.DETECTED),
+                HrSample(timestampMs = 2L, bpm = 72, contact = SensorContact.NOT_DETECTED),
+                HrSample(timestampMs = 3L, bpm = 72, rrIntervalsMs = listOf(830.0)),
+            )
+        val text = HrCsv.encode(samples)
+        assertEquals("timestamp_ms,hr_bpm,rr_ms,contact\n1,72,,1\n2,72,,0\n3,72,830.0,\n", text)
+        assertEquals(samples, HrCsv.decode(text))
+    }
+
+    /**
+     * Every HRM file written before #82 has three columns and no contact
+     * field, and must decode as NOT_RECORDED -- never as either live value,
+     * which would claim a contact report the strap never made. That covers
+     * every capture in the corpus, read below through the same codec.
+     */
+    @Test
+    fun `a three-column file decodes as contact not recorded`() {
+        val decoded = HrCsv.decode("timestamp_ms,hr_bpm,rr_ms\n1,50,\n2,72,830.0\n")
+        assertEquals(listOf(SensorContact.NOT_RECORDED, SensorContact.NOT_RECORDED), decoded.map { it.contact })
+        assertEquals(listOf(emptyList(), listOf(830.0)), decoded.map { it.rrIntervalsMs })
+        assertTrue(HrFixtures.unworn(1).all { it.contact == SensorContact.NOT_RECORDED })
     }
 
     @Test

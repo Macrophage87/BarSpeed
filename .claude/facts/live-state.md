@@ -225,6 +225,22 @@ core/data/build/test-results/test{Debug,Release}UnitTest/TEST-*.xml
 with nothing under `core/ble` — no test source set (§5). Copy them to `<scratch>/suite-<SHA>/`
 and hand lenses that path, not a build tree the next Gradle invocation can rewrite.
 
+**Copy them with the variant directory in the path, never flattened by filename.** `:app` and
+`:core:data` write the SAME `TEST-<class>.xml` name under both `testDebugUnitTest/` and
+`testReleaseUnitTest/`, so a copy that drops the directory (`cp */build/test-results/**/*.xml
+<dir>/`) lets the release run silently overwrite the debug run, class by class, and the tree
+then holds half of those two modules' executions while every file in it looks complete. It
+happened twice in #156's queue (25 classes in one round, reconciled by hand), recorded as #171
+item 9. The form that keeps both, run from the checkout root:
+
+```
+find . -path '*/build/test-results/*' -name 'TEST-*.xml' -not -path './.gradle/*' \
+  -exec cp --parents {} <scratch>/suite-<SHA>/ \;
+```
+
+`cp --parents` reproduces `app/build/test-results/testDebugUnitTest/…` under the target, so a
+count of files per variant directory is a check the copy can fail.
+
 **Mutation-test every pin you add.** A test that cannot fail is worse than no test, because it
 reads as coverage. Break the thing it guards, run the suite, report the numbers actually
 observed: *"reverting X reds exactly `SetAnalyzerTest.analysis is deterministic`, N−1/N measured
