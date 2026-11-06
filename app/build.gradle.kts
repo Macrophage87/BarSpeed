@@ -14,12 +14,12 @@ detekt {
 
 android {
     namespace = "com.macrophage.barspeed"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.macrophage.barspeed"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 61
         versionName = "0.2.0"
     }
