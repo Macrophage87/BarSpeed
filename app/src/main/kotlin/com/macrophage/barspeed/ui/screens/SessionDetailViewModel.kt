@@ -8,12 +8,15 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.macrophage.barspeed.AppLog
 import com.macrophage.barspeed.BuildConfig
+import com.macrophage.barspeed.CrashReporting
 import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.data.SetRecordEntity
 import com.macrophage.barspeed.data.guideCalls
 import com.macrophage.barspeed.data.repsSourceOf
 import com.macrophage.barspeed.model.ExerciseKind
+import com.macrophage.barspeed.model.ExportFailureCopy
 import com.macrophage.barspeed.model.ExportNaming
 import com.macrophage.barspeed.model.RepsCountChip
 import com.macrophage.barspeed.model.RepsSource
@@ -25,6 +28,7 @@ import com.macrophage.barspeed.model.VelocityLossRegime
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.model.sessionTimestamp
 import com.macrophage.barspeed.ui.ShareUtil
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -35,6 +39,8 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+private const val TAG = "SessionDetailViewModel"
 
 class SessionDetailViewModel(app: Application, private val sessionId: Long) : AndroidViewModel(app) {
     private val container = (app as LiftingApp).container
@@ -186,9 +192,9 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
      * [exporting], not on session being non-null, so a tap in the brief
      * window before that flow's first emission must not synthesise a name
      * from nothing. Null propagates the same way a missing session already
-     * does through [container]'s exportJson/buildZip -- the caller bails
-     * out via `?: return@launch`, exactly as it already does when the
-     * payload itself comes back null.
+     * does through [container]'s exportJson/buildZip -- the caller returns
+     * false to [export], which says the session was not found, exactly as it
+     * does when the payload itself comes back null.
      *
      * The JSON exports only. The raw zip is named by [rawZipName], which
      * drops the version (history-export F4); [ExportNaming] says why each
@@ -212,30 +218,54 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
     private suspend fun jsonName(includeDetail: Boolean) =
         exportName(if (includeDetail) "detailed.json" else "summary.json")
 
-    fun shareJson(includeDetail: Boolean) {
+    /**
+     * One export tap: [build] with [exporting] held for its length, and
+     * nothing it throws allowed to end the process. UX review 2026-11-06,
+     * history-export F6.
+     *
+     * The four export paths each had `try { ... } finally` and no catch, so a
+     * bad legacy row, a decode failure, running out of memory on a zip or the
+     * FileProvider refusing escaped `viewModelScope.launch` and crashed the
+     * app on the tap. Now any failure but cancellation is logged, written as
+     * a crash report that can be sent, and shown as
+     * [ExportFailureCopy.failed]. Throwable-wide on purpose: an
+     * OutOfMemoryError building a large zip is one of the named cases, and
+     * the buffer that failed to allocate is not held after the catch.
+     *
+     * [build] returns false when there was nothing to export because the
+     * session row is gone; that is said in words rather than in silence.
+     */
+    private fun export(build: suspend () -> Boolean) {
         viewModelScope.launch {
             _exporting.value = true
+            val app = getApplication<Application>()
             try {
-                val json = container.sessionExporter.exportJson(sessionId, includeDetail) ?: return@launch
-                val name = jsonName(includeDetail) ?: return@launch
-                ShareUtil.shareJson(getApplication(), name, json)
+                if (!build()) Toast.makeText(app, ExportFailureCopy.SESSION_MISSING, Toast.LENGTH_SHORT).show()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                AppLog.w(TAG, "export failed", e)
+                container.crashLogs.write(CrashReporting.recordOf(Thread.currentThread(), e))
+                val message = ExportFailureCopy.failed(e::class.simpleName, e.message)
+                Toast.makeText(app, message, Toast.LENGTH_LONG).show()
             } finally {
                 _exporting.value = false
             }
         }
     }
 
-    fun shareRawZip() {
-        viewModelScope.launch {
-            _exporting.value = true
-            try {
-                val zip = container.rawExporter.buildZip(sessionId) ?: return@launch
-                val name = rawZipName() ?: return@launch
-                ShareUtil.shareFile(getApplication(), name, zip, "application/zip")
-            } finally {
-                _exporting.value = false
-            }
-        }
+    fun shareJson(includeDetail: Boolean) = export {
+        val json = container.sessionExporter.exportJson(sessionId, includeDetail) ?: return@export false
+        val name = jsonName(includeDetail) ?: return@export false
+        ShareUtil.shareJson(getApplication(), name, json)
+        true
+    }
+
+    fun shareRawZip() = export {
+        val zip = container.rawExporter.buildZip(sessionId) ?: return@export false
+        val name = rawZipName() ?: return@export false
+        ShareUtil.shareFile(getApplication(), name, zip, "application/zip")
+        true
     }
 
     // --- Save-to-phone flow: build the bytes, then write to the SAF uri the user picks. ---
@@ -248,33 +278,21 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
      */
     private var pendingSave: Pair<SaveKind, ByteArray>? = null
 
-    fun prepareJsonSave(includeDetail: Boolean, onReady: (suggestedName: String) -> Unit) {
-        viewModelScope.launch {
-            _exporting.value = true
-            try {
-                val json = container.sessionExporter.exportJson(sessionId, includeDetail) ?: return@launch
-                val name = jsonName(includeDetail) ?: return@launch
-                val kind = if (includeDetail) SaveKind.DETAILED_JSON else SaveKind.SUMMARY_JSON
-                pendingSave = kind to json.toByteArray(Charsets.UTF_8)
-                onReady(name)
-            } finally {
-                _exporting.value = false
-            }
-        }
+    fun prepareJsonSave(includeDetail: Boolean, onReady: (suggestedName: String) -> Unit) = export {
+        val json = container.sessionExporter.exportJson(sessionId, includeDetail) ?: return@export false
+        val name = jsonName(includeDetail) ?: return@export false
+        val kind = if (includeDetail) SaveKind.DETAILED_JSON else SaveKind.SUMMARY_JSON
+        pendingSave = kind to json.toByteArray(Charsets.UTF_8)
+        onReady(name)
+        true
     }
 
-    fun prepareRawZipSave(onReady: (suggestedName: String) -> Unit) {
-        viewModelScope.launch {
-            _exporting.value = true
-            try {
-                val zip = container.rawExporter.buildZip(sessionId) ?: return@launch
-                val name = rawZipName() ?: return@launch
-                pendingSave = SaveKind.RAW_ZIP to zip
-                onReady(name)
-            } finally {
-                _exporting.value = false
-            }
-        }
+    fun prepareRawZipSave(onReady: (suggestedName: String) -> Unit) = export {
+        val zip = container.rawExporter.buildZip(sessionId) ?: return@export false
+        val name = rawZipName() ?: return@export false
+        pendingSave = SaveKind.RAW_ZIP to zip
+        onReady(name)
+        true
     }
 
     /**
@@ -295,10 +313,21 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
         if (uri == null || outcome == SaveOutcome.NOTHING) return
         viewModelScope.launch {
             val app = getApplication<Application>()
+            var failure: Throwable? = null
             val bytes =
                 when (outcome) {
                     SaveOutcome.WRITE_HELD -> held?.second
-                    SaveOutcome.REGENERATE -> exportBytes(kind)
+                    // A rebuild that throws is a failed save, not a crash (history-export F6).
+                    SaveOutcome.REGENERATE ->
+                        try {
+                            exportBytes(kind)
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Throwable) {
+                            AppLog.w(TAG, "rebuilding the export for the picker failed", e)
+                            failure = e
+                            null
+                        }
                     SaveOutcome.NOTHING, SaveOutcome.REFUSE -> null
                 }
             val ok =
@@ -327,6 +356,7 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
             val message =
                 when {
                     ok -> "Saved"
+                    failure != null -> ExportFailureCopy.failed(failure::class.simpleName, failure.message)
                     bytes == null -> SaveToPhonePolicy.REFUSED_MESSAGE
                     else -> "Save failed"
                 }
