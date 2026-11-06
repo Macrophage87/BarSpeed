@@ -330,14 +330,6 @@ class RescuedCardTest {
     }
 
     /**
-     * The record screen's own hold, alone. By the code, leaving that screen
-     * clears its ViewModel, whose onCleared releases the hold, so while Home
-     * is drawn this is the leak RecordingHold.SESSION's KDoc names (a task
-     * swipe; read from the code, not observed). Nothing will finish, so the
-     * note must not tell the lifter to wait; it names what does clear the
-     * holds, the process ending.
-     */
-    /**
      * Whole-branch review of 0.2.0, round 1, CAP-B1. A recovery putting an
      * interrupted set back holds RECOVERY_WRITE, which disables RESTORE; it
      * finishes on its own, so the note says to wait, not to force-stop.
@@ -350,6 +342,14 @@ class RescuedCardTest {
         )
     }
 
+    /**
+     * The record screen's own hold, alone. By the code, leaving that screen
+     * clears its ViewModel, whose onCleared releases the hold, so while Home
+     * is drawn this is the leak RecordingHold.SESSION's KDoc names (a task
+     * swipe; read from the code, not observed). Nothing will finish, so the
+     * note must not tell the lifter to wait; it names what does clear the
+     * holds, the process ending.
+     */
     @Test
     fun `a restorable rescue held only by the record screen's hold says how to clear it`() {
         assertEquals(

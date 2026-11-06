@@ -32,7 +32,8 @@ sealed interface RecoveryOutcome {
 
     /**
      * A recording write is outstanding; nothing was written and the capture
-     * stays. [held] is what was held when that was decided, for the note
+     * stays. [held] is what was held when that was decided, less the
+     * recovery's own hold (`JournalRecoveryPolicy.outstanding`), for the note
      * that names it (`JournalRecoveryPolicy.waitNote`).
      */
     data class Waiting(val held: Set<RecordingHold>) : RecoveryOutcome
@@ -72,8 +73,9 @@ internal sealed interface PreparedRecovery {
  * `SensorCapturePolicy.MIN_ANALYSABLE_FRAMES`. Span and stillness (#242,
  * #287) are not a second test here; they are inside `armedCaptureOf`'s choice
  * of that stream, as they are for a live set. ONE INPUT DIFFERS IN KIND, not
- * in path (whole-branch review of 0.2.0, round 1, DSP N4): a live set's cue
- * track ends with the terminal cue `SetEnd.of` bounds its rep list by, and an
+ * in path (whole-branch review of 0.2.0, round 1, DSP N4): a live guided
+ * set's cue track ends with the terminal cue `SetEnd.of` bounds its rep list
+ * by (a voice-off set's has none; round 2, CAP-R2-N2), and an
  * interrupted set's journaled track has none unless the guide had called
  * Done before the kill, so `SetEnd.of` reads it as not cued and a
  * sensor-counted recovered set's reps run to the last journaled sample,

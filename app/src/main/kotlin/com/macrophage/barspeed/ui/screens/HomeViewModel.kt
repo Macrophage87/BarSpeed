@@ -842,8 +842,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
 /**
  * What the lifter is told once [HomeViewModel.recoverInterrupted] has an
- * answer. [held] is the recording holds the answer was asked under, which is
- * what a wait is waiting for.
+ * answer. A wait names the holds it waits for, [RecoveryOutcome.Waiting.held]:
+ * the holds the recovery read when it placed the set, less its own.
  */
 private fun recoveryToast(outcome: RecoveryOutcome): String = when (outcome) {
     is RecoveryOutcome.Stored ->

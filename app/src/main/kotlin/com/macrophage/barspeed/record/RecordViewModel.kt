@@ -3103,6 +3103,14 @@ internal fun startedNextSetState(s: RecordState): RecordState? {
  * written onto [RecordState.resumeOffer] only while the screen is still on
  * SETUP: a lifter who has already chosen a session while the read ran has
  * answered the question by choosing.
+ *
+ * A visit entered while a recovery runs (`RecordingHold.RECOVERY_WRITE`) is
+ * offered nothing, and is not asked again when the recovery ends seconds
+ * later: its next set opens a session of its own rather than continuing the
+ * earlier one. That splits one workout across two rows and loses, doubles or
+ * misplaces nothing; it is the intended trade for never offering a session a
+ * recovery may be placing a set in (whole-branch review of 0.2.0, round 2,
+ * CAP-R2-N1).
  */
 private fun CoroutineScope.offerResume(
     repository: SessionRepository,
@@ -3205,8 +3213,9 @@ private fun closedState(s: RecordState): RecordState = s.copy(
  * The same bake, applied to the set already current, when START is tapped on
  * READY.
  *
- * READY is drawn once per session and it now carries the whole change-set
- * dialog (#152), because the owner's case is walking into a gym where every
+ * READY is drawn before the first set of a visit (a session's, or a continued
+ * session's, #48) and it now carries the whole change-set dialog (#152),
+ * because the owner's case is walking into a gym where every
  * squat rack is occupied: set one is exactly when rerouting matters. Three of
  * the four controls in that dialog wrote nothing that reached set one before
  * this function existed, and the failure was silent in the worst way -- the

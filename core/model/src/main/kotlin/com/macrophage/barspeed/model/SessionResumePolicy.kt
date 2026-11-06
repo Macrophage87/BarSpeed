@@ -55,8 +55,10 @@ object SessionResumePolicy {
      *
      * [latest] is the newest session row started within [LOOKBACK_MS] of
      * [nowMs], or null where there is none. [writeOutstanding] is whether a
-     * set write or a session close from an earlier visit is still running on
-     * the process-wide scope.
+     * set write or a session close from an earlier visit, or a recovery
+     * started on Home, is still running on the process-wide scope
+     * (`RecordingServicePolicy.writing`; whole-branch review of 0.2.0,
+     * round 2, UI-R2-N5).
      *
      * Asks only about a session that is open (no end time), holds at least one
      * set, and had its last set end no more than [RESUME_WINDOW_MS] before

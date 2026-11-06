@@ -87,7 +87,11 @@ enum class RecordingHold(val armsService: Boolean) {
      * has landed, so a process ended under it loses nothing, and the service
      * has no stream to protect from Home. The hold exists to keep the resume
      * offer, the other writers' positions and the restore off it, not to keep
-     * the process alive. Acquired and released by
+     * the process alive. It does not start the service, but while it is held
+     * [release] answers no STOP to the last of a SESSION or SET_WRITE that
+     * did, so a foreground notification can outlive Record by the recovery's
+     * seconds; that is benign (whole-branch review of 0.2.0, round 2,
+     * UI-R2-N5). Acquired and released by
      * `HomeViewModel.recoverInterrupted`, around the whole of
      * `JournalRecovery.recover`.
      */
