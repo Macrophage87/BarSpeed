@@ -209,6 +209,19 @@ class VoiceFocusPolicyTest {
         assertEquals(listOf(VoiceFocusStep.REQUEST, VoiceFocusStep.ABANDON), after)
     }
 
+    /**
+     * Switching the cues off mid-countdown silences the digits still to come
+     * (the countdown asks the toggle before each), so the span must not keep
+     * the music held down for the seconds that are now silent.
+     */
+    @Test
+    fun `switching the cues off ends a span`() {
+        val held = VoiceFocusPolicy.finished(say("3")(VoiceFocusPolicy.spanStarted(idle)), "3")
+        assertTrue(VoiceFocusPolicy.holds(held), "held between the countdown's words")
+        assertFalse(VoiceFocusPolicy.holds(VoiceFocusPolicy.cuesSwitchedOff(held, cadenceSpeaks = false)))
+        assertFalse(VoiceFocusPolicy.holds(VoiceFocusPolicy.cuesSwitchedOff(held, cadenceSpeaks = true)))
+    }
+
     /** A span outside a set never marks a set as spoken, so the next set starts clean. */
     @Test
     fun `a released span leaves the next set holding nothing until it speaks`() {

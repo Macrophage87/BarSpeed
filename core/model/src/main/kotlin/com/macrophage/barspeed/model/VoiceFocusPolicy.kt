@@ -152,9 +152,14 @@ object VoiceFocusPolicy {
      * spoken; a word playing at the toggle keeps focus until it finishes,
      * and a word spoken later -- the cues switched back on -- marks the set
      * again when it starts.
+     *
+     * A span ends either way (voice F9): the rest countdown asks the toggle
+     * before each word, so the words its span was holding focus for will not
+     * be said, and the music comes back once the word playing, if any,
+     * finishes.
      */
     fun cuesSwitchedOff(state: VoiceFocusState, cadenceSpeaks: Boolean): VoiceFocusState =
-        if (cadenceSpeaks) state else state.copy(spokenThisSet = false)
+        if (cadenceSpeaks) state.copy(span = false) else state.copy(spokenThisSet = false, span = false)
 
     /**
      * Whether the voice's request is still the platform's to answer for after
