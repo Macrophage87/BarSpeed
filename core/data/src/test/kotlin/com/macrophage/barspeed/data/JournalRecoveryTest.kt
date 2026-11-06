@@ -514,7 +514,6 @@ class JournalRecoveryTest {
         assertEquals(RecoveryRefusal.WORK_START_UNKNOWN, recovery(FakeSessionDao()).refusal(orphan))
     }
 
-    /** Counted whole by the listing scan and still not a stream: refused at the decode, not guessed around. */
     /**
      * A sensor-counted set whose analysis found no rep is refused, not
      * written as a 0-rep set (#100 review round 2, Lens A B2). The pulley
@@ -547,6 +546,7 @@ class JournalRecoveryTest {
         assertTrue(orphan.directory.exists(), "the capture went with nothing written")
     }
 
+    /** Counted whole by the listing scan and still not a stream: refused at the decode, not guessed around. */
     @Test
     fun `a stream that will not parse is refused`() = runTest {
         val broken = roleAText.replaceFirst("\n", "\nnot,a,sample\n")

@@ -494,9 +494,12 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      * is never reopened. The capture is removed only after the row is
      * written, so a failure here keeps it on the phone and on this card.
      *
-     * `RecordingHolds` non-empty is a write the record screen has not
-     * finished, or a set still being recorded: the recovery waits rather
-     * than racing it for a position in the same session.
+     * `RecordingHolds` non-empty is a set write or a session close still
+     * running, or the record screen's own SESSION hold, which under Home
+     * has leaked: every way out of Record pops it and its ViewModel
+     * releases the hold, so no set is recording anywhere. The recovery
+     * decides no position while either is held, and the toast says which
+     * (`JournalRecoveryPolicy.waitNote`).
      *
      * HOLDS [busyInterruptedFlow] for the whole call, the key SEND and
      * DISCARD already share (#304), so neither can reach a directory this is
