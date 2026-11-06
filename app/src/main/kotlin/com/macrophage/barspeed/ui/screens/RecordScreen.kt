@@ -1484,6 +1484,18 @@ private fun PrepAdjuster(state: RecordState, viewModel: RecordViewModel) {
             Text("+${PREP_STEP_S}s")
         }
     }
+    // The way back to the plan's prep (settings-onboarding F4). An adjustment
+    // is stored per exercise and beats every later plan's prep_s, so it is
+    // offered whenever one is stored -- including one that equals the plan's
+    // number today, written before a tap back stopped storing copies. The tap
+    // lands on the plan's value, which LeadInPolicy.overrideAfterTap clears.
+    if (state.prepOverrides.containsKey(state.prepExerciseId(slot))) {
+        // Kept a TextButton (#201): a quiet reset under the steppers it undoes; outlined, it would
+        // read as a third stepper.
+        TextButton(onClick = { viewModel.adjustPrep(plannedS - prepS) }) {
+            Text(if (slot != null) "Use plan prep (${plannedS}s)" else "Use default prep (${plannedS}s)")
+        }
+    }
 }
 
 /** How wide a digit's value sits, so four rows line their steppers up. */

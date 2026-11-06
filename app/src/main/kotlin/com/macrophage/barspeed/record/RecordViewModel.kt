@@ -1334,8 +1334,12 @@ private suspend fun recordPendingSet(
 private fun applyPrepAdjustment(s: RecordState, deltaS: Int, appScope: CoroutineScope, settings: SettingsStore) {
     val slot = s.upcomingSlot
     val exerciseId = s.prepExerciseId(slot)
-    val seconds = LeadInPolicy.clamp(s.prepSecondsFor(slot) + deltaS)
-    appScope.launch { settings.setPrepS(exerciseId, seconds) }
+    // A tap that lands on the plan's own prep CLEARS the override rather than
+    // storing a copy of the plan's number, which would beat every later plan's
+    // prep_s for this exercise (settings-onboarding F4). "Use plan prep" is
+    // this tap with the delta that lands there.
+    val seconds = LeadInPolicy.overrideAfterTap(slot?.prepS, s.prepSecondsFor(slot), deltaS)
+    appScope.launch { if (seconds == null) settings.clearPrepS(exerciseId) else settings.setPrepS(exerciseId, seconds) }
 }
 
 /**

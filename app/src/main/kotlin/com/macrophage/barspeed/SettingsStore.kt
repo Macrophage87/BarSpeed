@@ -101,6 +101,15 @@ class SettingsStore(private val context: Context) {
     }
 
     /**
+     * Drop [exerciseId]'s prep adjustment, so the plan's `prep_s` (or the
+     * default) plays again (settings-onboarding F4). Before this nothing
+     * removed the key: tapping back to the plan's number stored a copy of it.
+     */
+    suspend fun clearPrepS(exerciseId: String) {
+        context.settingsDataStore.edit { it.remove(intPreferencesKey("$PREP_KEY_PREFIX$exerciseId")) }
+    }
+
+    /**
      * Which accelerometer is which, by device address, issue #156.
      *
      * Here rather than in `DeviceRegistry` for two concrete reasons, both
