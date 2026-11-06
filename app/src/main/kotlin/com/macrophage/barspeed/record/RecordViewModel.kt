@@ -59,6 +59,7 @@ import com.macrophage.barspeed.model.HoldEndSource
 import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.Implement
 import com.macrophage.barspeed.model.ImuSample
+import com.macrophage.barspeed.model.JournalSetFacts
 import com.macrophage.barspeed.model.LatestSession
 import com.macrophage.barspeed.model.LeadInPolicy
 import com.macrophage.barspeed.model.LiveCountReadout
@@ -1626,6 +1627,71 @@ private fun CoroutineScope.mirrorLinkStates(autoConnect: AutoConnectManager, sta
 }
 
 /**
+ * The instant a cued set's work began, read off the clock now, journaled as
+ * well as returned (#100): a capture recovered after a kill is analysed from
+ * this instant, the way `endSet`'s write is, and without it on the disk a
+ * recovered prepped set is refused rather than counted from its countdown.
+ * [PrepWindowPolicy.of] decides whether the pair is a window at all, the same
+ * question `endSet` asks it; a pair it refuses journals nothing.
+ *
+ * Only the cadence runner's lead-in calls this. A hold's or carry's prep
+ * (TIMED) is not journaled: `JournalRecoveryPolicy` refuses every timed set,
+ * whose clock a kill leaves running, so the instant would be read by nothing.
+ *
+ * A free function for [sessionOpeningOf]'s reason, and so the call site stays
+ * one line in a class detekt's `LargeClass` already counts at its limit.
+ */
+private fun journaledWorkStart(
+    journal: SetJournal?,
+    prepCase: PrepCase,
+    setStartedAtMs: Long,
+    atMs: Long = System.currentTimeMillis(),
+): Long {
+    PrepWindowPolicy.of(prepCase, setStartedAtMs, atMs)?.let { journal?.appendPrepWindow(it) }
+    return atMs
+}
+
+/**
+ * The facts a recovered capture is written back under (#100), read at the
+ * set's start from the same inputs `endSet` reads at its end.
+ *
+ * The geometry, the stack rule and the load are the declaration [analysedAs]
+ * and [SetLoadPolicy.recordedLoad] are handed there; the analysed-unit choice
+ * is not made here, because it reads the stream, and the recovery makes it
+ * again from the stream it finds on disk. A load changed after START is the
+ * one way the two can differ, and the recovered row then carries the load the
+ * set began at -- the only one a kill leaves on the disk.
+ */
+private fun journalFactsOf(
+    s: RecordState,
+    exercise: ExerciseDef,
+    prepCase: PrepCase,
+    armedSensors: RecordedSensors?,
+): JournalSetFacts {
+    val slot = s.currentSlot
+    val load =
+        SetLoadPolicy.recordedLoad(
+            adHoc = s.adHoc,
+            plannedAddedKg = slot?.loadKg,
+            typedAddedKg = s.weightUnit.parseToKg(s.loadInput),
+            statedAddedKg = s.statedLoadKg,
+            bodyweight = exercise.bodyweight,
+            bodyWeightKg = s.bodyWeightKg,
+            declaredPlannedAddedKg = slot?.plannedLoadKg,
+        )
+    return JournalSetFacts(
+        exercise = exercise,
+        geometry = slot?.geometry ?: SetGeometryPolicy.describe(exercise, null),
+        stackRuleApplied = slot?.stackRuleApplied == true,
+        loadKg = load.loadKg,
+        bodyWeightKg = s.bodyWeightKg?.takeIf { exercise.bodyweight },
+        timed = s.currentIsTimed,
+        prepCase = prepCase,
+        armedSensors = armedSensors,
+    )
+}
+
+/**
  * Open the durable capture for a set that is about to begin.
  *
  * A free function taking what it needs, for the reason [sessionOpeningOf] gives.
@@ -1653,6 +1719,7 @@ private fun openJournal(
     sessionStartedAtMs: Long,
     startedAtMs: Long,
     roster: SensorRoster,
+    prepCase: PrepCase,
 ): SetJournal? = store.open(
     SetJournalHeader(
         exerciseId = exercise.id,
@@ -1677,6 +1744,11 @@ private fun openJournal(
         // recording a second stream a set was not armed to open `imu-b.csv`
         // for, and the interrupted-set card from reporting it missing.
         secondaryImuConnected = roster.secondary != null && s.imuConnectedB,
+        // What #100's recovery needs to write the set back the way endSet
+        // would have: the declaration the analysis runs under, the load, the
+        // prep case and the armed roster -- frozen at the start like the rest
+        // of this header, because a kill leaves no end to read them at.
+        facts = journalFactsOf(s, exercise, prepCase, SensorCapturePolicy.recorded(roster)),
     ),
 )
 
@@ -4836,7 +4908,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // with nowhere durable to go. A null here is the disk refusing, which
         // is the state this whole mechanism replaces -- it must not also stop
         // the set being recorded in memory as it always was.
-        journal = openJournal(container.setJournals, s, exercise, sessionStartedAtMs, setStartedAtMs, roster)
+        journal = openJournal(container.setJournals, s, exercise, sessionStartedAtMs, setStartedAtMs, roster, prepCase)
         // Every set, not just the first. The catch in
         // RecordingService.onStartCommand ends every refusal
         // ForegroundStartPolicy.classify recognises in stopSelf(startId), so a
@@ -5132,7 +5204,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // nothing about it, and the cue track cannot answer it either, because
         // LeadInPlan fixes the launch phrase a prescribed distance from the
         // first stroke call whatever the prep was (#185).
-        val onWorkStarted = { workStartedAtMs = System.currentTimeMillis() }
+        val onWorkStarted = { workStartedAtMs = journaledWorkStart(journal, prepCaseForSet, setStartedAtMs) }
         guidedCadence = newVoiceRunner().also { it.start(schedule, plannedReps, prepS, onWorkStarted) }
     }
 

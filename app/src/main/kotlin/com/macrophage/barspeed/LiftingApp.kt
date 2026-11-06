@@ -7,6 +7,7 @@ import com.macrophage.barspeed.ble.DeviceRegistry
 import com.macrophage.barspeed.data.AppDatabase
 import com.macrophage.barspeed.data.DATABASE_NAME
 import com.macrophage.barspeed.data.DatabaseRescue
+import com.macrophage.barspeed.data.JournalRecovery
 import com.macrophage.barspeed.data.PlanRepository
 import com.macrophage.barspeed.data.RawExporter
 import com.macrophage.barspeed.data.RescuedDatabaseStore
@@ -86,6 +87,13 @@ class AppContainer(app: Application) {
      */
     val setJournals =
         SetJournalStore(File(app.filesDir, "inflight"), CoroutineScope(SupervisorJob() + Dispatchers.IO))
+
+    /**
+     * Writes an interrupted set's capture back into History (#100), at the
+     * lifter's word from Home's card. The decision where it goes is
+     * `JournalRecoveryPolicy`'s; this holds the two stores it reads and writes.
+     */
+    val journalRecovery = JournalRecovery(sessionRepository, setJournals)
 
     /**
      * Where [DatabaseRescue.rescue] leaves a database it moved aside, read

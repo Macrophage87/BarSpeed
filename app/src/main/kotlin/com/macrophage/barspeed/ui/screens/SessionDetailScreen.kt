@@ -514,6 +514,10 @@ private fun SetChips(
         // carries no plannedReps, so without the chip it reads on this screen
         // as a prescribed set whose prescription went missing (#177).
         if (record.added) VerdictChip("ADDED", ChipTone.NEUTRAL)
+        // The same kind of answer (#100): written back from an interrupted
+        // set's capture, not by the set ending, so its missing targets and
+        // effort tap read as never saved rather than as lost.
+        if (record.recovered) VerdictChip("RECOVERED", ChipTone.NEUTRAL)
         // Whose count the header's figure is, named from repsSource and not
         // from repsManual, which is also true on a guided set: the old chip
         // read MANUAL COUNT on every set the metronome counted (#325).

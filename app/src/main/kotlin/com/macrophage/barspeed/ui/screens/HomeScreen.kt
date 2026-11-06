@@ -49,7 +49,9 @@ import com.macrophage.barspeed.data.RescuedDatabase
 import com.macrophage.barspeed.model.ArmedDelivery
 import com.macrophage.barspeed.model.ByteSize
 import com.macrophage.barspeed.model.ConnectionState
+import com.macrophage.barspeed.model.JournalRecoveryPolicy
 import com.macrophage.barspeed.model.RecordingHold
+import com.macrophage.barspeed.model.RecoveryRefusal
 import com.macrophage.barspeed.model.RestoreVerdict
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.ui.BarColors
@@ -81,6 +83,7 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
     val restoreVerdicts by viewModel.restoreVerdicts.collectAsState()
     val recordingHolds by viewModel.recordingHolds.collectAsState()
     val busyInterrupted by viewModel.busyInterrupted.collectAsState()
+    val recoveryRefusals by viewModel.recoveryRefusals.collectAsState()
     val busyCrashReports by viewModel.busyCrashReports.collectAsState()
     val crashReports by viewModel.crashReports.collectAsState()
     // Re-scanned every time this screen is composed, not only on first launch:
@@ -147,8 +150,10 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
             InterruptedSetNotice(
                 interrupted,
                 busyInterrupted,
+                recoveryRefusals,
                 viewModel::shareInterrupted,
                 viewModel::discardInterrupted,
+                viewModel::recoverInterrupted,
             )
             // Below both: a crash report is a diagnostic about the app, where
             // the two cards above it are the lifter's own data.
@@ -355,15 +360,24 @@ private fun volumeUnit(unit: WeightUnit): String = when (unit) {
  * as a measurement, when what it means is that there was nothing to measure --
  * and [InterruptedSetSummary] in `:core:data` is where that ruling lives, so
  * it is pinned on every push rather than only drawn.
+ *
+ * A THIRD ACTION, PUT IT BACK (#100), writes the capture into History marked
+ * recovered, behind a confirmation that says what is written and what is not
+ * -- unlike DISCARD, it adds a set to the lifter's record, and the words are
+ * `JournalRecoveryPolicy`'s so they are pinned rather than only drawn. Where
+ * [refusals] says it cannot be put back, the card says why in its place.
  */
 @Composable
 private fun InterruptedSetNotice(
     interrupted: List<OrphanedSet>,
     busy: Set<File>,
+    refusals: Map<File, RecoveryRefusal?>,
     onShare: (OrphanedSet) -> Unit,
     onDiscard: (OrphanedSet) -> Unit,
+    onRecover: (OrphanedSet) -> Unit,
 ) {
     if (interrupted.isEmpty()) return
+    var confirmRecover by remember { mutableStateOf<OrphanedSet?>(null) }
     Column(modifier = Modifier.fillMaxWidth()) {
         for (orphan in interrupted) {
             // #304: the same busy key RescuedDatabaseNotice already disables
@@ -389,6 +403,14 @@ private fun InterruptedSetNotice(
                     )
                     Spacer(Modifier.height(6.dp))
                     SectionCaption("Kept on this phone. Nothing deletes it but you")
+                    refusals[orphan.directory]?.let { refusal ->
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            JournalRecoveryPolicy.refusalNote(refusal),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = BarColors.Sub,
+                        )
+                    }
                     Spacer(Modifier.height(6.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(
@@ -404,9 +426,36 @@ private fun InterruptedSetNotice(
                             Text("DISCARD", color = BarColors.Red)
                         }
                     }
+                    if (refusals[orphan.directory] == null) {
+                        OutlinedButton(
+                            onClick = { confirmRecover = orphan },
+                            enabled = !isBusy,
+                            contentPadding = ButtonDefaults.TextButtonContentPadding,
+                        ) {
+                            Text(JournalRecoveryPolicy.ACTION_LABEL, color = BarColors.Volt)
+                        }
+                    }
                 }
             }
         }
+    }
+    confirmRecover?.let { orphan ->
+        AlertDialog(
+            onDismissRequest = { confirmRecover = null },
+            title = { Text(JournalRecoveryPolicy.CONFIRM_TITLE) },
+            text = { Text(JournalRecoveryPolicy.confirmBody(orphan.header.exerciseName)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onRecover(orphan)
+                        confirmRecover = null
+                    },
+                ) { Text(JournalRecoveryPolicy.CONFIRM_LABEL, color = BarColors.Volt) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmRecover = null }) { Text("Cancel") }
+            },
+        )
     }
 }
 

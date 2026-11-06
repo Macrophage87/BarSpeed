@@ -9,10 +9,13 @@ import com.macrophage.barspeed.AppLog
 import com.macrophage.barspeed.CrashReport
 import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.data.OrphanedSet
+import com.macrophage.barspeed.data.RecoveryOutcome
 import com.macrophage.barspeed.data.RescuedDatabase
 import com.macrophage.barspeed.data.SessionEntity
+import com.macrophage.barspeed.model.JournalRecoveryPolicy
 import com.macrophage.barspeed.model.RecordingHold
 import com.macrophage.barspeed.model.RecordingServicePolicy
+import com.macrophage.barspeed.model.RecoveryRefusal
 import com.macrophage.barspeed.model.RestoreVerdict
 import com.macrophage.barspeed.model.SessionHeartRate
 import com.macrophage.barspeed.model.VoidSetPolicy
@@ -217,6 +220,17 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     val busyInterrupted: StateFlow<Set<File>> = busyInterruptedFlow
 
     /**
+     * Why each interrupted capture cannot be put back into History (#100),
+     * keyed by its directory: null where it can. Read off the disk with the
+     * listing, so the card shows the note instead of an action that would
+     * only refuse. A capture missing from the map was not judged -- the scan
+     * failed -- and its action stays live, because [recoverInterrupted]
+     * judges it again before anything is written.
+     */
+    private val recoveryRefusalsFlow = MutableStateFlow<Map<File, RecoveryRefusal?>>(emptyMap())
+    val recoveryRefusals: StateFlow<Map<File, RecoveryRefusal?>> = recoveryRefusalsFlow
+
+    /**
      * [shareCrashReport]'s busy key, the same shape [busyRescuesFlow] gives
      * [shareRescued] (#304). Keyed on [CrashReport.file].
      */
@@ -263,12 +277,25 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun refreshInterrupted() {
         viewModelScope.launch {
-            interruptedFlow.value =
+            val (list, refusals) =
                 withContext(Dispatchers.IO) {
-                    runCatching { container.setJournals.orphans() }
-                        .onFailure { AppLog.w(TAG, "interrupted-set scan failed; listing none", it) }
-                        .getOrDefault(emptyList())
+                    val list =
+                        runCatching { container.setJournals.orphans() }
+                            .onFailure { AppLog.w(TAG, "interrupted-set scan failed; listing none", it) }
+                            .getOrDefault(emptyList())
+                    // Per capture, and under the same Throwable-wide catch for
+                    // the same reason: one capture the judgement cannot read
+                    // costs its note, never the card or the app.
+                    val refusals =
+                        list.mapNotNull { orphan ->
+                            runCatching { orphan.directory to container.journalRecovery.refusal(orphan) }
+                                .onFailure { AppLog.w(TAG, "recovery check failed; leaving it to the tap", it) }
+                                .getOrNull()
+                        }.toMap()
+                    list to refusals
                 }
+            recoveryRefusalsFlow.value = refusals
+            interruptedFlow.value = list
         }
     }
 
@@ -455,6 +482,49 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 busyInterruptedFlow.update { it - orphan.directory }
             }
         }
+    }
+
+    /**
+     * Put an interrupted capture back into History (#100). The lifter has
+     * confirmed, in the card's own dialog.
+     *
+     * Where it goes is `JournalRecoveryPolicy`'s decision, made inside
+     * `JournalRecovery.recover`: its own session when that session is still
+     * open and current, otherwise a new session of its own; a closed session
+     * is never reopened. The capture is removed only after the row is
+     * written, so a failure here keeps it on the phone and on this card.
+     *
+     * `RecordingHolds` non-empty is a write the record screen has not
+     * finished, or a set still being recorded: the recovery waits rather
+     * than racing it for a position in the same session.
+     *
+     * HOLDS [busyInterruptedFlow] for the whole call, the key SEND and
+     * DISCARD already share (#304), so neither can reach a directory this is
+     * reading or about to remove.
+     */
+    fun recoverInterrupted(orphan: OrphanedSet) {
+        if (orphan.directory in busyInterruptedFlow.value) return
+        viewModelScope.launch {
+            busyInterruptedFlow.update { it + orphan.directory }
+            try {
+                val writeOutstanding = container.recordingHolds.held.value.isNotEmpty()
+                val outcome =
+                    withContext(Dispatchers.IO) { container.journalRecovery.recover(orphan, writeOutstanding) }
+                toast(recoveryToast(outcome))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLog.w(TAG, "recovering an interrupted set failed; the capture is kept", e)
+                toast("Couldn't put it back -- the capture is kept")
+            } finally {
+                busyInterruptedFlow.update { it - orphan.directory }
+                refreshInterrupted()
+            }
+        }
+    }
+
+    private fun toast(text: String) {
+        Toast.makeText(getApplication(), text, Toast.LENGTH_SHORT).show()
     }
 
     /**
@@ -743,6 +813,15 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 }
 
 /** Names the file after the set it holds, so two captures cannot collide. */
+/** What the lifter is told once [HomeViewModel.recoverInterrupted] has an answer. */
+private fun recoveryToast(outcome: RecoveryOutcome): String = when (outcome) {
+    is RecoveryOutcome.Stored ->
+        if (outcome.newSession) "Saved to History as a session of its own" else "Saved to History in its session"
+    RecoveryOutcome.AlreadyStored -> "Already in History -- the capture was removed"
+    RecoveryOutcome.Waiting -> "A set is still being saved -- try again in a moment"
+    is RecoveryOutcome.Refused -> JournalRecoveryPolicy.refusalNote(outcome.refusal)
+}
+
 private fun interruptedName(orphan: OrphanedSet): String =
     "interrupted-${orphan.header.exerciseId}-${orphan.header.startedAtMs}.zip"
 
