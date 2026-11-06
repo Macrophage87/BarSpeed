@@ -2638,11 +2638,16 @@ private fun RecordState.endingCall(clockEnded: Boolean, prepCase: PrepCase, spok
  * The voice after the audio-cue toggle moved to [enabled] (#340).
  *
  * Switched on, a voice is made if there is none, which is what the collector
- * did alone before. Switched off, the voice that exists is told so, so a set
- * whose voice has just gone quiet stops holding the lifter's music down for
- * the rest of it; [guided] says whether a cadence is running, which speaks
- * whatever the toggle says, and `VoiceFocusPolicy.cuesSwitchedOff` decides
- * what that changes. Free function and one call site line for the reason the
+ * did alone before. A voice made while a set is IN_SET is told the set has
+ * started, as `beginSet` tells the voice it finds: the voice toggle is
+ * reachable mid-set now (UX review 2026-11-06, voice-audio F2), and a voice
+ * that never heard `setStarted` would take audio focus per word and pump the
+ * music for the rest of the set instead of holding it once. Switched off, the
+ * voice that exists is told so, so a set whose voice has just gone quiet stops
+ * holding the lifter's music down for the rest of it; [s]'s `guidedSet` says
+ * whether a cadence is running, which speaks whatever the toggle says, and
+ * `VoiceFocusPolicy.cuesSwitchedOff` decides what that changes. Free function
+ * and one call site line for the reason the
  * file's other free functions give: detekt's `LargeClass` counts
  * [RecordViewModel] against a default of 600 and this paid for its line.
  *
@@ -2651,11 +2656,11 @@ private fun RecordState.endingCall(clockEnded: Boolean, prepCase: PrepCase, spok
 private fun cuesToggled(
     enabled: Boolean,
     voice: VoiceCounter?,
-    guided: Boolean,
+    s: RecordState,
     make: () -> VoiceCounter,
 ): VoiceCounter? = when {
-    enabled -> voice ?: make()
-    else -> voice?.also { it.cuesSwitchedOff(cadenceSpeaks = guided) }
+    enabled -> voice ?: make().also { if (s.stage == Stage.IN_SET) it.setStarted() }
+    else -> voice?.also { it.cuesSwitchedOff(cadenceSpeaks = s.guidedSet) }
 }
 
 /**
@@ -4871,7 +4876,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             container.settings.audioCues.collect { enabled ->
                 stateFlow.value = stateFlow.value.copy(audioCues = enabled)
                 // One line, not two: see [cuesToggled].
-                voice = cuesToggled(enabled, voice, stateFlow.value.guidedSet) { VoiceCounter(getApplication()) }
+                voice = cuesToggled(enabled, voice, stateFlow.value) { VoiceCounter(getApplication()) }
             }
         }
     }
