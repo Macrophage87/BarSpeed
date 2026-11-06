@@ -58,11 +58,15 @@ class SetLimiterCompletedAskTest {
      * The rest screen scrolls to 0 on entering RESTING and starting the next
      * set clears the answer, so a question drawn low is not merely unasked --
      * it becomes unaskable.
+     *
+     * Since UX review 2026-11-06 (rest F4) a set rated 7 to 9 is asked with a
+     * one-line row in that same place rather than the whole page; see
+     * SetLimiterCollapsedRowTest. It is still asked, and still at the top.
      */
     @Test
     fun `the question on a completed set is drawn at the top of the rest screen`() {
         assertEquals(
-            SetLimiterPagePlacement.PROMPT,
+            SetLimiterPagePlacement.COLLAPSED,
             SetLimiterPolicy.placement(
                 failed = false,
                 rpe = 8,
