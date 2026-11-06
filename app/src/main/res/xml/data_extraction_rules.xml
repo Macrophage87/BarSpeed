@@ -29,12 +29,12 @@
         (sensor addresses for this phone's sensors) and cache.
 
         What is backed up: the settings DataStore (weight unit, voice cues,
-        body weight, per-exercise lead-in, sensor role by address) and any
-        shared preferences.
+        body weight, per-exercise lead-in, sensor role by address), and
+        nothing else. The app keeps no SharedPreferences, so none are listed;
+        a library's would be left out, which is the safe direction.
     -->
     <cloud-backup>
         <include domain="file" path="datastore/settings.preferences_pb" />
-        <include domain="sharedpref" path="." />
     </cloud-backup>
 
     <!--

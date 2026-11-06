@@ -14,5 +14,4 @@
 -->
 <full-backup-content>
     <include domain="file" path="datastore/settings.preferences_pb" />
-    <include domain="sharedpref" path="." />
 </full-backup-content>
