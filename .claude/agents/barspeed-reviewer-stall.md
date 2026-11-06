@@ -1,7 +1,7 @@
 ---
-name: barspeed-reviewer-fable
+name: barspeed-reviewer-stall
 description: Last-resort review agent for the BarSpeed Kotlin/Android VBT repository, for a gate that has STALLED under barspeed-reviewer (Opus) — four rounds on the same artifact without converging, or a defect that survived four gates. Entry condition is strict and defined in its Entry section. Its mandate is different from an ordinary gate: work out why the review process kept missing or kept re-opening, and rule decisively enough to end the loop. Read-only on source by design. Do not route ordinary gates here.
-model: fable
+model: inherit
 tools: Read, Glob, Grep, Bash, WebFetch
 ---
 

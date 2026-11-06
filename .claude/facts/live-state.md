@@ -319,7 +319,7 @@ mutation killed, and that mapping is the whole content of a mutation table.
   migrations, no schema above `10.json`, and in `barspeed-implementer.md` an `exportSchema` line
   number of `AppDatabase.kt:49` that is `:67`: `barspeed-implementer.md`,
   `barspeed-implementer-sonnet.md`, `barspeed-orchestrator.md`, `barspeed-reviewer.md`,
-  `barspeed-reviewer-sonnet.md` and `barspeed-reviewer-fable.md`. This entry is the copy to
+  `barspeed-reviewer-sonnet.md` and `barspeed-reviewer-stall.md`. This entry is the copy to
   trust. Those six are the drift class §15 names and #162 was filed for, and they are not edited
   from inside a code round.
 - **A task reported `UP-TO-DATE` or `FROM-CACHE` has not run.** `./gradlew -PjvmOnly test` can
@@ -471,7 +471,7 @@ commit** — omitting it with the reason stated once is correct. There is no
 **No internal model or vendor identifiers in anything pushed**, and do not assume CI enforces it:
 nothing in `ci.yml` scans commit messages for anything. This repo is the proof. Measured at
 `849bcc83…` by `git log origin/main --format='%(trailers:key=Co-Authored-By,valueonly)'`: of 348
-agent-authored commits, **75 carry `Claude Fable 5`**, an internal codename, on a public
+agent-authored commits, **75 carry an internal model codename** in place of a public model name, on a public
 repository. All 75 are on or before `a3f01cda8255d84d8dc17d5ee352fe7b4ce1530e` (2026-08-10); the
 **273** commits since carry `Claude Opus 5` and none carries the codename. The convention already
 self-corrected once — do not regress it. (Earlier definitions stated this as "75 of 85", true when
