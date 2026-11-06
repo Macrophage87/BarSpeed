@@ -85,6 +85,7 @@ import com.macrophage.barspeed.model.EffortAsk
 import com.macrophage.barspeed.model.EffortClaim
 import com.macrophage.barspeed.model.EffortGridSlipGuard
 import com.macrophage.barspeed.model.EffortScale
+import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.ExitAction
 import com.macrophage.barspeed.model.ExitPrompt
@@ -2232,8 +2233,9 @@ private fun SkipSetSection(state: RecordState, viewModel: RecordViewModel) {
  * when there are some. An ad-hoc session has no plan to leave and draws
  * nothing.
  *
- * The `modifier` carries no default, for the reason [ChangeSetButton]'s does
- * not: [NextSetControlsRow] is its only call site.
+ * The `modifier` carries no default: its two call sites, [NextSetControlsRow]
+ * and the last-set branch of [NextSetBlock], each size it differently (one
+ * place in a FlowRow, full width under the last set).
  */
 @Composable
 private fun SwitchExerciseSection(state: RecordState, viewModel: RecordViewModel, modifier: Modifier) {
@@ -2303,7 +2305,9 @@ private fun SwitchExerciseSection(state: RecordState, viewModel: RecordViewModel
                         color = BarColors.Sub,
                     )
                     Spacer(Modifier.height(8.dp))
-                    ExerciseChips(state, selectedId = null) { id ->
+                    // Without the lift of the block in progress: ADD SET adds a set of it.
+                    val offPlan = AdHocPicker.offPlanChoices(state.exerciseOptions, state.currentSlot?.exercise?.id)
+                    ExerciseChips(offPlan, selectedId = null) { id ->
                         showPicker = false
                         viewModel.addOffPlanExercise(id)
                     }
@@ -2328,12 +2332,13 @@ private const val PICKER_SHOWN_FIRST = 8
  * the one picked are shown; the rest wait behind "More exercises", so the
  * grid no longer pushes START below the fold.
  *
- * Shared by the ad-hoc form and the off-plan picker, so the two offer one list.
+ * Shared by the ad-hoc form and the off-plan picker, so the two offer one
+ * list; the off-plan picker hands it that list without the lift of the block
+ * in progress (`AdHocPicker.offPlanChoices`).
  */
 @Composable
-private fun ExerciseChips(state: RecordState, selectedId: String?, onPick: (String) -> Unit) {
+private fun ExerciseChips(options: List<ExerciseDef>, selectedId: String?, onPick: (String) -> Unit) {
     var showAll by remember { mutableStateOf(false) }
-    val options = state.exerciseOptions
     val first = options.take(PICKER_SHOWN_FIRST)
     val shown =
         when {
@@ -2600,7 +2605,7 @@ private fun AdHocForm(state: RecordState, viewModel: RecordViewModel) {
             label = { Text("Units: ${state.weightUnit.suffix}") },
         )
     }
-    ExerciseChips(state, state.selectedExerciseId, viewModel::selectExercise)
+    ExerciseChips(state.exerciseOptions, state.selectedExerciseId, viewModel::selectExercise)
     // Both/Left/Right only under a lift that can be done one side at a time
     // (AdHocPicker.offersSide, record-setup F12); under a squat it was noise.
     if (AdHocPicker.offersSide(state.selectedExerciseId, state.recentLifts, state.planSessions)) {

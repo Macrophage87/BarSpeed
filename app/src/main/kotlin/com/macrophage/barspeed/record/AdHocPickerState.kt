@@ -8,8 +8,12 @@ import com.macrophage.barspeed.model.PlanFile
 import com.macrophage.barspeed.model.RecordedLift
 import com.macrophage.barspeed.model.SideChoicePolicy
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 
 /**
@@ -20,14 +24,15 @@ import kotlinx.coroutines.launch
 private const val RECENT_SESSIONS = 10
 
 /**
- * One `set_records` row as [AdHocPicker] reads it. The row's load is
- * body-weight-inclusive on body-weight work, so the added load is
- * `loadKg - bodyWeightKg` (the entity's own KDoc); the lifter's warm-up mark
- * beats the plan's declaration, which is the entity's stated precedence.
+ * One `set_records` row as [AdHocPicker] reads it. The added load is
+ * [AdHocPicker.addedKg]'s: `loadKg - bodyWeightKg` on a row that stored a
+ * body weight (the entity's own KDoc), and unknown on a body-weight row from
+ * before one was stored. The lifter's warm-up mark beats the plan's
+ * declaration, which is the entity's stated precedence.
  */
 private fun recordedLiftOf(row: SetRecordEntity): RecordedLift = RecordedLift(
     exerciseId = row.exerciseId,
-    addedKg = row.loadKg - (row.bodyWeightKg ?: 0.0),
+    addedKg = AdHocPicker.addedKg(row.exerciseId, row.loadKg, row.bodyWeightKg),
     reps = row.actualReps,
     durationS = row.actualDurationS,
     tempo = row.tempo,
@@ -41,19 +46,32 @@ private fun recordedLiftOf(row: SetRecordEntity): RecordedLift = RecordedLift(
  * Mirror the latest sessions' sets onto the state, and re-order the picker
  * from them (UX review 2026-11-06, record-setup F3, core-model F2).
  *
- * Re-read whenever the session list changes, which is a session starting or
- * ending; a set recorded inside the running session is not re-read until then.
- * A failed read leaves the picker as it was rather than ending the collector.
+ * One observed query per session over the latest [RECENT_SESSIONS], combined,
+ * re-subscribed whenever the session list changes. Observed rather than read
+ * once (review of batch1-adhoc-rel): Room re-emits each on any `set_records`
+ * write, so a set voided or corrected in History, or recorded in the running
+ * session, reaches "last time" without waiting for a session to start or end.
+ * The session list alone does not re-emit on those writes. A row that fails
+ * to map leaves the picker as it was, and a failed query ends this mirror
+ * rather than the screen.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 internal fun CoroutineScope.mirrorRecentLifts(repository: SessionRepository, state: MutableStateFlow<RecordState>) =
     launch {
-        repository.sessions.collectLatest { sessions ->
-            val lifts =
-                runCatching {
-                    sessions.take(RECENT_SESSIONS).flatMap { repository.sets(it.id) }.map(::recordedLiftOf)
-                }.getOrNull() ?: return@collectLatest
-            state.value = withPickerOptions(state.value.copy(recentLifts = lifts))
-        }
+        repository.sessions
+            .flatMapLatest { sessions ->
+                val recent = sessions.take(RECENT_SESSIONS)
+                if (recent.isEmpty()) {
+                    flowOf(emptyList())
+                } else {
+                    combine(recent.map { repository.observeSets(it.id) }) { lists -> lists.flatMap { it } }
+                }
+            }
+            .catch { }
+            .collect { rows ->
+                val lifts = runCatching { rows.map(::recordedLiftOf) }.getOrNull() ?: return@collect
+                state.value = withPickerOptions(state.value.copy(recentLifts = lifts))
+            }
     }
 
 /**
