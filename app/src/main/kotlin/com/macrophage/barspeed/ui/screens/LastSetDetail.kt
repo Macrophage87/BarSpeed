@@ -313,7 +313,7 @@ private fun CorrectionDialog(
                 onClose()
             }) { Text("SAVE CORRECTIONS") }
         },
-        dismissButton = { TextButton(onClick = onClose) { Text("CANCEL", color = BarColors.Sub) } },
+        dismissButton = { TextButton(onClick = onClose) { Text("Cancel", color = BarColors.Sub) } },
     )
 }
 
