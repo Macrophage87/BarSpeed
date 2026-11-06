@@ -217,6 +217,20 @@ class PlansViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * The gate's "APPROVE & START": the approval and the start in one tap, for
+     * the plan imported to lift today (UX review 2026-11-06, plans F2).
+     *
+     * The gate is closed first and the rest is [start] unchanged, so the
+     * activation is still awaited before Record opens and Record reads this
+     * plan, not the one it replaces. It is an approval like [approve]: the
+     * lifter has the same summary and warnings in front of them when they tap.
+     */
+    fun approveAndStart(planId: Long) {
+        importResult.value = null
+        start(planId, activateFirst = true)
+    }
+
     fun discard(planId: Long) {
         viewModelScope.launch {
             repository.delete(planId)
