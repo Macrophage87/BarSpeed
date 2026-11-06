@@ -220,7 +220,7 @@ class JournalRecovery(
                 SetAnalysis(emptyList(), 0.0, null, null, listOf(MARKS_ONLY_NOTE))
             }
         val count =
-            JournalRecoveryPolicy.count(analysable, analysis.reps.size, streams.marks.size)
+            JournalRecoveryPolicy.count(facts.counter, analysable, analysis.reps.size, streams.marks.size)
                 ?: return PreparedRecovery.Refused(RecoveryRefusal.NOTHING_TO_COUNT)
         val endedAtMs =
             JournalRecoveryPolicy.endedAtMs(

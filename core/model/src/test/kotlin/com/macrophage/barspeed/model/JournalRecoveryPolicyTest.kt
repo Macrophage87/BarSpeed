@@ -136,6 +136,7 @@ class JournalRecoveryPolicyTest {
             geometry = SetGeometryPolicy.describe(squat, null),
             loadKg = 100.0,
             timed = false,
+            counter = RepCounter.SENSOR,
         )
 
     private fun refusal(
@@ -194,13 +195,13 @@ class JournalRecoveryPolicyTest {
 
     @Test
     fun `the sensor's count wins and is not stated`() {
-        assertEquals(RecoveredCount(6, stated = false), JournalRecoveryPolicy.count(true, 6, 8))
+        assertEquals(RecoveredCount(6, stated = false), JournalRecoveryPolicy.count(RepCounter.SENSOR, true, 6, 8))
     }
 
     @Test
     fun `with no analysable stream the journaled marks are the stated count`() {
-        assertEquals(RecoveredCount(8, stated = true), JournalRecoveryPolicy.count(false, 0, 8))
-        assertNull(JournalRecoveryPolicy.count(false, 0, 0))
+        assertEquals(RecoveredCount(8, stated = true), JournalRecoveryPolicy.count(RepCounter.MANUAL, false, 0, 8))
+        assertNull(JournalRecoveryPolicy.count(RepCounter.MANUAL, false, 0, 0))
     }
 
     // ---- the end ------------------------------------------------------------

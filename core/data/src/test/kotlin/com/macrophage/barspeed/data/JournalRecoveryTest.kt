@@ -11,6 +11,7 @@ import com.macrophage.barspeed.model.PrepCase
 import com.macrophage.barspeed.model.PrepWindow
 import com.macrophage.barspeed.model.RecordedSensors
 import com.macrophage.barspeed.model.RecoveryRefusal
+import com.macrophage.barspeed.model.RepCounter
 import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.model.SetGeometryPolicy
 import kotlinx.coroutines.CoroutineScope
@@ -96,6 +97,7 @@ class JournalRecoveryTest {
             prepCase = PrepCase.CUED,
             armedSensors =
             RecordedSensors(count = 2, expected = listOf(SensorRole.B, SensorRole.A), analysed = SensorRole.B),
+            counter = RepCounter.METRONOME,
         )
 
     private fun header(sessionId: Long? = 7L, facts: JournalSetFacts? = this.facts) = SetJournalHeader(

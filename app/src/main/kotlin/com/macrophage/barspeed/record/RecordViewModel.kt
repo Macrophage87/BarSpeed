@@ -1661,12 +1661,21 @@ private fun journaledWorkStart(
  * again from the stream it finds on disk. A load changed after START is the
  * one way the two can differ, and the recovered row then carries the load the
  * set began at -- the only one a kill leaves on the disk.
+ *
+ * [counter] is the counter [RecordViewModel.beginSet] froze, and [plannedPrepS]
+ * and [prepS] the prep seconds it resolved, all three before the journal
+ * opens. The tempo, warm-up, added and planned-side facts are read off the
+ * slot with the expressions `endSet` writes the row's own with (#100 review
+ * round 1), so a recovered set carries what its own write would have.
  */
 private fun journalFactsOf(
     s: RecordState,
     exercise: ExerciseDef,
     prepCase: PrepCase,
     armedSensors: RecordedSensors?,
+    counter: RepCounter,
+    plannedPrepS: Int?,
+    prepS: Int?,
 ): JournalSetFacts {
     val slot = s.currentSlot
     val load =
@@ -1688,6 +1697,18 @@ private fun journalFactsOf(
         timed = s.currentIsTimed,
         prepCase = prepCase,
         armedSensors = armedSensors,
+        counter = counter,
+        tempo =
+        when {
+            s.currentIsTimed -> null
+            s.adHoc -> s.tempoInput.ifBlank { null }
+            else -> slot?.tempo
+        },
+        warmup = slot?.warmup == true,
+        added = slot?.isAddedSet == true,
+        plannedSide = if (s.adHoc) null else slot?.plannedSide,
+        plannedPrepS = plannedPrepS,
+        prepS = prepS,
     )
 }
 
@@ -1720,6 +1741,9 @@ private fun openJournal(
     startedAtMs: Long,
     roster: SensorRoster,
     prepCase: PrepCase,
+    counter: RepCounter,
+    plannedPrepS: Int?,
+    prepS: Int?,
 ): SetJournal? = store.open(
     SetJournalHeader(
         exerciseId = exercise.id,
@@ -1748,7 +1772,10 @@ private fun openJournal(
         // would have: the declaration the analysis runs under, the load, the
         // prep case and the armed roster -- frozen at the start like the rest
         // of this header, because a kill leaves no end to read them at.
-        facts = journalFactsOf(s, exercise, prepCase, SensorCapturePolicy.recorded(roster)),
+        facts =
+        journalFactsOf(
+            s, exercise, prepCase, SensorCapturePolicy.recorded(roster), counter, plannedPrepS, prepS,
+        ),
     ),
 )
 
@@ -4908,7 +4935,11 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // with nowhere durable to go. A null here is the disk refusing, which
         // is the state this whole mechanism replaces -- it must not also stop
         // the set being recorded in memory as it always was.
-        journal = openJournal(container.setJournals, s, exercise, sessionStartedAtMs, setStartedAtMs, roster, prepCase)
+        journal =
+            openJournal(
+                container.setJournals, s, exercise, sessionStartedAtMs, setStartedAtMs, roster, prepCase,
+                counter, plannedPrepSForSet, prepSForSet,
+            )
         // Every set, not just the first. The catch in
         // RecordingService.onStartCommand ends every refusal
         // ForegroundStartPolicy.classify recognises in stopSelf(startId), so a

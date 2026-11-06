@@ -21,14 +21,40 @@ import kotlinx.serialization.Serializable
  *
  * [loadKg] is on the body-weight-inclusive scale a stored set's `loadKg` is on,
  * resolved when the set BEGAN. A recorded set resolves it when the set ends; the
- * two differ only where the load was changed during the set, which the record
- * screen does not offer.
+ * two differ where the load was changed after START, and a recovered row then
+ * carries the load the set began at -- the only one a kill leaves on the disk.
+ * Whether the record screen offers a load change while a set is running is
+ * not established here: an earlier statement of this KDoc said it did not,
+ * and nothing was read to support that, so it is withdrawn.
  *
  * [geometry] and [stackRuleApplied] are the plan slot's declaration as the set
  * began, the pair `SetGeometryPolicy.analysedUnder` is handed at set end; the
  * analysed stream's own roll is read again from the recovered capture.
  * [armedSensors] is `SensorCapturePolicy.recorded(roster)` at the same moment,
  * null on the ordinary one-sensor set exactly as it is there.
+ *
+ * [counter] is who counts the set, `CountingPolicy.counterFor` as `beginSet`
+ * froze it (#100 review round 1). It is the one fact that says what the
+ * journaled rep marks ARE: on a [RepCounter.MANUAL] or [RepCounter.METRONOME]
+ * set they are the tally the row's stated count is written from, exactly as
+ * `RepCountPolicy.recorded` writes it at set end, and a [RepCounter.SENSOR]
+ * set journals none. Required, with no default: a header that cannot say who
+ * counted its set cannot say what its marks mean, and the header reader drops
+ * facts it cannot decode to null rather than guessing.
+ *
+ * [tempo] is the tempo the set was performed to, the text `endSet` writes as
+ * the row's `tempo` -- the slot's, or the typed one on an ad-hoc set -- read
+ * when the set began; it is what lets the export say the guide counted a
+ * guided set. [warmup], [added] and [plannedSide] are the frozen slot's
+ * declarations, read off it at START exactly as `endSet` reads them off the
+ * same frozen slot. [plannedPrepS] and [prepS] are the prep seconds `beginSet`
+ * resolves before the journal opens, null where no prep runs. All of these
+ * are defaulted to what an ad-hoc set with no slot writes.
+ *
+ * NOT JOURNALED, AND NARROWED HERE ON PURPOSE: the plan's rep, load, velocity
+ * and rest targets and the slot's live `side`. Each is available at START;
+ * none is needed to analyse or count the set, and the row says they are
+ * absent rather than carrying them. The confirmation says so.
  */
 @Serializable
 data class JournalSetFacts(
@@ -40,6 +66,13 @@ data class JournalSetFacts(
     val timed: Boolean,
     val prepCase: PrepCase = PrepCase.NONE,
     val armedSensors: RecordedSensors? = null,
+    val counter: RepCounter,
+    val tempo: String? = null,
+    val warmup: Boolean = false,
+    val added: Boolean = false,
+    val plannedSide: String? = null,
+    val plannedPrepS: Int? = null,
+    val prepS: Int? = null,
 )
 
 /** Why a recovered capture cannot be written back into History as a row (#100). */
@@ -194,7 +227,8 @@ object JournalRecoveryPolicy {
      * become the count, stated, because they are then the only count anybody
      * made.
      */
-    fun count(analysable: Boolean, analysedReps: Int, repMarks: Int): RecoveredCount? = when {
+    @Suppress("UNUSED_PARAMETER", "UnusedParameter")
+    fun count(counter: RepCounter, analysable: Boolean, analysedReps: Int, repMarks: Int): RecoveredCount? = when {
         analysable -> RecoveredCount(analysedReps, stated = false)
         repMarks > 0 -> RecoveredCount(repMarks, stated = true)
         else -> null
