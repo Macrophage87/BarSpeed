@@ -5826,8 +5826,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // lifter's last `+1 REP` tap (#284 H1) -- and a set with none of those
         // falls back to the instant the write froze. #172. Since #141 a
         // guided set the lifter ended early is not in that group (`endSet`
-        // speaks `SetEnd.STOPPED` before freezing the buffer), since #295 neither is a timed set its clock ended, whose
-        // `Time` is terminal, and since #288 neither is a timed set the lifter
+        // speaks `SetEnd.STOPPED` before freezing the buffer), since #295
+        // neither is a timed set its clock ended, whose `Time` is terminal,
+        // and since #288 neither is a timed set the lifter
         // ended with the timed voice on, which says `Set ended` at the tap.
         // It is READ here rather than worked out again, because
         // #178 gave it a second reader in the rest-HR window and two

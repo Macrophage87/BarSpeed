@@ -238,7 +238,7 @@ object LiveFallbackPolicy {
  *
  * A single `withheld` argument, so the number, the velocity, the arc, the
  * cadence line and the next-rep caption cannot disagree about whether there
- * is a count. The screen feeds the velocity line a different flag from the
+ * is a count while the screen feeds them one flag. The screen feeds the velocity line a different flag from the
  * other four once the lifter taps `+1 REP` after a withhold: see
  * [velocityLabel].
  * `RepCountPolicy.displayedCount` stays the one place the NUMBER comes from --

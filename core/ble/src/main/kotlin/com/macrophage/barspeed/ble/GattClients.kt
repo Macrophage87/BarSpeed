@@ -114,7 +114,7 @@ abstract class GattClient(protected val context: Context) {
                 // no link opened with Bluetooth on, and SensorAdvicePolicy can
                 // say which to fix. isEnabled is true only in STATE_ON, so an
                 // adapter turning on or off reads as off -- which it is, for
-                // the link that was just refused. What connectGatt actually
+                // the link that was just not opened. What connectGatt actually
                 // returns with the adapter off has not been watched on a
                 // device: [Field].
                 stateFlow.value =

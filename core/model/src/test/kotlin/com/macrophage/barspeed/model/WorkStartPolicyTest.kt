@@ -42,12 +42,12 @@ class WorkStartPolicyTest {
     }
 
     /**
-     * #337: a set that ran no prep began its work at the START SET tap, the
-     * row's own `startedAtMs`. `AbandonedSetPolicy.workBegan` already says the
-     * work began there; the archive now says when.
+     * #337: a set that ran no prep publishes the START SET tap, the row's own
+     * `startedAtMs`, as its work start: the instant the app let the work
+     * begin, which bounds no set-up motion after it.
      */
     @Test
-    fun `a set that ran no prep began its work at the tap`() {
+    fun `a set that ran no prep publishes its tap as the work start`() {
         assertEquals(1_000L, WorkStartPolicy.publishedAtMs(null, 1_000L, prepS = null, workBegan = true))
     }
 

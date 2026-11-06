@@ -304,7 +304,7 @@ object DatabaseRescue {
      * empty restore journal falls back to the narrower open check. That is
      * reasoned from delayed-allocation semantics, not observed on a device,
      * and no test here can tell a synced write from an unsynced one. Round 2
-     * review, A's N1. Throws on failure; both callers catch.
+     * review, A's N1. Throws on failure; every caller catches.
      *
      * The file is synced; the directory that holds it is not. On a file
      * system that does not commit renames in the order they were made, the

@@ -18,7 +18,8 @@ import kotlin.test.assertEquals
  *
  * The two differ in one way that matters more than the arithmetic. `kind` is
  * re-derived from the id on every read -- `SessionRepository.exerciseById`
- * calls `inferKind` on both of its non-seed branches -- so correcting it
+ * reaches `inferKind` on both of its non-seed branches, through
+ * `CustomExerciseRepair.definition` and `ExerciseDef.inferred` -- so correcting it
  * corrects history too. `startsWith` is stored:
  * `SessionRepository.ensureExerciseExists` writes `inferStartPhase(id).name`
  * into a `CustomExerciseEntity` the first time an id is seen. Since #59

@@ -988,8 +988,12 @@ object SensorCapturePolicy {
      * that question and stays, so every caller that passes counts alone --
      * the live readout's `LiveFeed` and the orphan store's `SetJournal` --
      * gets exactly the answer it got before. Those two are named as the near
-     * neighbours #242's fix does not reach: an interrupted capture recovered
-     * from disk is still judged by its frame counts alone.
+     * neighbours #242's fix does not reach: an interrupted capture's analysed
+     * role, as the rescued-set card and the zip's header state it, is still
+     * judged by its frame counts alone. Putting that capture back into
+     * History (`JournalRecovery.prepare`) is not: it goes through
+     * `armedCaptureOf`, which passes both, so the row it writes can name the
+     * partner where the card named the armed unit.
      */
     fun analysable(
         expected: List<SensorRole>,

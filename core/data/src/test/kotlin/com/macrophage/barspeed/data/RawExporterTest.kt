@@ -1402,8 +1402,10 @@ class RawExporterTest {
      *
      * The controls are the rules the fix must keep: the dynamic set with
      * `startsWith` struck off must still be reported (the three stroke keys
-     * still go together), and the hold with `plane` struck off must still be
-     * reported (the six still go together on a stroke-less set).
+     * still go together), the hold with `plane` struck off must still be
+     * reported (the six still go together on a stroke-less set), and the
+     * dynamic set with `plane` struck off must still be reported (a stroke
+     * word still needs the geometry it was resolved with).
      */
     @Test
     fun `the manifests of a hold and a carry meet the published schema`() = runTest {

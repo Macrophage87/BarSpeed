@@ -141,11 +141,12 @@ fun armedCaptureOf(
     // key off the list rather than off the choice. It is NOT read again to make
     // the choice: `analysedFrom` composes it with `analysedStream` once (#211),
     // because a second reader asks the same question -- `SetJournalStore`
-    // answers it for a recovered capture -- and two compositions of two
+    // answers it for an interrupted capture's listing, and `JournalRecovery`
+    // calls this function itself to put one back -- and two compositions of two
     // functions are two places for the order to drift.
     //
     // The role, whether it moved, and WHY, from one decision (#278). It
-    // composes `analysedFrom` -- so the frame-count fallback of #207 and #209
+    // composes `analysedFrom` -- so the fallback of #207, #209, #242 and #287
     // decides first, and a unit the DSP would refuse cannot be chosen however
     // its roll reads -- and consults the roll signature only on a set that
     // declared a stack mount with both units delivering. The signal is measured
@@ -219,7 +220,7 @@ fun armedCaptureOf(
     // and the one unroled buffer otherwise -- measured here, because a
     // one-sensor set has no role to key a signal by and is the set #323 names.
     // Asked where the set declares a stack mount, and since #279 on every
-    // frame-count fallback as well; see [ArmedCapture.analysedSignal].
+    // fallback as well; see [ArmedCapture.analysedSignal].
     val analysedSignal = when {
         !declaresStackMount && !decision.fellBack -> StackMountSignal.UNMEASURED
         else -> decision.role?.let { signalByRole[it] } ?: stackSignalOf(samples)

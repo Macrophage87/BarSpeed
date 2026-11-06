@@ -227,7 +227,7 @@ class DevicesViewModel(app: Application) : AndroidViewModel(app) {
      *
      * `Exception`, not `IOException`: the pair, switch and forget taps run
      * `AutoConnectManager` code around the write -- `forgetAndDrop` reads the
-     * registry before its write and `pairAndConnect` after it, and all three
+     * registry before its write and `pairAndConnect` after it, and each may
      * drop or open links after the write -- and nothing here bounds what that
      * code throws, so a narrower catch would be a claim this file cannot back.
      * An earlier version of this paragraph said a registry read failure "is not

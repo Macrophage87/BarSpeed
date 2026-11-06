@@ -1058,7 +1058,8 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
         )
         // Everything the lifter can change about set one now lives behind one
         // button, and every change it makes is struck into the card above it.
-        // READY renders once per session on the way to set one, and again
+        // READY renders on the way to a session's first set, on the way to a
+        // continued session's first set of this visit (#48), and again
         // after a body-weight refusal taken from the rest screen -- see
         // SkipSetSection -- so this is not always the ONLY chance to say
         // anything, but until this button it could say only the load either
@@ -1140,10 +1141,11 @@ private const val PREP_STEP_S = 5
  * can neither clear a tempo nor add one, so the adjustment cannot move
  * [LeadInPolicy.playsPrep]'s answer either way.
  *
- * Rendered on READY and again on the rest screen because READY is drawn at most
- * once per session: `startNextSet` writes READY and calls `beginSet` in the same
- * frame, so from set two onwards the rest screen is the only place the lifter
- * can change anything.
+ * Rendered on READY and again on the rest screen because READY is drawn only
+ * before the first set of a visit (a session's, or a continued session's, #48)
+ * and after a body-weight refusal: `startNextSet` writes READY and calls
+ * `beginSet` in the same frame, so from the visit's second set onwards the rest
+ * screen is the only place the lifter can change anything.
  *
  * The adjustment is stored against the exercise, so it holds for the rest of
  * that exercise's sets and for the same exercise next week. What it is being
@@ -1265,9 +1267,11 @@ private fun sensorCaptureDetail(roster: SensorRoster): String? {
  * unit still sending nothing once the grace has passed is named on every
  * set.
  *
- * Drawn on READY and on RESTING. READY is drawn once per session --
- * `startNextSet` writes READY and calls `beginSet` in the same frame -- so a
- * card on READY alone names a silent unit before set one and never again,
+ * Drawn on READY and on RESTING. READY is drawn before the first set of a
+ * visit (a session's, or a continued session's, #48) and after a body-weight
+ * refusal -- `startNextSet` writes READY and calls `beginSet` in the same
+ * frame -- so a card on READY alone names a silent unit before the visit's
+ * first set and almost never again,
  * while RESTING precedes every later set. SETUP draws no card: the roster IS
  * answerable there, so the omission is a DECISION and not a limit, made
  * because the bar-sensor card already on that screen covers the analysed
@@ -1661,8 +1665,9 @@ private fun NextSetControlsRow(state: RecordState, viewModel: RecordViewModel, s
  * crowds the screen out of usefulness. They are all here now, behind one
  * outlined button.
  *
- * Drawn on the rest screen AND on READY. READY renders once per session on
- * the way to set one, and again after a body-weight refusal taken from the
+ * Drawn on the rest screen AND on READY. READY renders on the way to a
+ * session's first set, on the way to a continued session's first set of this
+ * visit (#48), and again after a body-weight refusal taken from the
  * rest screen -- see SkipSetSection -- and used to offer only the load box,
  * so set one was the set whose reps, tempo and prep could not be touched. The owner's
  * case for closing that is the gym itself: "What if someone is using all the
@@ -3466,7 +3471,8 @@ internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     // where the lifter has a rest period to spend fixing it.
     PermissionBanner()
     // Same reason as the banner above it, for the sensor rather than the
-    // permission: READY renders once per session on the way to set one, and
+    // permission: READY renders on the way to a session's first set, on the
+    // way to a continued session's first set of this visit (#48), and
     // again after a body-weight refusal taken from the rest screen -- see
     // SkipSetSection -- so a card drawn only there can name a silent unit
     // more than once, though almost always just before set one. Every set

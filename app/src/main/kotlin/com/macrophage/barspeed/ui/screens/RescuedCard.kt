@@ -149,7 +149,10 @@ internal fun rescuedTapEffect(tap: RescuedTap, item: RescuedDatabase): RescuedTa
  * close finishes on its own, so the note says to wait. The record screen's
  * own hold, [RecordingHold.SESSION], is released when that screen goes
  * away, so read from the code it is held under Home only when it has
- * leaked -- its KDoc names a task swipe -- and nothing will finish: the
+ * leaked -- its KDoc names a task swipe -- or, reasoned from navigation-
+ * compose's behaviour and not observed, for the moment the record screen's
+ * exit transition runs before its ViewModel is cleared; when it has leaked
+ * nothing will finish: the
  * note names the process ending instead, since the holds live in process
  * memory. That a force-stop clears it on a device is reasoned, not
  * observed. Round 3 review of #112, A2 and B1.

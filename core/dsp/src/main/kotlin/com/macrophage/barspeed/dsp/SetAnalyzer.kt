@@ -178,7 +178,7 @@ data class PhaseComplianceResult(
     val repsWithinTolerance: Int,
     val repsEvaluated: Int,
     /**
-     * False for pauses -- measured and reported, but deliberately not scored --
+     * False for pauses -- reported, but deliberately not scored --
      * and false for a prescribed movement phase that no rep resolved, because a
      * phase with nothing behind it cannot be graded. This is the flag the export
      * turns into `scoredPhases`, the coach's only statement of what the set's
@@ -883,7 +883,8 @@ object SetAnalyzer {
         // reversal was dwell-free. On session 29 the owner's estimator,
         // independent of segmentation, put turnaround dwell at 0.10-0.14 s on
         // leg press, single-leg press and seated leg curl alike (0.13 s on the
-        // leg curl, n=33), where this figure's session-29 medians were 1.18 s
+        // leg curl, n=33), where this field's session-29 medians, under the
+        // build of that day, which predates 1.16's one-turnaround rule, were 1.18 s
         // (single-leg press), 0.16 s (leg press) and 0.04 s (leg curl) --
         // #92's table: over on the presses, under on the leg curl -- so it
         // neither tracks nor bounds the dwell.
