@@ -72,6 +72,7 @@ import com.macrophage.barspeed.dsp.AccelArtefact
 import com.macrophage.barspeed.dsp.CoachingRules
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.VelocityLoss
+import com.macrophage.barspeed.model.AdHocPicker
 import com.macrophage.barspeed.model.AddSetControl
 import com.macrophage.barspeed.model.ArmedSilencePolicy
 import com.macrophage.barspeed.model.BlePermissionStep
@@ -1992,11 +1993,9 @@ internal fun ChangeSetDialog(
  * the reason that applies here unchanged -- set one is when a wrong load first
  * shows itself, and READY is the only screen set one has.
  *
- * NOT ALWAYS BESIDE IT. [SwitchExerciseSection] returns before drawing
- * anything when `RecordState.exerciseChoices` is empty, so on the session's
- * last remaining exercise the row is CHANGE NEXT SET and ADD SET only, two
- * buttons wide. Which of the three the row holds is decided per render by
- * each one's own guard, not by the row.
+ * Which of the three the row holds is decided per render by each one's own
+ * guard, not by the row. [SwitchExerciseSection] draws on every plan session
+ * since record-setup F2 (its chooser always holds "Different exercise...").
  *
  * NOT inside the change-set dialog. Everything in that dialog changes the set
  * coming up; this changes the SESSION, and folding it in would put it under a
@@ -2222,18 +2221,26 @@ private fun SkipSetSection(state: RecordState, viewModel: RecordViewModel) {
  * Switch exercise". The "Equipment busy?" framing is not dropped: it moves
  * to the chooser's title, which is what the tap opens.
  *
- * DRAWS NOTHING when `RecordState.exerciseChoices` is empty, which is the
- * session's last remaining exercise: there is nothing to switch to. What
- * that leaves the row holding is stated once, in [AddSetSection].
+ * DRAWN ON EVERY PLAN SESSION since the UX review of 2026-11-06
+ * (record-setup F2), where it used to draw nothing once
+ * `RecordState.exerciseChoices` was empty. Its chooser ends in "Different
+ * exercise...", which opens the exercise picker and puts ONE off-plan set of
+ * the pick next, marked as added and taking no plan slot -- every decision is
+ * `offPlanAddedState`'s. That entry is there even on the session's last
+ * remaining exercise and after its last planned set, where a finisher or a
+ * rack taken is likeliest; the remaining-exercise entries are listed only
+ * when there are some. An ad-hoc session has no plan to leave and draws
+ * nothing.
  *
  * The `modifier` carries no default, for the reason [ChangeSetButton]'s does
  * not: [NextSetControlsRow] is its only call site.
  */
 @Composable
 private fun SwitchExerciseSection(state: RecordState, viewModel: RecordViewModel, modifier: Modifier) {
+    if (state.adHoc) return
     val choices = state.exerciseChoices
-    if (choices.isEmpty()) return
     var showChooser by remember { mutableStateOf(false) }
+    var showPicker by remember { mutableStateOf(false) }
     OutlinedButton(onClick = { showChooser = true }, modifier = modifier) {
         Text("SWITCH EXERCISE")
     }
@@ -2243,11 +2250,13 @@ private fun SwitchExerciseSection(state: RecordState, viewModel: RecordViewModel
             title = { Text("Equipment busy? Do another exercise next") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        "Its remaining sets move to the front; everything else keeps its order.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = BarColors.Sub,
-                    )
+                    if (choices.isNotEmpty()) {
+                        Text(
+                            "Its remaining sets move to the front; everything else keeps its order.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = BarColors.Sub,
+                        )
+                    }
                     choices.forEach { choice ->
                         OutlinedButton(
                             onClick = {
@@ -2263,6 +2272,16 @@ private fun SwitchExerciseSection(state: RecordState, viewModel: RecordViewModel
                             )
                         }
                     }
+                    OutlinedButton(
+                        onClick = {
+                            showChooser = false
+                            showPicker = true
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = ButtonDefaults.TextButtonContentPadding,
+                    ) {
+                        Text("Different exercise…")
+                    }
                 }
             },
             // Kept a TextButton (#201): this dialog's one action; the dialog's frame already marks
@@ -2271,6 +2290,75 @@ private fun SwitchExerciseSection(state: RecordState, viewModel: RecordViewModel
                 TextButton(onClick = { showChooser = false }) { Text("Cancel") }
             },
         )
+    }
+    if (showPicker) {
+        AlertDialog(
+            onDismissRequest = { showPicker = false },
+            title = { Text("Different exercise") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    Text(
+                        "One set of it next, marked as added. The plan's sets stay queued.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = BarColors.Sub,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    ExerciseChips(state, selectedId = null) { id ->
+                        showPicker = false
+                        viewModel.addOffPlanExercise(id)
+                    }
+                }
+            },
+            // Kept a TextButton (#201): this dialog's one action; the dialog's frame already marks
+            // it as its answer.
+            confirmButton = {
+                TextButton(onClick = { showPicker = false }) { Text("Cancel") }
+            },
+        )
+    }
+}
+
+/** How many exercise chips the picker shows before "More exercises". */
+private const val PICKER_SHOWN_FIRST = 8
+
+/**
+ * The exercise picker's chips, in `RecordState.exerciseOptions` order -- the
+ * lifter's recent lifts, then the active plan's, then the built-in seeds
+ * (`AdHocPicker.options`, record-setup F3). The first [PICKER_SHOWN_FIRST] and
+ * the one picked are shown; the rest wait behind "More exercises", so the
+ * grid no longer pushes START below the fold.
+ *
+ * Shared by the ad-hoc form and the off-plan picker, so the two offer one list.
+ */
+@Composable
+private fun ExerciseChips(state: RecordState, selectedId: String?, onPick: (String) -> Unit) {
+    var showAll by remember { mutableStateOf(false) }
+    val options = state.exerciseOptions
+    val first = options.take(PICKER_SHOWN_FIRST)
+    val shown =
+        when {
+            showAll -> options
+            first.any { it.id == selectedId } -> first
+            else -> first + options.filter { it.id == selectedId }
+        }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        shown.chunked(2).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                row.forEach { exercise ->
+                    FilterChip(
+                        selected = selectedId == exercise.id,
+                        onClick = { onPick(exercise.id) },
+                        label = { Text(exercise.displayName) },
+                    )
+                }
+            }
+        }
+        if (options.size > first.size) {
+            // Kept a TextButton (#201): a disclosure toggle under the chips it opens.
+            TextButton(onClick = { showAll = !showAll }) {
+                Text(if (showAll) "Fewer exercises" else "More exercises")
+            }
+        }
     }
 }
 
@@ -2503,37 +2591,32 @@ private fun AdHocForm(state: RecordState, viewModel: RecordViewModel) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text("Exercise", style = MaterialTheme.typography.titleSmall)
+        // Drawn SELECTED (record-setup F12): it shows the unit in force and
+        // switches it, which converts the typed load. Unselected it read as a
+        // filter that was off.
         FilterChip(
-            selected = false,
+            selected = true,
             onClick = viewModel::toggleWeightUnit,
             label = { Text("Units: ${state.weightUnit.suffix}") },
         )
     }
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        state.exerciseOptions.chunked(2).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                row.forEach { exercise ->
-                    FilterChip(
-                        selected = state.selectedExerciseId == exercise.id,
-                        onClick = { viewModel.selectExercise(exercise.id) },
-                        label = { Text(exercise.displayName) },
-                    )
-                }
+    ExerciseChips(state, state.selectedExerciseId, viewModel::selectExercise)
+    // Both/Left/Right only under a lift that can be done one side at a time
+    // (AdHocPicker.offersSide, record-setup F12); under a squat it was noise.
+    if (AdHocPicker.offersSide(state.selectedExerciseId, state.recentLifts, state.planSessions)) {
+        Spacer(Modifier.height(8.dp))
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Side", style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+            listOf(null to "Both", "left" to "Left", "right" to "Right").forEach { (value, label) ->
+                FilterChip(
+                    selected = state.sideInput == value,
+                    onClick = { viewModel.selectSide(value) },
+                    label = { Text(label) },
+                )
             }
-        }
-    }
-    Spacer(Modifier.height(8.dp))
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text("Side", style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
-        listOf(null to "Both", "left" to "Left", "right" to "Right").forEach { (value, label) ->
-            FilterChip(
-                selected = state.sideInput == value,
-                onClick = { viewModel.selectSide(value) },
-                label = { Text(label) },
-            )
         }
     }
     Spacer(Modifier.height(4.dp))
@@ -3772,6 +3855,10 @@ private fun NextSetBlock(state: RecordState, viewModel: RecordViewModel) {
         AddSetSection(state, viewModel)
         AddSetCaption(state)
         RemoveSetSection(state, viewModel)
+        // A finisher the plan does not list: the chooser's "Different
+        // exercise..." puts one off-plan set next, which brings START back the
+        // way an appended set does (record-setup F2).
+        SwitchExerciseSection(state, viewModel, Modifier.fillMaxWidth())
     }
 }
 

@@ -81,6 +81,7 @@ import com.macrophage.barspeed.model.PrepWindow
 import com.macrophage.barspeed.model.PrepWindowPolicy
 import com.macrophage.barspeed.model.PreviewSet
 import com.macrophage.barspeed.model.ProgressionKind
+import com.macrophage.barspeed.model.RecordedLift
 import com.macrophage.barspeed.model.RecordedSensors
 import com.macrophage.barspeed.model.RecordedTimeZone
 import com.macrophage.barspeed.model.RecordingHold
@@ -2919,17 +2920,25 @@ private fun tempoAdjustedState(s: RecordState, position: Int, value: String): Re
  * [RecordState.statedLoadKg] is cleared to keep one rule rather than to close a
  * reachable defect: resolve reads the typed field, never the stated one, on an
  * ad-hoc set.
+ *
+ * Opens on the picker's first exercise -- the lift recorded most recently, when
+ * there is one -- with its boxes filled from that last time, through
+ * [prefilledState] (UX review 2026-11-06, record-setup F3). It used to open on
+ * Back Squat at "60" and 5 whatever the lifter trains.
  */
-private fun adHocSessionState(s: RecordState): RecordState = s.copy(
-    stage = Stage.READY,
-    adHoc = true,
-    queue = emptyList(),
-    statedLoadKg = null,
-    statedReps = null,
-    statedDurationS = null,
-    // An ad-hoc session has no prescription to deviate from; its side is
-    // sideInput, which the Both/Left/Right chips write.
-    statedSide = null,
+private fun adHocSessionState(s: RecordState): RecordState = prefilledState(
+    s.copy(
+        stage = Stage.READY,
+        adHoc = true,
+        queue = emptyList(),
+        statedLoadKg = null,
+        statedReps = null,
+        statedDurationS = null,
+        // An ad-hoc session has no prescription to deviate from; its side is
+        // sideInput, which the Both/Left/Right chips write.
+        statedSide = null,
+    ),
+    s.exerciseOptions.firstOrNull()?.id ?: s.selectedExerciseId,
 )
 
 /**
@@ -3505,7 +3514,14 @@ data class RecordState(
     val queue: List<PlannedSlot> = emptyList(),
     val queueIndex: Int = 0,
     val adHoc: Boolean = false,
+    /**
+     * What the exercise picker offers, the lifter's own lifts first: built by
+     * `withPickerOptions` from [recentLifts] and [planSessions] through
+     * `AdHocPicker.options`. The seeds alone until either has loaded.
+     */
     val exerciseOptions: List<ExerciseDef> = ExerciseDef.SEED,
+    /** The latest sessions' sets, newest session first, as the picker reads them; see `mirrorRecentLifts`. */
+    val recentLifts: List<RecordedLift> = emptyList(),
     val selectedExerciseId: String = ExerciseDef.SEED.first().id,
     val loadInput: String = "60",
     /**
@@ -4825,14 +4841,10 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.offerResume(sessionRepository, holds, stateFlow)
         viewModelScope.launch {
             container.planRepository.activePlan.collect { entity ->
-                val plan = entity?.let { container.planRepository.decode(it) }
-                stateFlow.value =
-                    stateFlow.value.copy(
-                        planName = plan?.planName,
-                        planSessions = plan?.sessions ?: emptyList(),
-                    )
+                stateFlow.value = activePlanState(stateFlow.value, entity?.let { container.planRepository.decode(it) })
             }
         }
+        viewModelScope.mirrorRecentLifts(sessionRepository, stateFlow)
         // Passive HR display even outside sets; R-R intervals feed the HRV readouts.
         viewModelScope.launch {
             autoConnect.hrSamples.collect { hr ->
@@ -4961,7 +4973,10 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     // reason: detekt's `LargeClass` counts this class against a default of
     // 600, and these two pay for the line #302's frozen live-trust flag adds
     // to endSet.
-    fun selectExercise(id: String) = stateFlow.value.copy(selectedExerciseId = id).let { stateFlow.value = it }
+    fun selectExercise(id: String) = exerciseTappedState(stateFlow.value, id).let { stateFlow.value = it }
+
+    /** "Different exercise..." on SWITCH EXERCISE (record-setup F2); every decision is [offPlanAddedState]'s. */
+    fun addOffPlanExercise(id: String) = offPlanAddedState(stateFlow.value, id)?.let { stateFlow.value = it }
 
     // One line each, these input updaters, for selectExercise's reason above;
     // the copies are RecordInputEdits.kt's.
