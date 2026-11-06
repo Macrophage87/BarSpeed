@@ -87,9 +87,9 @@ enum class RecordingHold(val armsService: Boolean) {
      * has landed, so a process ended under it loses nothing, and the service
      * has no stream to protect from Home. The hold exists to keep the resume
      * offer, the other writers' positions and the restore off it, not to keep
-     * the process alive.
-     *
-     * DECLARED AHEAD OF ITS HOLDER: nothing acquires it yet.
+     * the process alive. Acquired and released by
+     * `HomeViewModel.recoverInterrupted`, around the whole of
+     * `JournalRecovery.recover`.
      */
     RECOVERY_WRITE(armsService = false),
 }
@@ -180,18 +180,24 @@ object RecordingServicePolicy {
      * a record screen is capture in progress, and this function does not
      * second-guess a hold that may have been left held (see its own KDoc);
      * the cost of that is a refused restore until the app is restarted, which
-     * loses nothing.
+     * loses nothing. [RecordingHold.RECOVERY_WRITE] refuses too, though its
+     * capture is on disk and an ended process would lose nothing of it: a
+     * restore swaps the database the recovery is writing a row into, and
+     * waiting a moment costs nothing (whole-branch review of 0.2.0, round 1,
+     * CAP-B1).
      */
     fun mayEndProcess(held: Set<RecordingHold>): Boolean = held.isEmpty()
 
     /**
      * Whether a write that finishes on its own is outstanding in [held]: a
-     * set-end write or a session close. The one reading of "still saving"
+     * set-end write, a session close, or a recovery putting an interrupted
+     * set back. The one reading of "still saving"
      * the resume offer (#48), the rescued card's restore note (#112) and the
      * recovery's wait note (#100) share, so the three cannot name the same
      * hold two ways (whole-branch review of 0.2.0, round 1, UI-B2, CAP-B1).
      * [RecordingHold.SESSION] alone is not a write.
      */
     fun writing(held: Set<RecordingHold>): Boolean =
-        RecordingHold.SET_WRITE in held || RecordingHold.SESSION_CLOSE in held
+        RecordingHold.SET_WRITE in held || RecordingHold.SESSION_CLOSE in held ||
+            RecordingHold.RECOVERY_WRITE in held
 }

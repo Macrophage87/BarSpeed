@@ -494,12 +494,26 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      * is never reopened. The capture is removed only after the row is
      * written, so a failure here keeps it on the phone and on this card.
      *
-     * `RecordingHolds` non-empty is a set write or a session close still
-     * running, or the record screen's own SESSION hold, which under Home
-     * has leaked: every way out of Record pops it and its ViewModel
-     * releases the hold, so no set is recording anywhere. The recovery
-     * decides no position while either is held, and the toast says which
-     * (`JournalRecoveryPolicy.waitNote`).
+     * A RECOVERY IS A SET WRITE, AND HOLDS ONE (whole-branch review of
+     * 0.2.0, round 1, CAP-B1). [RecordingHold.RECOVERY_WRITE] is held for
+     * the whole call, so the resume offer will not offer to continue a
+     * session while a recovery may be placing a set in it, and RESTORE is
+     * refused under it (`RecordingServicePolicy.writing` and `mayEndProcess`).
+     * Recoveries run one at a time: a tap while one runs is answered with
+     * the saving note and starts nothing, so the hold the recovery leaves out
+     * of its own wait is always its own. The holds are read by the recovery
+     * when it places the set, after the decode, not here at the tap.
+     *
+     * Any other hold held then is a set write or a session close still
+     * running, or the record screen's own SESSION hold -- held under Home
+     * only when it has leaked, or while Record is open on top of Home. The
+     * recovery decides no position while any is held, and the toast says
+     * which (`JournalRecoveryPolicy.waitNote`).
+     *
+     * The hold's acquire and release are compile- and lint-gated only: no
+     * test reaches this function. What is pinned is the policy it reads
+     * (`JournalRecoveryPolicyTest`, `RecordingServicePolicyTest`) and the
+     * read order in `JournalRecoveryTest`.
      *
      * HOLDS [busyInterruptedFlow] for the whole call, the key SEND and
      * DISCARD already share (#304), so neither can reach a directory this is
@@ -507,11 +521,22 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun recoverInterrupted(orphan: OrphanedSet) {
         if (orphan.directory in busyInterruptedFlow.value) return
+        val holds = container.recordingHolds
         viewModelScope.launch {
+            // viewModelScope dispatches on Main.immediate, so from a tap this
+            // runs at once, on the main thread every acquire and release is
+            // issued from, and no second tap can pass the check between it
+            // and the acquire. A cancelled scope runs none of it, so nothing
+            // is acquired that the finally would not release.
+            if (RecordingHold.RECOVERY_WRITE in holds.held.value) {
+                toast(JournalRecoveryPolicy.waitNote(holds.held.value))
+                return@launch
+            }
+            holds.acquire(RecordingHold.RECOVERY_WRITE)
             busyInterruptedFlow.update { it + orphan.directory }
             try {
-                val held = container.recordingHolds.held.value
-                val outcome = withContext(Dispatchers.IO) { container.journalRecovery.recover(orphan) { held } }
+                val outcome =
+                    withContext(Dispatchers.IO) { container.journalRecovery.recover(orphan) { holds.held.value } }
                 toast(recoveryToast(outcome))
             } catch (e: CancellationException) {
                 throw e
@@ -519,6 +544,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 AppLog.w(TAG, "recovering an interrupted set failed; the capture is kept", e)
                 toast("Couldn't put it back -- the capture is kept")
             } finally {
+                holds.release(RecordingHold.RECOVERY_WRITE)
                 busyInterruptedFlow.update { it - orphan.directory }
                 refreshInterrupted()
             }
@@ -526,7 +552,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun toast(text: String) {
-        Toast.makeText(getApplication(), text, Toast.LENGTH_SHORT).show()
+        Toast.makeText(getApplication(), text, Toast.LENGTH_LONG).show()
     }
 
     /**

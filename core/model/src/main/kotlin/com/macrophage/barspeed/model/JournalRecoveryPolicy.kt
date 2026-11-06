@@ -158,12 +158,19 @@ object JournalRecoveryPolicy {
      * began, null on the first set of a session -- no row existed yet.
      * [latest] is `SessionRepository.latestSession` over
      * [SessionResumePolicy.LOOKBACK_MS] before [nowMs]. [writeOutstanding] is
-     * whether any recording hold is still held. [alreadyStored] is
+     * [mustWait]'s answer: whether any recording hold but the recovery's own
+     * is held. [alreadyStored] is
      * [alreadyStored]'s answer for this capture.
      *
      * In order: nothing is decided while a write is outstanding, because it
      * could be writing this very set or could close the session after the
-     * answer; a capture whose set is already a row is never written again;
+     * answer -- which holds because the caller reads [writeOutstanding] when
+     * the set is placed, after the decode, and holds
+     * [RecordingHold.RECOVERY_WRITE] for the whole recovery so no session it
+     * may attach to can be continued or closed under it (whole-branch review
+     * of 0.2.0, round 1, CAP-B1; `JournalRecovery.recover` names the one
+     * database read that remains between the answer and the write); a
+     * capture whose set is already a row is never written again;
      * the set rejoins its own session only while that session is the one
      * [SessionResumePolicy.offer] would offer to continue -- open, holding
      * sets, newest, and left within [SessionResumePolicy.RESUME_WINDOW_MS] --
@@ -187,6 +194,17 @@ object JournalRecoveryPolicy {
      * One boundary with the resume prompt, by construction: the offer is
      * asked here rather than restated, so the recovery cannot call a session
      * current that Record would not offer to continue, or the reverse.
+     *
+     * THE MATCH IS ON THE BARE SESSION ID, named and not closed (whole-branch
+     * review of 0.2.0, round 1, CAP-N2, migrations N4, UI-N3). After a
+     * database rescue (a fresh database, ids from 1) or a restore (an older
+     * file), [headerSessionId] names a row in a database that is no longer
+     * the one open; if the open database's current session happens to carry
+     * the same id, the set joins a different workout. It needs a mid-set
+     * kill, a rescue or restore, and an id collision on the one session that
+     * is open and current inside the resume window. Comparing the current
+     * row's start with the header's would close it; that is a behaviour
+     * change left for the owner or the next release.
      */
     fun target(
         headerSessionId: Long?,
@@ -342,14 +360,26 @@ object JournalRecoveryPolicy {
     fun waitNote(held: Set<RecordingHold>): String =
         if (RecordingServicePolicy.writing(held)) SAVING_NOTE else RECORDING_NOTE
 
-    /** The holds in [held] a recovery must wait for: every one held. */
-    fun outstanding(held: Set<RecordingHold>): Set<RecordingHold> = held
+    /**
+     * The holds in [held] a recovery must wait for: every hold but
+     * [RecordingHold.RECOVERY_WRITE], which the recovery itself holds while
+     * it runs (whole-branch review of 0.2.0, round 1, CAP-B1). Recoveries
+     * run one at a time (`HomeViewModel.recoverInterrupted` refuses a second
+     * while that hold is held), so a held RECOVERY_WRITE is the asker's own.
+     */
+    fun outstanding(held: Set<RecordingHold>): Set<RecordingHold> = held - RecordingHold.RECOVERY_WRITE
 
     /** Whether [outstanding] leaves anything to wait for. */
     fun mustWait(held: Set<RecordingHold>): Boolean = outstanding(held).isNotEmpty()
 
-    /** [waitNote] while a set-end write or a session close, which finishes on its own, is held. */
-    const val SAVING_NOTE = "A set is still being saved -- try again in a moment"
+    /**
+     * [waitNote] while a write that finishes on its own is held: a set-end
+     * write, a session close, or another recovery. "A set or session", as
+     * `rescuedRestoreNote` says it for the same holds; "A set is still being
+     * saved" was false on a session close alone (whole-branch review of
+     * 0.2.0, round 1, UI-B2).
+     */
+    const val SAVING_NOTE = "A set or session is still saving -- try again in a moment"
 
     /** [waitNote] while only the record screen's own hold is held. */
     const val RECORDING_NOTE =

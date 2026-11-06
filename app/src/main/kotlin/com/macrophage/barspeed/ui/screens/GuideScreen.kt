@@ -140,8 +140,9 @@ private val SECTIONS =
                 "said. Holds and carries are never counted in reps. " +
                 "Right when a set ends, tap how hard it felt — on every set, whether or not it hit " +
                 "its target, warm-up always among the choices. A set that met its target also gets " +
-                "a 'failed the set' tile; one stopped short does not, because it is logged as " +
-                "failed automatically. Rest follows, then 'Start next set' — after the last " +
+                "a 'failed the set' tile; one stopped short does not, " +
+                "because it is recorded as short of target automatically. Rest follows, then " +
+                "'Start next set' — after the last " +
                 "planned set, that screen offers 'Finish session' instead, or lets you add " +
                 "another set if you want one.",
         ),

@@ -286,8 +286,8 @@ internal fun rescuedDiscardWarning(item: RescuedDatabase): String = when (item.c
     RescueCompleteness.COMPLETE ->
         "This permanently removes ${ByteSize.format(item.totalBytes)} of rescued data " +
             "(${item.files.joinToString(", ")}). The rescue MOVED these files rather than " +
-            "copying them, so the app's own database does not have what is in them and nothing " +
-            "here can put them back. Send it to yourself first if you are not sure. " +
+            "copying them, so the app's own database does not have what is in them, and once they " +
+            "are discarded nothing can put them back. Send it to yourself first if you are not sure. " +
             "This cannot be undone."
     RescueCompleteness.FRAGMENT ->
         "This rescue saved no database file -- only ${item.files.joinToString(", ")}, " +

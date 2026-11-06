@@ -71,7 +71,14 @@ internal sealed interface PreparedRecovery {
  * stream `armedCaptureOf` chose reaches
  * `SensorCapturePolicy.MIN_ANALYSABLE_FRAMES`. Span and stillness (#242,
  * #287) are not a second test here; they are inside `armedCaptureOf`'s choice
- * of that stream, as they are for a live set.
+ * of that stream, as they are for a live set. ONE INPUT DIFFERS IN KIND, not
+ * in path (whole-branch review of 0.2.0, round 1, DSP N4): a live set's cue
+ * track ends with the terminal cue `SetEnd.of` bounds its rep list by, and an
+ * interrupted set's journaled track has none unless the guide had called
+ * Done before the kill, so `SetEnd.of` reads it as not cued and a
+ * sensor-counted recovered set's reps run to the last journaled sample,
+ * handling after the set included -- the population an ad-hoc voice-off set
+ * already sits in.
  *
  * WHAT A RECOVERED ROW DOES NOT HAVE, said once here and in the card's
  * confirmation. No plan targets, side or effort rating: they were never
@@ -121,7 +128,22 @@ class JournalRecovery(
      *
      * [holds] reads the recording holds; while `JournalRecoveryPolicy.mustWait`
      * says one is outstanding, nothing is decided
-     * (`JournalRecoveryPolicy.target`).
+     * (`JournalRecoveryPolicy.target`). The caller holds
+     * `RecordingHold.RECOVERY_WRITE` for the whole call, which `mustWait`
+     * leaves out.
+     *
+     * THE HOLDS ARE READ WHEN THE SET IS PLACED, not when the tap arrived
+     * (whole-branch review of 0.2.0, round 1, CAP-B1): after the decode and
+     * re-analysis, which on a large capture take seconds, immediately before
+     * the newest session is read and the target asked. A set write, a session
+     * close or a `beginSet` that started during the decode is therefore seen.
+     * What is left is the window between that read and the row's insert --
+     * one database read -- and nothing that writes a position into this
+     * set's session can start inside it: continuing a session is refused at
+     * Record's entry while RECOVERY_WRITE is held (`RecordingServicePolicy.
+     * writing`, read by the resume offer), so a session the recovery may
+     * attach to cannot also be continued, and a close needs a continued
+     * session. Reasoned from the call paths, not observed on a device.
      *
      * WHERE IT GOES is `JournalRecoveryPolicy.target`'s answer, asked with the
      * newest session over `SessionResumePolicy.LOOKBACK_MS` -- the read the
@@ -141,7 +163,13 @@ class JournalRecovery(
      * asked before the re-analysis, so a stored set whose capture the
      * re-analysis would refuse -- a sensor-counted set whose analysis
      * withheld, whose row carries the live count -- goes too, rather than
-     * being told no count survived (#100 review round 3, Lens A N2).
+     * being told no count survived (#100 review round 3, Lens A N2). So does
+     * a stored capture the listing itself would refuse (an unreadable stream,
+     * a work start that never reached the disk) when its facts exist: the
+     * row holds the set. And a stored capture WAITS while a write is
+     * outstanding, whatever its re-analysis would say, rather than falling
+     * through to that re-analysis and being refused (whole-branch review,
+     * round 1, migrations N3; L13 round 4, Lens A N1).
      *
      * A NEW SESSION IS TWO WRITES, NOT ONE (#100 review round 1, Lens A N6,
      * Lens B N5): `recordFirstSet` opens the session with the set in it, and
@@ -156,8 +184,6 @@ class JournalRecovery(
      * does not otherwise make, and that has not been designed.
      */
     suspend fun recover(orphan: OrphanedSet, holds: () -> Set<RecordingHold>): RecoveryOutcome {
-        val held = holds()
-        val writeOutstanding = JournalRecoveryPolicy.mustWait(held)
         val header = orphan.header
         // Asked before the re-analysis can refuse (#100 review round 3,
         // Lens A N2): a capture whose set is already a row is that row's
@@ -166,7 +192,11 @@ class JournalRecovery(
         // id and the header's startedAtMs -- so nothing here needs the
         // analysis. A capture with no facts is refused below, as before.
         val stored = header.facts?.let { storedAlready(header, it.exercise.id) } == true
-        if (stored && !writeOutstanding) {
+        if (stored) {
+            val held = holds()
+            if (JournalRecoveryPolicy.mustWait(held)) {
+                return RecoveryOutcome.Waiting(JournalRecoveryPolicy.outstanding(held))
+            }
             store.discard(orphan)
             return RecoveryOutcome.AlreadyStored
         }
@@ -176,8 +206,11 @@ class JournalRecovery(
                 is PreparedRecovery.Ready -> prepared.set
             }
         val now = nowMs()
+        // Read here, after the decode, not at the tap (CAP-B1; see the KDoc).
+        val held = holds()
         val latest = repository.latestSession(now - SessionResumePolicy.LOOKBACK_MS, now)
-        val target = JournalRecoveryPolicy.target(header.sessionId, latest, now, writeOutstanding, stored)
+        val target =
+            JournalRecoveryPolicy.target(header.sessionId, latest, now, JournalRecoveryPolicy.mustWait(held), stored)
         return when (target) {
             RecoveryTarget.Wait -> RecoveryOutcome.Waiting(JournalRecoveryPolicy.outstanding(held))
             RecoveryTarget.AlreadyStored -> {
@@ -204,10 +237,23 @@ class JournalRecovery(
     /**
      * Whether a row of [exerciseId] begun at [header]'s instant is already in
      * any session that could hold it: begun before it, and no earlier than
-     * the header's own session or the resume look-back, whichever reaches
-     * further. Wider than the header's session alone, because a session
-     * opened for an earlier recovery of this same capture begins at the
-     * set's own start.
+     * the header's `sessionStartedAtMs` or the resume look-back, whichever
+     * reaches further. Wider than the header's session alone, because a
+     * session opened for an earlier recovery of this same capture begins at
+     * the set's own start.
+     *
+     * WHAT `sessionStartedAtMs` HOLDS ON A CONTINUED VISIT (whole-branch
+     * review of 0.2.0, round 1, CAP-N1): the instant this visit picked its
+     * session, not the adopted row's start -- "Continue it" (#48) adopts the
+     * earlier row without touching the visit's clock -- so on a continued
+     * session the bound is later than the row it names. The look-back covers
+     * that unless a chain of continues puts the set more than
+     * `SessionResumePolicy.LOOKBACK_MS` after the row began; there, a capture
+     * killed between its row and its journal's removal is not found here,
+     * `latestSession` does not return the row either, and the recovery
+     * writes the set a second time, in a session of its own. Named, not closed:
+     * reading the row's own start by `header.sessionId` is the fix, and it is
+     * a behaviour change no test here pins yet.
      */
     private suspend fun storedAlready(header: SetJournalHeader, exerciseId: String): Boolean {
         val from = minOf(header.sessionStartedAtMs, header.startedAtMs - SessionResumePolicy.LOOKBACK_MS)

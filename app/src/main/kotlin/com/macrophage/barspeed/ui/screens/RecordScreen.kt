@@ -428,7 +428,7 @@ internal fun exitBody(prompt: ExitPrompt, unwritten: UnwrittenClose?): String = 
     ExitPrompt.SET_IN_PROGRESS ->
         "Nothing about this set has been saved — the reps, the sensor data and the effort rating all go. " +
             "To keep it, tap Keep recording and end the set with the control at the bottom of this screen. " +
-            "On a tempo-guided or timed set that is under way that control ends the set as a failure, and " +
+            "On a tempo-guided or timed set that is under way that control ends the set short of target, and " +
             "you can still rate the set while you rest."
     // Says the session can be picked up again, and for how long, because as
     // of #48 it can: coming back to Record asks "Continue this session?" while
@@ -3304,7 +3304,8 @@ internal fun EndSetEarlyButton(viewModel: RecordViewModel) {
 }
 
 /** What END SET EARLY's caption says, a constant so `ShortOfTargetCopyTest` can read it. */
-internal const val END_SET_EARLY_CAPTION = "Ends the set with no rating · a set that came up short logs as failed"
+internal const val END_SET_EARLY_CAPTION =
+    "Ends the set with no rating · a set that came up short is recorded as short of target"
 
 /**
  * The effort grid IS the end-set control. Tapping how the set felt ends the set

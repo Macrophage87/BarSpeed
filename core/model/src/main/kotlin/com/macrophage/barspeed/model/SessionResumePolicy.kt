@@ -6,7 +6,12 @@ package com.macrophage.barspeed.model
  * [lastSetEndedAtMs] is null only where the row has no set at all, and
  * [nextOrderIdx] is one past the highest `orderIdx` the row holds -- the slot
  * the next set recorded into this session must take, so a continued session
- * cannot write two sets at one position.
+ * cannot write two sets at one position. That holds against the one other
+ * writer of a position, a recovery putting an interrupted set back (#100),
+ * because the resume is not offered while that recovery's
+ * [RecordingHold.RECOVERY_WRITE] is held (`RecordingServicePolicy.writing`),
+ * and the recovery waits while any other write is held at the moment it
+ * places its set (whole-branch review of 0.2.0, round 1, CAP-B1).
  */
 data class LatestSession(
     val sessionId: Long,

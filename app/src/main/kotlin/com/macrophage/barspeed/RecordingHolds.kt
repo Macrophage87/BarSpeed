@@ -28,8 +28,8 @@ import kotlinx.coroutines.flow.StateFlow
  * Not synchronised, and the reason is a claim about `:app` code paths read
  * rather than anything a test here can show. Every acquire and release is
  * issued from the main thread: `beginSet` from a tap, the two durable writers
- * from `Dispatchers.Main.immediate` coroutines, and `onCleared` from
- * `ViewModelStore.clear`. Nothing in this repository can verify which thread an
+ * and Home's recovery of an interrupted set from `Dispatchers.Main.immediate`
+ * coroutines, and `onCleared` from `ViewModelStore.clear`. Nothing in this repository can verify which thread an
  * Android lifecycle callback runs on.
  */
 class RecordingHolds(private val app: Application) {
