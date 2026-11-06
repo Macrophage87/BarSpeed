@@ -81,7 +81,11 @@ fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewMo
     // Navigation is driven by the ViewModel rather than by the tap, because the
     // activation has to land first: see PlansViewModel.start.
     LaunchedEffect(Unit) {
-        viewModel.recordRequests.collect { navController.navigate(RecordRoute.path()) }
+        viewModel.recordRequests.collect { session ->
+            // MAKE ACTIVE & START names the session to do next and opens its
+            // preview, as Home's hero does; a row's START opens the picker.
+            navController.navigate(if (session == null) RecordRoute.path() else RecordRoute.preview(session))
+        }
     }
 
     Scaffold(

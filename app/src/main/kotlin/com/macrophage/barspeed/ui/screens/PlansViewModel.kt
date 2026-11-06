@@ -11,6 +11,7 @@ import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.data.PlanEntity
 import com.macrophage.barspeed.data.PlanImportResult
 import com.macrophage.barspeed.model.BodyWeightPromptPolicy
+import com.macrophage.barspeed.model.HomeHeroPolicy
 import com.macrophage.barspeed.model.PlanLifecycle
 import com.macrophage.barspeed.model.PlanStartDecision
 import com.macrophage.barspeed.model.PlanStartPolicy
@@ -24,6 +25,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -100,9 +102,12 @@ class PlansViewModel(app: Application) : AndroidViewModel(app) {
      * exactly what a configuration change tears down between the tap and the
      * activation completing. A conflated channel holds the one pending request
      * until a collector returns, and delivers it once.
+     *
+     * Carries the plan session to open in Record's preview, or null for
+     * Record's session picker: only [approveAndStart] names one.
      */
-    private val startRequests = Channel<Unit>(Channel.CONFLATED)
-    val recordRequests: Flow<Unit> = startRequests.receiveAsFlow()
+    private val startRequests = Channel<String?>(Channel.CONFLATED)
+    val recordRequests: Flow<String?> = startRequests.receiveAsFlow()
 
     /**
      * Start a session from [planId], making it the active plan first when
@@ -116,7 +121,7 @@ class PlansViewModel(app: Application) : AndroidViewModel(app) {
     fun start(planId: Long, activateFirst: Boolean) {
         viewModelScope.launch {
             if (activateFirst) repository.activate(planId)
-            startRequests.send(Unit)
+            startRequests.send(null)
         }
     }
 
@@ -242,10 +247,31 @@ class PlansViewModel(app: Application) : AndroidViewModel(app) {
      * activation is still awaited before Record opens and Record reads this
      * plan, not the one it replaces. It is an approval like [approve]: the
      * lifter has the same summary and warnings in front of them when they tap.
+     *
+     * START is literal (whole-release review): Record opens on the preview of
+     * the session to do next, the one Home's hero would offer --
+     * [HomeHeroPolicy.nextSession] after the last session done under this
+     * plan's name -- rather than on the session picker. Where that has no
+     * answer it falls back to the picker, as before. The activation is still
+     * awaited before the request is sent, for [start]'s reason.
      */
     fun approveAndStart(planId: Long) {
         importResult.value = null
-        start(planId, activateFirst = true)
+        viewModelScope.launch {
+            repository.activate(planId)
+            startRequests.send(sessionToDoNext(planId))
+        }
+    }
+
+    /** The plan session Home's hero would start next under [planId], or null. */
+    private suspend fun sessionToDoNext(planId: Long): String? {
+        val entity = repository.plan(planId) ?: return null
+        val plan = withContext(Dispatchers.Default) { repository.decode(entity) } ?: return null
+        val lastDone =
+            container.sessionRepository.sessions.first()
+                .firstOrNull { it.planName == plan.planName && it.planSessionName != null }
+                ?.planSessionName
+        return HomeHeroPolicy.nextSession(plan.sessions, lastDone)?.name
     }
 
     fun discard(planId: Long) {
