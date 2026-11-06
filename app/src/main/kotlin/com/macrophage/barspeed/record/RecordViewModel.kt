@@ -62,6 +62,7 @@ import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.Implement
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.JournalSetFacts
+import com.macrophage.barspeed.model.LastRanSet
 import com.macrophage.barspeed.model.LatestSession
 import com.macrophage.barspeed.model.LeadInPolicy
 import com.macrophage.barspeed.model.LiveCountReadout
@@ -69,6 +70,9 @@ import com.macrophage.barspeed.model.LiveFallback
 import com.macrophage.barspeed.model.LiveFallbackPolicy
 import com.macrophage.barspeed.model.LiveFeed
 import com.macrophage.barspeed.model.LiveFeedPolicy
+import com.macrophage.barspeed.model.NextSetInputs
+import com.macrophage.barspeed.model.NextSetSlot
+import com.macrophage.barspeed.model.NextSetStatements
 import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.PlanSessionDef
 import com.macrophage.barspeed.model.PrepCase
@@ -2025,6 +2029,51 @@ private fun planSessionState(s: RecordState, planSession: PlanSessionDef, queue:
     )
 
 /**
+ * This slot as [NextSetInputs.of] reads it: the frozen declarations and the
+ * live values, nothing else.
+ */
+internal fun PlannedSlot.nextSetSlot(): NextSetSlot = NextSetSlot(
+    exerciseId = exercise.id,
+    setIndexInExercise = setIndexInExercise,
+    bodyweight = exercise.bodyweight,
+    warmup = warmup,
+    plannedLoadKg = plannedLoadKg,
+    plannedReps = plannedReps,
+    plannedDurationS = plannedDurationS,
+    plannedTempo = plannedTempo,
+    loadKg = loadKg,
+    reps = reps,
+    durationS = durationS,
+    tempo = tempo,
+)
+
+/** What the lifter has stated for the set the boxes describe, as [NextSetInputs.of] reads it. */
+internal val RecordState.nextSetStatements: NextSetStatements
+    get() = NextSetStatements(
+        loadKg = statedLoadKg,
+        reps = statedReps,
+        durationS = statedDurationS,
+        tempo = statedTempo,
+    )
+
+/**
+ * The next set's inputs written into the four stated fields and the four boxes,
+ * the one place every route that changes the coming set writes them
+ * (code-health review 2026-11-06, F2). A null box value leaves the box as it is.
+ * `statedSide` is not here: each caller decides it, and every one clears it.
+ */
+private fun RecordState.withNextInputs(inputs: NextSetInputs): RecordState = copy(
+    loadInput = inputs.loadKg?.let { weightUnit.inputValue(it) } ?: loadInput,
+    statedLoadKg = inputs.statedKg,
+    repsInput = inputs.reps?.toString() ?: repsInput,
+    statedReps = inputs.statedReps,
+    durationInput = inputs.durationS?.toString() ?: durationInput,
+    statedDurationS = inputs.statedDurationS,
+    statedTempo = inputs.statedTempo,
+    tempoInput = inputs.adHocTempo,
+)
+
+/**
  * Add one more set of the exercise just finished, at the values standing for
  * it (#177, #188).
  *
@@ -2252,27 +2301,15 @@ internal fun appendedState(s: RecordState): RecordState? {
     // Unreachable from READY -- there the block always has the set being set
     // up still to run, so the appended set never lands next -- so #177's
     // behaviour on that screen is untouched.
-    val seedKg =
-        SetLoadPolicy.seedAddedKg(
-            hasPlannedNext = true,
-            nextDeclaredAddedKg = appended.loadKg,
-            lastAddedKg = null,
-        )
-    return s.copy(
+    // The statements are cleared (NONE) for [jumpedState]'s reason: they were
+    // statements about the set that is no longer coming up.
+    val inputs = NextSetInputs.of(last = null, next = appended.nextSetSlot(), stated = NextSetStatements.NONE)
+    return s.withNextInputs(inputs).copy(
         queue = queue,
-        loadInput = seedKg?.let { s.weightUnit.inputValue(it) } ?: s.loadInput,
-        // Cleared for [jumpedState]'s reason: these were statements about the
-        // exercise that is no longer coming up.
-        statedLoadKg = null,
-        statedTempo = null,
-        statedReps = null,
-        statedDurationS = null,
         // Cleared for the same reason, and it would have been cleared on the
         // next rest transition anyway: a side stated for the set that has just
         // been displaced is not a statement about the one now coming up.
         statedSide = null,
-        repsInput = appended.reps?.toString() ?: s.repsInput,
-        durationInput = appended.durationS?.toString() ?: s.durationInput,
     )
 }
 
@@ -2323,24 +2360,14 @@ internal fun removedState(s: RecordState): RecordState? {
     val queue = s.queue.toMutableList().apply { removeAt(at) }
     if (!target.wasUpcoming) return s.copy(queue = queue)
     val upcoming = queue.getOrNull(at) ?: return s.copy(queue = queue)
-    val seedKg =
-        SetLoadPolicy.seedAddedKg(
-            hasPlannedNext = true,
-            nextDeclaredAddedKg = upcoming.loadKg,
-            lastAddedKg = null,
-        )
-    return s.copy(
+    // The statements are cleared (NONE): the slot that moved up is outside the
+    // block, so nothing said about the removed set is about it.
+    val inputs = NextSetInputs.of(last = null, next = upcoming.nextSetSlot(), stated = NextSetStatements.NONE)
+    return s.withNextInputs(inputs).copy(
         queue = queue,
-        loadInput = seedKg?.let { s.weightUnit.inputValue(it) } ?: s.loadInput,
-        statedLoadKg = null,
-        statedTempo = null,
-        statedReps = null,
-        statedDurationS = null,
-        // Cleared with the four above it: a side stated for the set that has
+        // Cleared with the four statements: a side stated for the set that has
         // just been REMOVED is not a statement about the one that moved up.
         statedSide = null,
-        repsInput = upcoming.reps?.toString() ?: s.repsInput,
-        durationInput = upcoming.durationS?.toString() ?: s.durationInput,
     )
 }
 
@@ -2401,83 +2428,26 @@ internal fun skippedState(s: RecordState): RecordState? {
     val skipped = s.skippedSets + SkipSetControl.recordOf(slot.exercise.id, target)
     val queue = s.queue.toMutableList().apply { removeAt(at) }
     val upcoming = queue.getOrNull(at) ?: return s.copy(queue = queue, skippedSets = skipped)
-    // Where the block ends, hoisted for [restingState]'s reason: all four
-    // statements below are bounded by the SAME block, and asking four times
-    // would be four statements of one rule. The skipped slot is one side of the
-    // pair and the slot that moves up is the other.
-    val sameBlock =
-        SetLoadPolicy.sameExerciseBlock(
-            lastExerciseId = slot.exercise.id,
-            nextExerciseId = upcoming.exercise.id,
-            nextSetIndexInExercise = upcoming.setIndexInExercise,
+    // The SKIPPED slot is the "last" side of the pair: the boxes were showing
+    // the statement for the set now being dropped, so that is the declaration
+    // the statement is a correction to. NextSetInputs compares the FROZEN
+    // declarations on both sides, which stay right whether or not a bake has
+    // run -- on the body-weight refusal door the skipped slot HAS been baked.
+    // No LastRanSet: the skipped slot never ran.
+    val inputs =
+        NextSetInputs.of(
+            last = slot.nextSetSlot(),
+            next = upcoming.nextSetSlot(),
+            stated = s.nextSetStatements,
         )
-    // The FROZEN declarations on both sides, never loadKg/reps/durationS/tempo:
-    // startNextSet's bake writes a statement into those, and comparing them
-    // would compare a value against itself. The frozen pair is the only pair
-    // that stays right whether or not a bake has run: on the body-weight
-    // refusal door the SKIPPED slot HAS been baked (startNextSet ran
-    // advancedState before beginSet refused), and plannedLoadKg /
-    // plannedReps / plannedDurationS / plannedTempo are never written back.
-    val standingKg =
-        SetLoadPolicy.standingStatedAddedKg(
-            statedAddedKg = s.statedLoadKg,
-            sameExerciseBlock = sameBlock,
-            lastDeclaredAddedKg = slot.plannedLoadKg,
-            nextDeclaredAddedKg = upcoming.plannedLoadKg,
-            // The COMING slot's movement, for [restingState]'s reason: inside a
-            // block the two are the same exercise by construction.
-            bodyweight = upcoming.exercise.bodyweight,
-            // The plan's own warm-up declaration on each side, never
-            // s.lastSetWarmup or lastSetWarmupMark: one describes the set
-            // BEFORE the skipped slot and the other is the lifter's live
-            // statement about it.
-            finishedWarmup = slot.warmup,
-            nextWarmup = upcoming.warmup,
-        )
-    val standingTempo =
-        TempoAdjustPolicy.standingAdjustedTempo(
-            adjustedTempo = s.statedTempo,
-            sameExerciseBlock = sameBlock,
-            lastDeclaredTempo = slot.plannedTempo,
-            nextDeclaredTempo = upcoming.plannedTempo,
-        )
-    val standingReps =
-        SetRepsPolicy.standingStatedReps(
-            statedReps = s.statedReps,
-            sameExerciseBlock = sameBlock,
-            lastDeclaredReps = slot.plannedReps,
-            nextDeclaredReps = upcoming.plannedReps,
-        )
-    val standingDurationS =
-        SetRepsPolicy.standingStatedDurationS(
-            statedDurationS = s.statedDurationS,
-            sameExerciseBlock = sameBlock,
-            lastDeclaredDurationS = slot.plannedDurationS,
-            nextDeclaredDurationS = upcoming.plannedDurationS,
-        )
-    val seedKg =
-        SetLoadPolicy.seedAddedKg(
-            hasPlannedNext = true,
-            nextDeclaredAddedKg = upcoming.loadKg,
-            lastAddedKg = null,
-        )
-    return s.copy(
+    return s.withNextInputs(inputs).copy(
         queue = queue,
         skippedSets = skipped,
-        // A statement that still stands is shown ahead of the plan's number, so
-        // the box and what the set would record cannot disagree --
-        // [restingState]'s arrangement at the same three boxes.
-        loadInput = (standingKg ?: seedKg)?.let { s.weightUnit.inputValue(it) } ?: s.loadInput,
-        statedLoadKg = standingKg,
-        statedTempo = standingTempo,
-        statedReps = standingReps,
-        statedDurationS = standingDurationS,
-        // NOT carried, and this is the field that differs from the four above
-        // it -- see the KDoc's last paragraph. Written explicitly rather than
-        // left to the copy: a field omitted here keeps the skipped set's answer.
+        // NOT carried, and this is the field that differs from the four
+        // statements -- see the KDoc's last paragraph. Written explicitly rather
+        // than left to the copy: a field omitted here keeps the skipped set's
+        // answer.
         statedSide = null,
-        repsInput = (standingReps ?: upcoming.reps)?.toString() ?: s.repsInput,
-        durationInput = (standingDurationS ?: upcoming.durationS)?.toString() ?: s.durationInput,
     )
 }
 
@@ -2500,34 +2470,17 @@ internal fun skippedState(s: RecordState): RecordState? {
  * READY, where that typed value is the one the set would be recorded with.
  */
 private fun jumpedState(s: RecordState, done: List<PlannedSlot>, fixed: List<PlannedSlot>): RecordState {
-    val upcoming = fixed.first()
-    val seedKg =
-        SetLoadPolicy.seedAddedKg(
-            hasPlannedNext = true,
-            nextDeclaredAddedKg = upcoming.loadKg,
-            lastAddedKg = null,
-        )
-    return s.copy(
+    // Refresh the editable inputs so they describe the new upcoming set, with
+    // every statement cleared (NONE) for [RecordState.statedLoadKg]'s reason: a
+    // load, tempo, rep count or hold set for the exercise the lifter was about
+    // to do is not a statement about the one they switched to.
+    val inputs = NextSetInputs.of(last = null, next = fixed.first().nextSetSlot(), stated = NextSetStatements.NONE)
+    return s.withNextInputs(inputs).copy(
         queue = done + fixed,
-        // Refresh the editable inputs so they describe the new upcoming set.
-        loadInput = seedKg?.let { s.weightUnit.inputValue(it) } ?: s.loadInput,
-        statedLoadKg = null,
-        // Cleared for [RecordState.statedLoadKg]'s reason, one field over: a
-        // tempo set on the wheels for the exercise the lifter was about to do
-        // is not a statement about the one they switched to.
-        statedTempo = null,
-        // Cleared for statedLoadKg's reason, two fields over: a rep count or
-        // a hold set for the exercise the lifter was about to do is not a
-        // statement about the one they switched to.
-        statedReps = null,
-        statedDurationS = null,
-        // Cleared for statedLoadKg's reason, three fields over: an arm chosen
+        // Cleared for statedLoadKg's reason, one field over: an arm chosen
         // for the exercise the lifter was about to do is not a statement about
         // the one they switched to.
         statedSide = null,
-        repsInput = upcoming.reps?.toString() ?: s.repsInput,
-        durationInput = upcoming.durationS?.toString() ?: s.durationInput,
-        tempoInput = upcoming.tempo ?: "",
     )
 }
 
@@ -2779,88 +2732,37 @@ private fun restingState(
     restRemainingS: Int,
 ): RecordState {
     val nextSlot = s.nextSlot
-    // Where the block ends. Hoisted to a local because the load and the tempo
-    // are bounded by the SAME block -- asking twice would be two statements of
-    // one rule, and the way they diverge is one of the two carrying past a
-    // boundary the other stops at.
-    val sameBlock =
-        SetLoadPolicy.sameExerciseBlock(
-            lastExerciseId = p.slot?.exercise?.id,
-            nextExerciseId = nextSlot?.exercise?.id,
-            nextSetIndexInExercise = nextSlot?.setIndexInExercise,
+    // What the lifter said, and whether each statement still applies to the set
+    // coming up: NextSetInputs asks the carry policies about the two slots'
+    // FROZEN declarations -- never their live values, which the bake has
+    // already written a statement into -- bounded by one block. The plan's own
+    // warm-up declarations are read off the slots, never s.lastSetWarmup, which
+    // still describes the set BEFORE p.slot here.
+    //
+    // The LastRanSet is the WORKING values of the set just finished, not its
+    // frozen prescription: what the lifter last did is the only thing to go on
+    // where the plan offers nothing. addedKg, never loadKg: seeding the box with
+    // the body-weight-inclusive total is what made a loadless block climb set
+    // over set.
+    val inputs =
+        NextSetInputs.of(
+            last = p.slot?.nextSetSlot(),
+            next = nextSlot?.nextSetSlot(),
+            stated = s.nextSetStatements,
+            lastRan =
+            LastRanSet(
+                addedKg = p.addedKg,
+                reps = p.targetReps,
+                durationS = p.targetDurationS,
+                tempo = p.tempoText,
+            ),
         )
-    // What the lifter said about the load, and whether it still applies to the
-    // set coming up. The decision is SetLoadPolicy's; this hands it the two
-    // slots' FROZEN declarations -- never their loadKg, which the bake below
-    // has already written a statement into -- and where the block ends.
-    val standingKg =
-        SetLoadPolicy.standingStatedAddedKg(
-            statedAddedKg = s.statedLoadKg,
-            sameExerciseBlock = sameBlock,
-            lastDeclaredAddedKg = p.slot?.plannedLoadKg,
-            nextDeclaredAddedKg = nextSlot?.plannedLoadKg,
-            // The COMING slot's movement, because that is the set the answer
-            // is offered for. Inside a block the two are the same exercise by
-            // construction -- sameExerciseBlock compared their ids -- so this
-            // differs from the finished set's only where the answer is null
-            // anyway.
-            bodyweight = nextSlot?.exercise?.bodyweight ?: false,
-            // The plan's own warmup declaration on each side of the pair --
-            // never s.lastSetWarmup, which this same function wrote into the
-            // RETURNED state on the transition before this one, so read here
-            // it still describes the set BEFORE p.slot rather than p.slot
-            // itself; p.slot?.warmup is asked directly instead.
-            // lastSetWarmupMark is excluded for the other reason: it is the
-            // lifter's own live statement, not the plan's declaration.
-            finishedWarmup = p.slot?.warmup == true,
-            nextWarmup = nextSlot?.warmup == true,
-        )
-    // The same question about the tempo, and since #143 NOT by the same rule:
-    // TempoAdjustPolicy.standingAdjustedTempo drops the adjustment wherever the
-    // two declarations differ, where the load carries it as a distance, and it
-    // has no warm-up guard.
-    // plannedTempo on both sides, never tempo: the bake has already written the
-    // adjustment into the slot's own tempo, so comparing those would compare a
-    // value against itself and the carry would never stop.
-    val standingTempo =
-        TempoAdjustPolicy.standingAdjustedTempo(
-            adjustedTempo = s.statedTempo,
-            sameExerciseBlock = sameBlock,
-            lastDeclaredTempo = p.slot?.plannedTempo,
-            nextDeclaredTempo = nextSlot?.plannedTempo,
-        )
-    // The same question again for the rep count and the hold, bounded by the
-    // same block and decided by SetRepsPolicy's rule, which is the tempo's:
-    // standingStatedReps and standingStatedDurationS both drop the statement
-    // wherever the two declarations differ, and neither has a warm-up guard.
-    // The two slots' FROZEN declarations on both sides, never their live
-    // reps/durationS: the bake writes the statement into those, so comparing
-    // them would compare a number against itself and a descending 10 / 8 / 6
-    // would flatten to 12 / 12 / 12 the moment set one was changed. #174.
-    val standingReps =
-        SetRepsPolicy.standingStatedReps(
-            statedReps = s.statedReps,
-            sameExerciseBlock = sameBlock,
-            lastDeclaredReps = p.slot?.plannedReps,
-            nextDeclaredReps = nextSlot?.plannedReps,
-        )
-    val standingDurationS =
-        SetRepsPolicy.standingStatedDurationS(
-            statedDurationS = s.statedDurationS,
-            sameExerciseBlock = sameBlock,
-            lastDeclaredDurationS = p.slot?.plannedDurationS,
-            nextDeclaredDurationS = nextSlot?.plannedDurationS,
-        )
-    val seedKg =
-        SetLoadPolicy.seedAddedKg(
-            hasPlannedNext = nextSlot != null,
-            nextDeclaredAddedKg = nextSlot?.loadKg,
-            // addedKg, never loadKg: the field holds what is ADDED, and seeding
-            // it with the body-weight-inclusive total is what made a loadless
-            // block climb set over set.
-            lastAddedKg = p.addedKg,
-        )
-    return s.copy(
+    // The four statements and the four boxes, a standing statement shown ahead
+    // of the plan's number so the box and what the set would record cannot
+    // disagree. The ad-hoc tempo field among them is one nothing on a plan
+    // session draws or reads -- the wheels read statedTempo -- and it is no
+    // longer handed the last tempo that ran when a planned set is coming up.
+    return s.withNextInputs(inputs).copy(
         stage = Stage.RESTING,
         setWrite = SetWriteState.NONE,
         restTotalS = restS,
@@ -2942,42 +2844,13 @@ private fun restingState(
         // Off the pending write, never off s.currentExercise, which by the time
         // the rest screen draws is already the movement coming up.
         lastSetExerciseId = p.exercise.id,
-        // Pre-fill next-set inputs so in-rest edits start from plan values --
-        // except the load, where a statement that still stands is shown ahead
-        // of the plan's number, so the box and what the set would record cannot
-        // disagree.
-        loadInput = (standingKg ?: seedKg)?.let { s.weightUnit.inputValue(it) } ?: s.loadInput,
-        statedLoadKg = standingKg,
-        // Same arrangement as the load one line up: a statement that still
-        // stands is shown ahead of the plan's number, so the box and what the
-        // set would record cannot disagree. The fallbacks are the WORKING
-        // targets of the set just finished, not its frozen prescription --
-        // they are reached only when the plan has run out, where what the
-        // lifter last did is the only thing to go on.
-        repsInput = (standingReps ?: nextSlot?.reps ?: p.targetReps ?: 5).toString(),
-        statedReps = standingReps,
-        durationInput =
-        (standingDurationS ?: nextSlot?.durationS ?: p.targetDurationS)?.toString() ?: s.durationInput,
-        statedDurationS = standingDurationS,
-        statedTempo = standingTempo,
-        // NOT carried, and this is the field that differs from the four above
-        // it. A stated side expires with the set it was made for: the plan
-        // writes unilateral work one set per side, so its own order is the
+        // NOT carried, and this is the field that differs from the four
+        // statements. A stated side expires with the set it was made for: the
+        // plan writes unilateral work one set per side, so its own order is the
         // alternation, and a choice that stood would put every remaining set of
         // the block on one arm. Written explicitly rather than left to the
         // copy: a field omitted here keeps the finished set's answer.
         statedSide = null,
-        // The AD-HOC field. On a plan session nothing draws or reads it -- the
-        // wheels read statedTempo above, falling back to the slot's own
-        // declaration -- and seedTempo no longer hands it the last tempo that
-        // ran when a planned set is coming up, which is the inheritance this
-        // change removes.
-        tempoInput =
-        TempoAdjustPolicy.seedTempo(
-            hasPlannedNext = nextSlot != null,
-            nextDeclaredTempo = nextSlot?.tempo,
-            lastRanTempo = p.tempoText,
-        ) ?: "",
         // The set is written, so there is nothing left for CANCEL SET to take
         // back (UX review 2026-11-06, rest F2).
         cancelTo = null,
