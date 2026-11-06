@@ -199,7 +199,10 @@ fun RecordScreen(
     // system gesture — and the lifter uses whichever is nearer the thumb, so a
     // guard on one is not a guard. Both ask [RecordExitPolicy] the same
     // question about the same stage, which is what stops them drifting apart.
-    val prompt = RecordExitPolicy.promptFor(state.stage, state.setWrite, state.sessionClose)
+    // Told whether CANCEL SET could still take the set back, so Discard on a
+    // set with no rep counted stays on Record (UX review 2026-11-06,
+    // record-live F6) and a set with reps is discarded by leaving, as before.
+    val prompt = RecordExitPolicy.promptFor(state.stage, state.setWrite, state.sessionClose, state.mayCancelSet)
     // Whether the gate is open, not which gate it is. Storing the prompt here
     // latched the policy's answer at the moment Back was pressed, and the answer
     // moves underneath it: Back during a set write raises SET_SAVING, which says
@@ -230,6 +233,12 @@ fun RecordScreen(
             // is common enough that it should ask too is a [Field] question,
             // not something this file can answer.
             ExitAction.FINISH_SESSION -> viewModel.finishSession(null)
+            // The landed CANCEL SET path: nothing written, the journal
+            // discarded, READY or the rest screen back with the same set next.
+            // cancelSet itself refuses if the first rep landed after the
+            // dialog opened; the prompt is live, so it would already read
+            // SET_IN_PROGRESS by then.
+            ExitAction.DISCARD_SET_AND_STAY -> viewModel.cancelSet()
             ExitAction.DISCARD_SET_AND_LEAVE,
             ExitAction.LEAVE_SESSION_OPEN,
             // Same navigation, a different promise. The close runs on a scope
@@ -420,6 +429,7 @@ private val UNKNOWN_UNWRITTEN =
 private fun exitTitle(prompt: ExitPrompt, unwritten: UnwrittenClose?): String = when (prompt) {
     ExitPrompt.NONE -> ""
     ExitPrompt.SET_IN_PROGRESS -> "Discard this set?"
+    ExitPrompt.SET_NOT_STARTED -> "Discard this set?"
     ExitPrompt.SESSION_OPEN -> "Leave the session?"
     ExitPrompt.SET_SAVING -> "This set is still saving"
     ExitPrompt.SET_UNSAVED -> "This set did not save"
@@ -454,6 +464,8 @@ internal fun exitBody(prompt: ExitPrompt, unwritten: UnwrittenClose?): String = 
     // SessionResumePolicy.offer would (an open row with sets, its last set
     // within RESUME_WINDOW_MS). The HRV clause is conditional because a
     // continued session's close withholds it (SessionResumePolicy.closeRrMs).
+    ExitPrompt.SET_NOT_STARTED ->
+        "No rep has been counted yet. Discarding saves nothing and keeps you here, with this same set next."
     ExitPrompt.SESSION_OPEN ->
         "Every completed set is already saved. Finishing writes the session's end time and its heart-rate " +
             "summary, and its HRV unless it was continued from an earlier visit. Leaving without finishing " +
@@ -493,7 +505,10 @@ internal fun exitBody(prompt: ExitPrompt, unwritten: UnwrittenClose?): String = 
 }
 
 private fun exitLabel(prompt: ExitPrompt, action: ExitAction): String = when (action) {
-    ExitAction.DISCARD_SET_AND_LEAVE -> "Discard set"
+    // "and leave" since record-live F6, because Discard alone now also
+    // names the discard that stays (DISCARD_SET_AND_STAY).
+    ExitAction.DISCARD_SET_AND_LEAVE -> "Discard and leave"
+    ExitAction.DISCARD_SET_AND_STAY -> "Discard set"
     ExitAction.FINISH_SESSION -> "Finish session"
     ExitAction.LEAVE_SESSION_OPEN -> "Leave without finishing"
     ExitAction.LEAVE_SESSION_CLOSING -> "Leave"
@@ -506,6 +521,7 @@ private fun exitLabel(prompt: ExitPrompt, action: ExitAction): String = when (ac
         when (prompt) {
             ExitPrompt.NONE -> ""
             ExitPrompt.SET_IN_PROGRESS -> "Keep recording"
+            ExitPrompt.SET_NOT_STARTED -> "Keep recording"
             ExitPrompt.SESSION_OPEN -> "Keep resting"
             ExitPrompt.SET_SAVING -> "Stay here"
             ExitPrompt.SET_UNSAVED -> "Keep this set"
@@ -516,7 +532,7 @@ private fun exitLabel(prompt: ExitPrompt, action: ExitAction): String = when (ac
 }
 
 private fun exitColor(action: ExitAction): Color = when (action) {
-    ExitAction.DISCARD_SET_AND_LEAVE -> BarColors.Red
+    ExitAction.DISCARD_SET_AND_LEAVE, ExitAction.DISCARD_SET_AND_STAY -> BarColors.Red
     ExitAction.LEAVE_SESSION_OPEN, ExitAction.LEAVE_SESSION_CLOSING, ExitAction.LEAVE_FINISHED_SESSION -> BarColors.Sub
     else -> Color.Unspecified
 }

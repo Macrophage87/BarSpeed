@@ -429,4 +429,63 @@ class RecordExitPolicyTest {
             ExitPrompt.FINAL_REST_UNSAVED.actions,
         )
     }
+
+    // ---- discarding a set that has not started, UX review 2026-11-06 ------
+
+    @Test
+    fun `discarding a set that CANCEL SET could take back keeps the lifter on Record`() {
+        // record-live F6: "Discard set" popped the screen, so aborting a set
+        // started on the wrong plates meant reopening Record, Continue, START.
+        // Where CANCEL SET applies (lead-in, or no rep counted yet) the
+        // discard IS that cancel, and the prompt says so.
+        assertEquals(
+            ExitPrompt.SET_NOT_STARTED,
+            RecordExitPolicy.promptFor(
+                Stage.IN_SET,
+                SetWriteState.NONE,
+                SessionCloseState.NONE,
+                setCancellable = true,
+            ),
+        )
+        assertEquals(
+            listOf(ExitAction.DISCARD_SET_AND_STAY, ExitAction.STAY),
+            ExitPrompt.SET_NOT_STARTED.actions,
+        )
+    }
+
+    @Test
+    fun `a set with a rep counted is still discarded by leaving`() {
+        // CANCEL SET refuses from the first rep on, so the old exit stays:
+        // discard and leave. Nothing about that prompt changes.
+        assertEquals(
+            ExitPrompt.SET_IN_PROGRESS,
+            RecordExitPolicy.promptFor(
+                Stage.IN_SET,
+                SetWriteState.NONE,
+                SessionCloseState.NONE,
+                setCancellable = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `whether the set could be cancelled changes no other answer`() {
+        // A set being saved, or one that failed to save, is over: there is no
+        // in-progress set to cancel, so those prompts and every other stage's
+        // answer the same either way.
+        Stage.entries.forEach { stage ->
+            SetWriteState.entries.forEach { write ->
+                SessionCloseState.entries.forEach { close ->
+                    val plain = RecordExitPolicy.promptFor(stage, write, close)
+                    val cancellable = RecordExitPolicy.promptFor(stage, write, close, setCancellable = true)
+                    if (plain == ExitPrompt.SET_IN_PROGRESS) {
+                        assertEquals(ExitPrompt.SET_NOT_STARTED, cancellable)
+                    } else {
+                        assertEquals(plain, cancellable, "$stage/$write/$close")
+                    }
+                    assertEquals(plain, RecordExitPolicy.promptFor(stage, write, close, setCancellable = false))
+                }
+            }
+        }
+    }
 }

@@ -31,6 +31,15 @@ enum class ExitAction {
     DISCARD_SET_AND_LEAVE,
 
     /**
+     * Discard the set in progress and STAY on the record screen, back where
+     * START was tapped: the landed CANCEL SET path (`RecordViewModel.cancelSet`,
+     * [SetCancelPolicy]). Offered only from [ExitPrompt.SET_NOT_STARTED], so
+     * only while that cancel may be taken; nothing is written either way.
+     * UX review 2026-11-06, record-live F6.
+     */
+    DISCARD_SET_AND_STAY,
+
+    /**
      * Close the session row, and STAY on the screen.
      *
      * The reason given here used to be that `finishSession` wrote on
@@ -100,6 +109,13 @@ enum class ExitPrompt(val actions: List<ExitAction>) {
 
     /** A set is being recorded and none of it is written yet. */
     SET_IN_PROGRESS(listOf(ExitAction.DISCARD_SET_AND_LEAVE, ExitAction.STAY)),
+
+    /**
+     * A set is running that CANCEL SET may still take back -- the lead-in, or
+     * a rep set with no rep counted ([SetCancelPolicy]). Discarding it keeps
+     * the lifter on Record with the same set next, instead of leaving.
+     */
+    SET_NOT_STARTED(listOf(ExitAction.DISCARD_SET_AND_STAY, ExitAction.STAY)),
 
     /** Every set is written, but the session row is still open. */
     SESSION_OPEN(listOf(ExitAction.FINISH_SESSION, ExitAction.LEAVE_SESSION_OPEN, ExitAction.STAY)),
@@ -329,4 +345,16 @@ object RecordExitPolicy {
                 SessionCloseState.REST_UNSAVED -> ExitPrompt.FINAL_REST_UNSAVED
             }
     }
+
+    /**
+     * [promptFor], told whether the set in progress may still be cancelled
+     * (`RecordState.mayCancelSet`). Where it may, [ExitPrompt.SET_IN_PROGRESS]
+     * becomes [ExitPrompt.SET_NOT_STARTED], whose discard stays on the screen;
+     * every other answer is unchanged. Required rather than defaulted, as the
+     * other arguments are.
+     */
+    fun promptFor(stage: Stage, write: SetWriteState, close: SessionCloseState, setCancellable: Boolean): ExitPrompt =
+        promptFor(stage, write, close).let {
+            if (it == ExitPrompt.SET_IN_PROGRESS && setCancellable) ExitPrompt.SET_NOT_STARTED else it
+        }
 }
