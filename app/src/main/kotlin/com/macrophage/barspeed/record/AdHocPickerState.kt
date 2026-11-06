@@ -4,6 +4,7 @@ import com.macrophage.barspeed.data.SessionRepository
 import com.macrophage.barspeed.data.SetRecordEntity
 import com.macrophage.barspeed.model.AdHocPicker
 import com.macrophage.barspeed.model.ExerciseDef
+import com.macrophage.barspeed.model.OffPlanHold
 import com.macrophage.barspeed.model.PlanFile
 import com.macrophage.barspeed.model.RecordedLift
 import com.macrophage.barspeed.model.SideChoicePolicy
@@ -145,6 +146,13 @@ internal fun prefilledState(s: RecordState, exerciseId: String): RecordState {
  * Inserted at `upcomingIndex`, which is the current slot on READY and the
  * next one during rest, and the end of the queue after the last planned set.
  * The slot it displaces has its "move the sensor" flag recomputed against it.
+ *
+ * What the lifter had said for the displaced slot -- a corrected load, reps,
+ * hold, tempo or side -- is held aside rather than lost ([OffPlanHold],
+ * whole-release review): the rest after the off-plan set, or removing it, gives
+ * it back to that slot. Where the displaced slot is itself an off-plan set the
+ * hold already standing is kept, so two off-plan sets in a row still hand the
+ * block's statements back.
  */
 internal fun offPlanAddedState(s: RecordState, exerciseId: String): RecordState? {
     if (s.adHoc) return null
@@ -179,8 +187,16 @@ internal fun offPlanAddedState(s: RecordState, exerciseId: String): RecordState?
         queue[at] = displaced.copy(isExerciseChange = displaced.exercise.id != exerciseId)
     }
     queue.add(at, slot)
+    val displaced = s.queue.getOrNull(at)
+    val held =
+        if (displaced == null || displaced.isOffPlan) {
+            s.heldStatements
+        } else {
+            OffPlanHold.hold(displaced.nextSetSlot(), s.nextSetStatements, s.statedSide)
+        }
     return s.copy(
         queue = queue,
+        heldStatements = held,
         loadInput = s.weightUnit.inputValue(fill.addedKg),
         statedLoadKg = null,
         statedTempo = null,

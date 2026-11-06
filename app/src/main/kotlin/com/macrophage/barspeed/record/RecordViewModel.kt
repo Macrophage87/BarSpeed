@@ -56,6 +56,7 @@ import com.macrophage.barspeed.model.EffortScale
 import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.ForegroundStartFailure
+import com.macrophage.barspeed.model.HeldStatements
 import com.macrophage.barspeed.model.HoldEndPolicy
 import com.macrophage.barspeed.model.HoldEndSource
 import com.macrophage.barspeed.model.HrSample
@@ -74,6 +75,7 @@ import com.macrophage.barspeed.model.NextSetCall
 import com.macrophage.barspeed.model.NextSetInputs
 import com.macrophage.barspeed.model.NextSetSlot
 import com.macrophage.barspeed.model.NextSetStatements
+import com.macrophage.barspeed.model.OffPlanHold
 import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.PlanSessionAutoOpen
 import com.macrophage.barspeed.model.PlanSessionDef
@@ -2163,6 +2165,8 @@ private fun planSessionState(s: RecordState, planSession: PlanSessionDef, queue:
         queue = queue,
         queueIndex = 0,
         adHoc = false,
+        // A hold from a session before this one names a slot of that session.
+        heldStatements = null,
         // Empty, not the plan's number rendered through inputValue: that
         // render is lossy, and seeding the field with it would put a
         // display-quantised value one keystroke away from being recorded as
@@ -2520,16 +2524,36 @@ internal fun removedState(s: RecordState): RecordState? {
     val queue = s.queue.toMutableList().apply { removeAt(at) }.let { offPlanRemovalSensorMoves(s.queue[at], it, at) }
     if (!target.wasUpcoming) return s.copy(queue = queue)
     val upcoming = queue.getOrNull(at) ?: return s.copy(queue = queue)
-    // The statements are cleared (NONE): the slot that moved up is outside the
-    // block, so nothing said about the removed set is about it.
-    val inputs = NextSetInputs.of(last = null, next = upcoming.nextSetSlot(), stated = NextSetStatements.NONE)
+    // An off-plan set's removal gives back what stood for the slot it was put
+    // in front of (OffPlanHold). Otherwise the statements are cleared (NONE):
+    // the slot that moved up is outside the block, so nothing said about the
+    // removed set is about it.
+    val back = s.heldStatementsAfter(s.queue[at], upcoming)
+    val inputs =
+        back?.inputs
+            ?: NextSetInputs.of(last = null, next = upcoming.nextSetSlot(), stated = NextSetStatements.NONE)
     return s.withNextInputs(inputs).copy(
         queue = queue,
         // Cleared with the four statements: a side stated for the set that has
         // just been REMOVED is not a statement about the one that moved up.
-        statedSide = null,
+        statedSide = back?.side,
+        heldStatements = s.heldStatementsLeft(s.queue[at]),
     )
 }
+
+/**
+ * What [OffPlanHold.resumed] gives back for [next] when [left] -- the slot just
+ * run, skipped or removed -- was an off-plan set, else null.
+ */
+internal fun RecordState.heldStatementsAfter(left: PlannedSlot?, next: PlannedSlot?) =
+    if (left?.isOffPlan == true) OffPlanHold.resumed(heldStatements, next?.nextSetSlot()) else null
+
+/** The hold once [left] has gone: spent when [left] was the off-plan set, else kept. */
+internal fun RecordState.heldStatementsLeft(left: PlannedSlot?) = heldStatements.takeUnless { left?.isOffPlan == true }
+
+/** [OffPlanHold.isOffPlan] of this slot. */
+internal val PlannedSlot.isOffPlan: Boolean
+    get() = OffPlanHold.isOffPlan(isAddedSet, setIndexInExercise, setsInExercise)
 
 /**
  * The state dropping an upcoming PRESCRIBED set leaves behind, or null when
@@ -2594,8 +2618,10 @@ internal fun skippedState(s: RecordState): RecordState? {
     // declarations on both sides, which stay right whether or not a bake has
     // run -- on the body-weight refusal door the skipped slot HAS been baked.
     // No LastRanSet: the skipped slot never ran.
+    // A skipped off-plan set gives back what stood for the slot behind it.
+    val back = s.heldStatementsAfter(slot, upcoming)
     val inputs =
-        NextSetInputs.of(
+        back?.inputs ?: NextSetInputs.of(
             last = slot.nextSetSlot(),
             next = upcoming.nextSetSlot(),
             stated = s.nextSetStatements,
@@ -2603,11 +2629,12 @@ internal fun skippedState(s: RecordState): RecordState? {
     return s.withNextInputs(inputs).copy(
         queue = queue,
         skippedSets = skipped,
+        heldStatements = s.heldStatementsLeft(slot),
         // NOT carried, and this is the field that differs from the four
         // statements -- see the KDoc's last paragraph. Written explicitly rather
         // than left to the copy: a field omitted here keeps the skipped set's
-        // answer.
-        statedSide = null,
+        // answer. A side held across an off-plan set is the exception.
+        statedSide = back?.side,
     )
 }
 
@@ -2915,8 +2942,12 @@ private fun restingState(
     // where the plan offers nothing. addedKg, never loadKg: seeding the box with
     // the body-weight-inclusive total is what made a loadless block climb set
     // over set.
+    // After an off-plan set, what stood for the slot it was put in front of
+    // comes back (OffPlanHold); that pair is two exercises, so the carry
+    // policies alone would drop it.
+    val back = s.heldStatementsAfter(p.slot, nextSlot)
     val inputs =
-        NextSetInputs.of(
+        back?.inputs ?: NextSetInputs.of(
             last = p.slot?.nextSetSlot(),
             next = nextSlot?.nextSetSlot(),
             stated = s.nextSetStatements,
@@ -3024,8 +3055,10 @@ private fun restingState(
         // plan writes unilateral work one set per side, so its own order is the
         // alternation, and a choice that stood would put every remaining set of
         // the block on one arm. Written explicitly rather than left to the
-        // copy: a field omitted here keeps the finished set's answer.
-        statedSide = null,
+        // copy: a field omitted here keeps the finished set's answer. A side
+        // held across an off-plan set was chosen for the coming set, not this one.
+        statedSide = back?.side,
+        heldStatements = s.heldStatementsLeft(p.slot),
         // The set is written, so there is nothing left for CANCEL SET to take
         // back (UX review 2026-11-06, rest F2).
         cancelTo = null,
@@ -3733,6 +3766,12 @@ data class RecordState(
      * the opposite of what a lifter swapping arm order for ONE set asked for.
      */
     val statedSide: String? = null,
+    /**
+     * The statements that stood for the slot an off-plan set was put in front
+     * of, held aside while that set is upcoming and given back when the slot
+     * comes up again ([OffPlanHold], whole-release review). Null otherwise.
+     */
+    val heldStatements: HeldStatements? = null,
     /**
      * The AD-HOC tempo text field. A plan session neither draws it nor reads
      * it: its control is the digit steppers, and what they produce is

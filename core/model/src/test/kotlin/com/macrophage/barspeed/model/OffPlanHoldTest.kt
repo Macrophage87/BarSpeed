@@ -16,26 +16,21 @@ import kotlin.test.assertNull
  * notices; removing the curl did the same.
  */
 class OffPlanHoldTest {
-    private fun slot(
-        id: String,
-        index: Int,
-        plannedKg: Double? = 90.0,
-        reps: Int? = 8,
-        tempo: String? = "3010",
-    ) = NextSetSlot(
-        exerciseId = id,
-        setIndexInExercise = index,
-        bodyweight = false,
-        warmup = false,
-        plannedLoadKg = plannedKg,
-        plannedReps = reps,
-        plannedDurationS = null,
-        plannedTempo = tempo,
-        loadKg = plannedKg,
-        reps = reps,
-        durationS = null,
-        tempo = tempo,
-    )
+    private fun slot(id: String, index: Int, plannedKg: Double? = 90.0, reps: Int? = 8, tempo: String? = "3010") =
+        NextSetSlot(
+            exerciseId = id,
+            setIndexInExercise = index,
+            bodyweight = false,
+            warmup = false,
+            plannedLoadKg = plannedKg,
+            plannedReps = reps,
+            plannedDurationS = null,
+            plannedTempo = tempo,
+            loadKg = plannedKg,
+            reps = reps,
+            durationS = null,
+            tempo = tempo,
+        )
 
     private val a2 = slot("leg_press", 1)
     private val curl = slot("leg_curl", 0, plannedKg = null, reps = null, tempo = null)
