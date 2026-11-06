@@ -15,6 +15,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
@@ -114,81 +118,65 @@ private val SECTIONS =
     listOf(
         GuideSection(
             "Sensors",
-            "Pair the WitMotion bar sensor and your heart-rate strap once under Devices — the app " +
-                "auto-connects from then on. Mount the sensor on the bar with the strap tight. The dots " +
-                "in the top bar show status: green = live, amber = reconnecting. Heart-rate straps " +
-                "doze when they lose skin contact; they reconnect on their own. No sensor? Sets still " +
-                "work — the app switches to manual counting or voice-guided tempo automatically.",
+            "Pair the bar sensor and the heart-rate strap once under Devices. They reconnect on " +
+                "their own. Using two bar sensors? Label them A and B there. " +
+                "Clip the bar sensor to the bar, or to the weight stack on a cable machine. " +
+                "Top-bar dots: green = sending data, amber = connecting or sending nothing, " +
+                "red = failed, grey = off. " +
+                "No bar sensor? Tempo sets are still counted by the voice; on other sets you tap " +
+                "the reps yourself.",
         ),
         GuideSection(
             "Plans",
-            "Import a plan on the Plans screen: paste JSON or pick a .json file. The plan is validated " +
-                "and saved — nothing becomes active until you make it active. Tap a plan to review every " +
-                "session, exercise, and set first. Use the prompt below to have an LLM " +
-                "generate the file.",
+            "Plans, then Import plan: paste the JSON or pick the file. Any problems are listed " +
+                "before anything changes. Tap a plan to see every set, and approve it to make it " +
+                "active. The prompt at the bottom of this page gets an LLM to write one.",
         ),
         GuideSection(
-            "Recording",
-            "Start a session from the home screen. Each set shows live bar velocity, the tempo ring, " +
-                "and per-rep bars; explosive lifts show peak velocity and cadence; holds and carries " +
-                "get a countdown. Equipment busy? SWITCH EXERCISE reorders the queue. Barbell sets " +
-                "show which plates to load per side. WHO COUNTS depends on the set: a tempo " +
-                "set is counted by the voice guide, a set with no sensor connected is counted by " +
-                "you (tap), and a straight-reps set with the sensor on is counted BY THE SENSOR " +
-                "— it names each rep aloud and the ring shows the same number. If it misses one, " +
-                "+1 REP THE SENSOR MISSED moves the count up by one and it keeps counting; the " +
-                "export then says the count was corrected and still carries what the sensor " +
-                "said. Holds and carries are never counted in reps. " +
-                "Right when a set ends, tap how hard it felt — on every set, whether or not it hit " +
-                "its target, warm-up always among the choices. A set that met its target also gets " +
-                "a 'failed the set' tile; one stopped short does not, " +
-                "because it is recorded as short of target automatically. Rest follows, then " +
-                "'Start next set' — after the last " +
-                "planned set, that screen offers 'Finish session' instead, or lets you add " +
-                "another set if you want one.",
+            "A set",
+            "START SET says who counts: the voice on a tempo set, the bar sensor on straight " +
+                "reps, or you, tapping +1 REP, when no sensor is connected. " +
+                "If the sensor misses a rep, tap +1 REP THE SENSOR MISSED and it keeps counting. " +
+                "Holds and carries run on a clock instead. " +
+                "End the set by tapping how hard it felt. Stopped before the target? " +
+                "It is recorded as short of target automatically. " +
+                "END SET EARLY ends it with no rating.",
+        ),
+        GuideSection(
+            "Rest",
+            "Fix the last set's reps, load or rating here, or mark it a warm-up. " +
+                "CHANGE NEXT SET edits what comes next, and the Prep buttons set the get-ready " +
+                "time. Equipment busy? SWITCH EXERCISE. After the last planned set: ADD SET, or " +
+                "FINISH SESSION, which asks how the whole session felt.",
         ),
         GuideSection(
             "Voice",
-            "Voice cues are ON by default, with the rest countdown. When you tap the reps, each " +
-                "rep is called, then 'last rep' and 'done'. When the sensor counts, each rep is " +
-                "called at lockout, with the target marked: 'Rep 4, last rep', 'Rep 5, target'. " +
-                "It never says 'done', so keep going if you have more and end the set yourself. " +
-                "'Guided tempo' goes further: " +
-                "the app calls the whole cadence, counting only the seconds strictly inside each " +
-                "stroke, and the rep number is spoken at the START of the rep IN PLACE OF " +
-                "that rep's first stroke word, with that stroke's counts continuing from the " +
-                "number: on a bench 3010 that's 'Down, 1, 2, Up… Rep 2, 2, 3, Up…'. Rep 1 " +
-                "keeps its word, so the first word of the set is the stroke, not 'Rep 1'. " +
-                "A two-second stroke is counted on every rep the same way: an accessory " +
-                "2011 goes 'Up, Hold, Down, 1… Rep 2, Hold, Down, 1…', so the count never " +
-                "goes quiet in the middle of a set. " +
-                "A cadence with no pause at the end and no stroke longer than a second — 1010, " +
-                "and 1110 on some lifts — has no free second at the START of the rep, so the " +
-                "number moves. Where the rep OPENS with the drive it's spoken as that drive " +
-                "ends, in place of the word that second carried: 'Up, Rep 1… Up, Rep 2…', and " +
-                "the last one is 'Up, Last rep'. Rep 1 is named here, unlike every other " +
-                "cadence, and the prep countdown says 'Rep numbers mark the end of each " +
-                "drive'. Only where the rep ENDS with the drive does it call the strokes " +
-                "only: no rep number and no 'last rep', with the count on screen. " +
-                "There's a lead-in first so you can get set on the bar — 5 seconds unless the " +
-                "plan says otherwise or you change it on the rest screen — and the app counts " +
-                "the reps for you. " +
-                "Lifts that start from the bottom (press, deadlift, row) are called the way " +
-                "they're performed, starting on 'Up', with the same two rules. Guided mode is " +
-                "automatic for tempo work when no sensor is connected. Holds and carries get " +
-                "spoken time checks every 5 seconds remaining, then a second-by-second count " +
-                "from 10. Turn voice cues off or on with the 'Voice cues' switch: on the setup " +
-                "and ready screens, and at the top of Record during a set and the rest. " +
-                "Tempo sets still call the cadence.",
+            "Voice cues are on by default. The 'Voice cues' switch on any Record screen turns " +
+                "them off or on; tempo sets still call the cadence. " +
+                "Every tempo set except an explosive lift is called stroke by stroke, sensor or " +
+                "not, after a 5-second lead-in you can change on the rest screen. " +
+                "On a bench 3010 that's 'Down, 1, 2, Up… Rep 2, 2, 3, Up…'. Rep 1 starts on the " +
+                "stroke word, not 'Rep 1'. " +
+                "Two-second strokes are counted too: an accessory 2011 goes " +
+                "'Up, Hold, Down, 1… Rep 2, Hold, Down, 1…'. " +
+                "Lifts that start from the bottom (press, deadlift, row) are called starting on 'Up'. " +
+                "On those, a fast tempo like 1010 names the rep as the drive ends: " +
+                "'Up, Rep 1… Up, Rep 2…', and the last one 'Up, Last rep'. The prep then says " +
+                "'Rep numbers mark the end of each drive'. From the top, a 1010 is called by " +
+                "stroke only, with the count on screen. " +
+                "Sensor-counted sets call each rep ('Rep 1', 'Rep 2'…), 'last rep' one rep " +
+                "before the target and 'Rep 5, target' on it, and never 'Done': you end the set. " +
+                "Tap-counted sets end on 'Last rep', 'Done'. " +
+                "Holds and carries get spoken time checks every 5 seconds remaining, then a " +
+                "second-by-second count from 10.",
         ),
         GuideSection(
-            "Exports",
-            "On any session: Share or Save the compact JSON (for LLM analysis), the detailed JSON " +
-                "(per-rep velocity and power), or the Raw zip — sensor CSVs plus the full analysis in " +
-                "one archive. Every spoken cue ('Down', 'Up', 'Rep 4'…) is timestamped on the same " +
-                "clock as the sensor streams, so cues can be cross-referenced with the " +
-                "accelerometer data. Paste a session export into your LLM chat and ask it to " +
-                "revise next week's plan; RPE, HRV, power, and velocity-loss data are all in there.",
+            "After the session",
+            "History, then the session, then Share or Save to phone. Raw zip is the file " +
+                "robocoach reads. JSON is a short summary to paste into a chat; Detailed adds " +
+                "per-rep figures. Every spoken cue is in the export, on the same clock as the " +
+                "sensor data. Didn't do a set? Open it and tap 'Didn't perform this set?': it " +
+                "shows as Not performed and drops out of your totals.",
         ),
     )
 
@@ -196,6 +184,7 @@ private val SECTIONS =
 @Composable
 fun GuideScreen(navController: NavController) {
     val clipboard = LocalClipboardManager.current
+    var showPrompt by rememberSaveable { mutableStateOf(false) }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -221,8 +210,8 @@ fun GuideScreen(navController: NavController) {
                 SectionCaption("Generate a plan with an LLM", color = BarColors.Volt)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Copy this prompt into Claude (or any LLM). It will ask for context only if it " +
-                        "needs it, then produce a plan file you can import here.",
+                    "Copy this prompt into Claude or any LLM. It asks for context only if it needs " +
+                        "it, then writes a plan file you can import here.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = BarColors.Sub,
                 )
@@ -231,14 +220,23 @@ fun GuideScreen(navController: NavController) {
                     onClick = { clipboard.setText(AnnotatedString(PLAN_PROMPT)) },
                     modifier = Modifier.fillMaxWidth().height(48.dp),
                 ) { Text("COPY PLAN PROMPT") }
-                Spacer(Modifier.height(8.dp))
-                Card(Modifier.fillMaxWidth()) {
-                    Text(
-                        PLAN_PROMPT,
-                        Modifier.padding(12.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = BarColors.Sub,
-                    )
+                // Collapsed by default (UX review 2026-11-06, copy F2): the
+                // prompt is tens of kilobytes written for an LLM, and drawn
+                // inline it turned this page into a long scroll past it. COPY
+                // above hands over the whole of it either way.
+                // Kept a TextButton (#201): a disclosure toggle; it reveals rather than acts.
+                TextButton(onClick = { showPrompt = !showPrompt }) {
+                    Text(if (showPrompt) "Hide prompt" else "Show prompt")
+                }
+                if (showPrompt) {
+                    Card(Modifier.fillMaxWidth()) {
+                        Text(
+                            PLAN_PROMPT,
+                            Modifier.padding(12.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = BarColors.Sub,
+                        )
+                    }
                 }
                 Spacer(Modifier.height(20.dp))
             }

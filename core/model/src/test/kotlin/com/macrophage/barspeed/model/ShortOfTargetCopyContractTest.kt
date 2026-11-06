@@ -28,6 +28,6 @@ class ShortOfTargetCopyContractTest {
     @Test
     fun `the guide says a set stopped short is recorded as short of target`() {
         assertFalse("failed automatically" in guide, "How it works still says a short set is logged as failed")
-        assertTrue("because it is recorded as short of target automatically" in guide, "How it works")
+        assertTrue("It is recorded as short of target automatically" in guide, "How it works")
     }
 }
