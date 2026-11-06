@@ -353,6 +353,16 @@ object RecordExitPolicy {
      * every other answer is unchanged. Required rather than defaulted, as the
      * other arguments are.
      */
+    /**
+     * The prompt the exit dialog draws: [now] while it is still the prompt the
+     * lifter opened ([openedFor]), and [ExitPrompt.NONE] -- the dialog closed
+     * -- once it has changed or when none was opened. Closing rather than
+     * redrawing in place, so a button never turns into a different button
+     * under a thumb already moving (a rep landing turns "Discard set", which
+     * stays, into "Discard and leave"). Back asks again with the new prompt.
+     */
+    fun dialogFor(openedFor: ExitPrompt?, now: ExitPrompt): ExitPrompt = if (openedFor == now) now else ExitPrompt.NONE
+
     fun promptFor(stage: Stage, write: SetWriteState, close: SessionCloseState, setCancellable: Boolean): ExitPrompt =
         promptFor(stage, write, close).let {
             if (it == ExitPrompt.SET_IN_PROGRESS && setCancellable) ExitPrompt.SET_NOT_STARTED else it

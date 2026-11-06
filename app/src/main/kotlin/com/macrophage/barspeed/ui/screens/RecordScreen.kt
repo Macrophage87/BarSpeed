@@ -243,10 +243,14 @@ fun RecordScreen(
     // the old buttons, so the lifter left on a promise that had stopped being
     // true and was never offered the retry that still had the set in memory.
     // Reading the live value means the dialog cannot describe a state the app is
-    // no longer in.
-    var exitOpen by remember { mutableStateOf(false) }
+    // no longer in. Since the record-live F6 review it does not redraw in place
+    // either: the dialog remembers which prompt it was opened for and CLOSES
+    // when the live one changes (RecordExitPolicy.dialogFor), so no button
+    // turns into another under a moving thumb. Back asks the new question.
+    var exitOpenFor by remember { mutableStateOf<ExitPrompt?>(null) }
+    LaunchedEffect(prompt) { if (exitOpenFor != prompt) exitOpenFor = null }
     val onExitAction: (ExitAction) -> Unit = { action ->
-        exitOpen = false
+        exitOpenFor = null
         when (action) {
             ExitAction.STAY -> Unit
             // Closes the session row and stays put. Not because popping would
@@ -288,13 +292,13 @@ fun RecordScreen(
         if (prompt == ExitPrompt.NONE) {
             navController.popBackStack()
         } else {
-            exitOpen = true
+            exitOpenFor = prompt
         }
     }
     BackHandler(enabled = prompt != ExitPrompt.NONE, onBack = onBack)
-    // A prompt that becomes NONE while the dialog is open closes it, which is
-    // the right outcome: NONE is the policy saying nothing is at risk any more.
-    ExitDialog(if (exitOpen) prompt else ExitPrompt.NONE, state.closeUnwritten, onExitAction)
+    // Any change of prompt while the dialog is open closes it, NONE included:
+    // NONE is the policy saying nothing is at risk any more.
+    ExitDialog(RecordExitPolicy.dialogFor(exitOpenFor, prompt), state.closeUnwritten, onExitAction)
 
     Scaffold(
         topBar = {
@@ -493,16 +497,19 @@ internal fun exitBody(prompt: ExitPrompt, unwritten: UnwrittenClose?): String = 
     // control that is not on screen is worse than naming none.
     ExitPrompt.SET_IN_PROGRESS ->
         "Nothing about this set has been saved — the reps, the sensor data and the effort rating all go. " +
-            "To keep it, tap Keep recording and end the set with the control at the bottom of this screen. " +
+            "To keep it, tap Keep recording and end the set with its end control on this screen. " +
             "On a tempo-guided or timed set that is under way that control ends the set short of target, and " +
             "you can still rate the set while you rest."
+    // The discard that stays (record-live F6): CANCEL SET's path. "Nothing has
+    // been recorded" rather than "no rep counted", because a hold or a carry
+    // in its lead-in reaches this prompt too.
+    ExitPrompt.SET_NOT_STARTED ->
+        "Nothing has been recorded yet. Discarding saves nothing and keeps you here, with this same set next."
     // Says the session can be picked up again, and for how long, because as
     // of #48 it can: coming back to Record asks "Continue this session?" while
     // SessionResumePolicy.offer would (an open row with sets, its last set
     // within RESUME_WINDOW_MS). The HRV clause is conditional because a
     // continued session's close withholds it (SessionResumePolicy.closeRrMs).
-    ExitPrompt.SET_NOT_STARTED ->
-        "No rep has been counted yet. Discarding saves nothing and keeps you here, with this same set next."
     ExitPrompt.SESSION_OPEN ->
         "Every completed set is already saved. Finishing writes the session's end time and its heart-rate " +
             "summary, and its HRV unless it was continued from an earlier visit. Leaving without finishing " +

@@ -488,4 +488,22 @@ class RecordExitPolicyTest {
             }
         }
     }
+
+    @Test
+    fun `an open exit dialog closes when the prompt changes under it`() {
+        // Reviewer nit on record-live F6: the live prompt used to MORPH the
+        // open dialog -- a rep landing turned "Discard set" (stays) into
+        // "Discard and leave" in the same spot, under a thumb already on its
+        // way. It now closes, and Back asks again with the new question.
+        ExitPrompt.entries.forEach { opened ->
+            ExitPrompt.entries.forEach { now ->
+                assertEquals(
+                    if (opened == now) now else ExitPrompt.NONE,
+                    RecordExitPolicy.dialogFor(openedFor = opened, now = now),
+                    "opened=$opened now=$now",
+                )
+            }
+            assertEquals(ExitPrompt.NONE, RecordExitPolicy.dialogFor(openedFor = null, now = opened))
+        }
+    }
 }
