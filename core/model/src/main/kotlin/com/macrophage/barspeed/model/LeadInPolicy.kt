@@ -131,6 +131,19 @@ object LeadInPolicy {
     fun resolve(declaredS: Int?, adjustedS: Int?): Int = clamp(adjustedS ?: declaredS ?: DEFAULT_S)
 
     /**
+     * The per-exercise override one tap of the prep control leaves stored, or
+     * null when the tap lands on what the plan prescribes ([planned]), which
+     * CLEARS the override rather than storing a copy of the plan's number
+     * (UX review 2026-11-06, settings-onboarding F4).
+     *
+     * A stored copy looks reset on screen but keeps beating every later plan's
+     * `prep_s` for that exercise. [currentS] is what plays now
+     * ([resolve]); a [deltaS] of `planned - current` is the "Use plan prep"
+     * reset.
+     */
+    fun overrideAfterTap(declaredS: Int?, currentS: Int, deltaS: Int): Int? = clamp(currentS + deltaS)
+
+    /**
      * The word a TIMED set's prep ends on, or null for a kind whose timed sets
      * get no prep.
      *
