@@ -811,6 +811,22 @@ class SessionRepository(
         )
     }
 
+    /**
+     * The exercise and start instant of every set held by a session started
+     * between [fromMs] and [toMs] (#100).
+     *
+     * What `JournalRecoveryPolicy.alreadyStored` compares a recovered capture
+     * against: a set row is the capture's set when it is the same exercise
+     * begun at the same instant. Read through `sessionsInRange` and
+     * `setsForSession`, existing queries, for [latestSession]'s reason -- a new
+     * abstract DAO member would have to be implemented by every hand-written
+     * fake in this module's tests.
+     */
+    suspend fun setsBegunInSessionsBetween(fromMs: Long, toMs: Long): List<Pair<String, Long>> =
+        sessionDao.sessionsInRange(fromMs, toMs)
+            .flatMap { session -> sessionDao.setsForSession(session.id) }
+            .map { set -> set.exerciseId to set.startedAtMs }
+
     fun observeSession(id: Long): Flow<SessionEntity?> = sessionDao.observeSession(id)
 
     fun observeSets(sessionId: Long): Flow<List<SetRecordEntity>> = sessionDao.observeSetsForSession(sessionId)
