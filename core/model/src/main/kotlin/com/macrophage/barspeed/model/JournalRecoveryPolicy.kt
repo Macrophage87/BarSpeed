@@ -83,7 +83,11 @@ enum class RecoveryRefusal {
     /** A timed set's figure is its seconds, and a killed process ended no clock. */
     TIMED,
 
-    /** Not a rep-based lift, so there is no rep list for the analyzer to rebuild. */
+    /**
+     * A hold or a carry recorded untimed: not a rep-based lift, so there is no
+     * rep list for the analyzer to rebuild. Dynamic and explosive lifts are
+     * both rep-based and both admitted.
+     */
     NOT_REP_BASED,
 
     /** A bar-sensor stream the analysis would read is oversize or malformed, so it is not decoded. */
@@ -92,7 +96,11 @@ enum class RecoveryRefusal {
     /** A prep ran and the instant the work began was never journaled, so the reps cannot be bounded. */
     WORK_START_UNKNOWN,
 
-    /** Neither an analysable sensor stream nor a counted rep: the row would have to state a count nobody made. */
+    /**
+     * The counter the set ran under made no count the capture holds: a tally
+     * counter with no mark, or a sensor-counted set with no analysable stream.
+     * The row would have to state a count nobody made.
+     */
     NOTHING_TO_COUNT,
 }
 
@@ -196,7 +204,9 @@ object JournalRecoveryPolicy {
      * counted whole by the listing scan. [analysable] is whether the analysed
      * stream reaches `SensorCapturePolicy.MIN_ANALYSABLE_FRAMES`, [repMarks]
      * the rows in `reps.csv`, and [workStartJournaled] whether the instant the
-     * work began after a prep reached the journal.
+     * work began after a prep reached the journal. Whether the set can be
+     * counted is [count]'s question, asked with the journaled counter, so the
+     * refusal and the count cannot disagree.
      *
      * The order is the order the facts are needed in, so a capture refused
      * for two reasons names the one that stops everything after it.
@@ -210,29 +220,38 @@ object JournalRecoveryPolicy {
     ): RecoveryRefusal? = when {
         facts == null -> RecoveryRefusal.NOT_JOURNALED
         facts.timed -> RecoveryRefusal.TIMED
-        facts.exercise.kind != ExerciseKind.DYNAMIC -> RecoveryRefusal.NOT_REP_BASED
+        facts.exercise.kind !in repBased -> RecoveryRefusal.NOT_REP_BASED
         !imuReadable -> RecoveryRefusal.STREAM_UNREADABLE
         facts.prepCase != PrepCase.NONE && !workStartJournaled -> RecoveryRefusal.WORK_START_UNKNOWN
-        !analysable && repMarks <= 0L -> RecoveryRefusal.NOTHING_TO_COUNT
+        count(facts.counter, analysable, 0, repMarks.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()) == null ->
+            RecoveryRefusal.NOTHING_TO_COUNT
         else -> null
     }
 
     /**
      * The count the row is written with, or null where there is none to write.
      *
-     * The sensor counts reps: an analysable stream gives the batch segmenter's
-     * count, unstated. The live count the lifter heard died with the process,
-     * so it is not on the row. Only where no stream can be analysed do the
-     * journaled marks -- the lifter's `+1 REP` taps or the guide's cycles --
-     * become the count, stated, because they are then the only count anybody
-     * made.
+     * `RepCountPolicy.recorded`'s precedence, which the set's own write
+     * applies, read with the counter the set ran under (#100 review round 1,
+     * Lens B B1). On a set the lifter or the guide counted
+     * ([RepCounter.MANUAL], [RepCounter.METRONOME]) the journaled marks ARE
+     * the tally -- the `+1 REP` taps or the guide's calls -- and the row
+     * states them, an analysable stream beside them or not; a tally of none
+     * is no count. On a [RepCounter.SENSOR] set the live count the lifter
+     * heard died with the process and no mark was journaled, so the count is
+     * the batch segmenter's over an analysable stream, unstated, or none.
+     * [RepCounter.NOBODY] counts nothing.
+     *
+     * The previous rule, "the sensor's count wins and the marks count only
+     * where no stream can be analysed", threw a lifter's taps away beside
+     * an analysable stream and wrote a count the lifter never gave.
      */
-    @Suppress("UNUSED_PARAMETER", "UnusedParameter")
-    fun count(counter: RepCounter, analysable: Boolean, analysedReps: Int, repMarks: Int): RecoveredCount? = when {
-        analysable -> RecoveredCount(analysedReps, stated = false)
-        repMarks > 0 -> RecoveredCount(repMarks, stated = true)
-        else -> null
-    }
+    fun count(counter: RepCounter, analysable: Boolean, analysedReps: Int, repMarks: Int): RecoveredCount? =
+        when (counter) {
+            RepCounter.MANUAL, RepCounter.METRONOME -> RecoveredCount(repMarks, stated = true).takeIf { repMarks > 0 }
+            RepCounter.SENSOR -> RecoveredCount(analysedReps, stated = false).takeIf { analysable }
+            RepCounter.NOBODY -> null
+        }
 
     /**
      * When the recovered set is recorded as having ended: the last instant any
@@ -243,6 +262,9 @@ object JournalRecoveryPolicy {
      */
     fun endedAtMs(startedAtMs: Long, journaledInstants: List<Long>): Long =
         maxOf(startedAtMs, journaledInstants.maxOrNull() ?: startedAtMs)
+
+    /** The kinds a set row can be rebuilt for: the rep-based ones. */
+    private val repBased = setOf(ExerciseKind.DYNAMIC, ExerciseKind.EXPLOSIVE)
 
     /** The third action on the interrupted-set card. */
     const val ACTION_LABEL = "PUT IT BACK"
@@ -256,12 +278,12 @@ object JournalRecoveryPolicy {
     /**
      * The confirmation's body: what will be written and what will not.
      *
-     * It says the set is re-analysed and marked recovered, that the targets and
-     * the effort tap are not recovered, and where the set goes.
+     * It says the set is re-analysed and marked recovered, that the targets,
+     * the side and the effort tap are not recovered, and where the set goes.
      */
     fun confirmBody(exerciseName: String): String =
         "$exerciseName is analysed again from what reached the disk and saved to History marked recovered. " +
-            "Its plan targets, side, tempo and effort rating were never saved and stay empty. It joins its own " +
+            "Its plan targets, side and effort rating were never saved and stay empty. It joins its own " +
             "session if that session is still open and current; otherwise it is saved as a session of its own. " +
             "The capture on this phone is removed once the set is saved."
 

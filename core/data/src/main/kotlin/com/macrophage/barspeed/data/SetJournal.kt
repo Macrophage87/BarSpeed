@@ -13,9 +13,16 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.nullable
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -151,9 +158,38 @@ data class SetJournalHeader(
      * [secondaryImuConnected]'s reason: a field an older header cannot
      * supply would otherwise drop the whole directory. JOURNAL_VERSION does
      * not move, for [sensorRoles]'s.
+     *
+     * DECODED LENIENTLY, for the same reason one level down (#100 review
+     * round 1). The facts nest an `ExerciseDef`, a `ResolvedGeometry` and a
+     * `RecordedSensors`, and carry a required counter; a header whose facts
+     * this build cannot decode -- a required field missing, an enum value it
+     * does not know -- would otherwise fail the whole header, and the
+     * capture #42 stage 1 exists to keep would drop off the card for a fact
+     * only #100 needs. [LenientJournalSetFactsSerializer] reads such facts as
+     * none, which `JournalRecoveryPolicy.refusal` answers `NOT_JOURNALED`.
      */
+    @Serializable(with = LenientJournalSetFactsSerializer::class)
     val facts: JournalSetFacts? = null,
 )
+
+/**
+ * [SetJournalHeader.facts]'s reader: facts that do not decode are none, never
+ * the reason a header is dropped. Encoding is the plain serializer's.
+ */
+internal object LenientJournalSetFactsSerializer : KSerializer<JournalSetFacts?> {
+    private val plain = JournalSetFacts.serializer().nullable
+
+    override val descriptor: SerialDescriptor = plain.descriptor
+
+    override fun serialize(encoder: Encoder, value: JournalSetFacts?) = plain.serialize(encoder, value)
+
+    override fun deserialize(decoder: Decoder): JournalSetFacts? {
+        val json = decoder as? JsonDecoder ?: return plain.deserialize(decoder)
+        val element = json.decodeJsonElement()
+        if (element is JsonNull) return null
+        return runCatching { json.json.decodeFromJsonElement(JournalSetFacts.serializer(), element) }.getOrNull()
+    }
+}
 
 /**
  * An interrupted set found on disk, MEASURED rather than decoded.

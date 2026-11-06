@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.data
 
 import com.macrophage.barspeed.dsp.ImuCsv
+import com.macrophage.barspeed.dsp.RestStart
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.SetAnalyzer
 import com.macrophage.barspeed.dsp.SetEnd
@@ -18,6 +19,7 @@ import com.macrophage.barspeed.model.RecoveryTarget
 import com.macrophage.barspeed.model.SensorCapturePolicy
 import com.macrophage.barspeed.model.SessionResumePolicy
 import com.macrophage.barspeed.model.SetGeometryPolicy
+import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.VoiceCue
 import com.macrophage.barspeed.model.armedCaptureOf
 import java.io.File
@@ -63,9 +65,13 @@ internal sealed interface PreparedRecovery {
  * of from the heap.
  *
  * WHAT A RECOVERED ROW DOES NOT HAVE, said once here and in the card's
- * confirmation. No plan targets, side, tempo or effort rating: they were never
- * journaled. No live count: it died with the process, so the row's reps are
- * the segmenter's. No silence words for an armed unit that delivered nothing:
+ * confirmation. No plan targets, side or effort rating: they were never
+ * journaled (the tempo, warm-up, added and planned-side declarations and the
+ * prep seconds were, and are written as the set's own write writes them). No
+ * live count: it died with the process. The row's reps are the journaled
+ * marks, stated, on a set the lifter or the guide counted, and the batch
+ * segmenter's, unstated, on a sensor-counted one -- `JournalRecoveryPolicy.
+ * count`. No silence words for an armed unit that delivered nothing:
  * those read the link states at the end of the set, and the links ended with
  * the process. No time zone on a session opened for the set: the journal never
  * carried one, and null is `SessionOpening`'s "could not establish".
@@ -202,6 +208,17 @@ class JournalRecovery(
                 analysedSignal = capture.analysedSignal,
             )
         val analysable = capture.samples.size >= SensorCapturePolicy.MIN_ANALYSABLE_FRAMES
+        // Asked before the analysis, because the count is what the analyzer
+        // is handed to compare its own against -- the tally on a set the lifter
+        // or the guide counted, exactly as `endSet` hands it `stated ?: live`.
+        // A sensor-counted set's live count died with the process, so it is
+        // handed none. The segmenter's count fills in after.
+        val tally = JournalRecoveryPolicy.count(
+            counter = facts.counter,
+            analysable = false,
+            analysedReps = 0,
+            repMarks = streams.marks.size,
+        )
         val analysis =
             if (analysable) {
                 SetAnalyzer.analyze(
@@ -209,7 +226,8 @@ class JournalRecovery(
                     analysed.exercise.liftDirection(),
                     facts.loadKg,
                     SetTargets(
-                        countedReps = streams.marks.size.takeIf { it > 0 },
+                        countedReps = tally?.reps,
+                        tempo = facts.tempo?.let { Tempo.parseOrNull(it) },
                         cadenceGuided = cadenceGuided,
                     ),
                     cues = streams.cues,
@@ -244,13 +262,17 @@ class JournalRecovery(
                 bodyWeightKg = facts.bodyWeightKg,
                 plannedReps = null,
                 manualReps = count.reps.takeIf { count.stated },
-                tempo = null,
+                tempo = facts.tempo,
                 targetMeanConVelMps = null,
                 velocityLossStopPct = null,
                 plannedRestS = null,
-                restStartedAtMs = endedAtMs,
-                plannedPrepS = null,
-                prepS = null,
+                // The instant the set's own write would start the rest from,
+                // asked of the same rule over the journaled cues and marks; no
+                // hold reaches here, so no release decides it.
+                restStartedAtMs = RestStart.of(streams.cues, cadenceGuided, streams.marks, null, endedAtMs),
+                plannedSide = facts.plannedSide,
+                plannedPrepS = facts.plannedPrepS,
+                prepS = facts.prepS,
                 startedAtMs = header.startedAtMs,
                 endedAtMs = endedAtMs,
                 analysis = analysis,
@@ -263,6 +285,8 @@ class JournalRecovery(
                 secondary = capture.secondary,
                 prepWindow = prepWindow,
                 workBegan = AbandonedSetPolicy.workBegan(facts.prepCase, prepWindow?.workStartedAtMs),
+                warmup = facts.warmup,
+                added = facts.added,
                 recovered = true,
             ),
         )
