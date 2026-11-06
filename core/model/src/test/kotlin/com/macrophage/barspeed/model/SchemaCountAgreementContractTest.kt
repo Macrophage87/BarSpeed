@@ -115,6 +115,30 @@ class SchemaCountAgreementContractTest {
         assertFalse("nothing a set stores supports one" in entry, "the #246 entry still states the impossibility")
     }
 
+    /**
+     * Review round 1 (lens A 1, lens B B1): the 1.26 paragraph widened what
+     * false means and left the OPENER saying false is a count difference, so a
+     * reader stopping at the first sentence read the 1.26 false -- equal counts,
+     * misaligned against the guide -- as impossible. The opener now says both.
+     */
+    @Test
+    fun `repMetricsComplete opens with both ways false arises`() {
+        val opener = description("repMetricsComplete").substringBefore(" Everything derived")
+        assertTrue("different number of reps" in opener, "the count difference is not in the opener: $opener")
+        assertTrue("FROM 1.26 (#246) ON A `metronome` SET" in opener, "the 1.26 false is not in the opener: $opener")
+        assertTrue("counts AGREE but the detections do not" in opener, "the opener: equal counts can read false")
+    }
+
+    /** The coach's copy of the same opener. */
+    @Test
+    fun `the plan prompt says false can arrive with equal counts on a guided set`() {
+        assertTrue(
+            "or, from export 1.26 on a \"metronome\" set, the counts agree but the detections do not sit one to a " +
+                "cycle of the guide's marks" in prompt,
+            "the plan prompt still says false is only a count difference",
+        )
+    }
+
     /** The copy the coach receives: the per-rep line said what false means and nothing about true. */
     @Test
     fun `the plan prompt says true is only the counts matching`() {
