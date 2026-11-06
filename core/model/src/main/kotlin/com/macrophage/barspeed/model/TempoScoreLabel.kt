@@ -50,9 +50,10 @@ object TempoScoreLabel {
      * The phases a set can be GRADED on, in the order they are reported.
      *
      * The names are the ones `SetAnalyzer.complianceFor` writes and the export
-     * publishes in `scoredPhases`. Pauses are measured and reported but never
-     * scored, so a prescribed pause nothing measured is not a gap in the
-     * ratio's coverage and must not be named as one.
+     * publishes in `scoredPhases`. Pauses are reported but never scored (and
+     * a reported pause is the segmenter's gap between the phases, not a
+     * measured dwell, #92), so a prescribed pause nothing measured is not a
+     * gap in the ratio's coverage and must not be named as one.
      * `TempoScoreWiringTest` in `:core:dsp` pins these strings against what the
      * analyzer actually emits; drift there would leave every set matching no
      * phase, and a set matching no phase would tick unconditionally.

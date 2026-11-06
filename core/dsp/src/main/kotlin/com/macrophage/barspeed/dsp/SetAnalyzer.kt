@@ -37,7 +37,10 @@ data class RepAnalysis(
      */
     val bottomPauseS: Double?,
     val conS: Double,
-    /** Seconds still at the TOP turnaround, on the same rule as [bottomPauseS]. */
+    /**
+     * Seconds still at the TOP turnaround, on the same rule as [bottomPauseS]:
+     * the segmenter's gap between the two phases, not a measured dwell (#92).
+     */
     val topPauseS: Double?,
     /** Mean drive velocity, positive in the direction the drive moves. */
     val meanConVelMps: Double,
@@ -852,7 +855,10 @@ object SetAnalyzer {
         // reversal was dwell-free. On session 29 the owner's estimator,
         // independent of segmentation, put turnaround dwell at 0.10-0.14 s on
         // leg press, single-leg press and seated leg curl alike (0.13 s on the
-        // leg curl, n=33), where this figure under-reads it.
+        // leg curl, n=33), where this figure's session-29 medians were 1.18 s
+        // (single-leg press), 0.16 s (leg press) and 0.04 s (leg curl) --
+        // #92's table: over on the presses, under on the leg curl -- so it
+        // neither tracks nor bounds the dwell.
         //
         // Measured at a6d3c4f2 by a scratch run over the committed captures
         // with SetAnalyzer's own defaults, NOT committed and NOT pinned: every

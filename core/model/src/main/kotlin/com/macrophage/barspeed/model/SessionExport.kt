@@ -2952,8 +2952,8 @@ data class SessionExport(
          * on the word's description -- while all 53 barbell streams in the
          * committed corpus read moved (pinned by `StackMountFieldTest`;
          * measured over each stream's cue- and work-start-bounded window and
-         * over its whole capture; the nearest, field-42 set 5's bench press, at 5.685
-         * degrees against a 3.0 bound).
+         * over its whole capture; the nearest, field-42 set 5's bench press,
+         * at 5.685 degrees against a 3.0 bound).
          *
          * Under 1.26 and not a mint: 1.26 is unreleased, minted on this branch
          * for #289 above. NOT RETROACTIVE: the roll verdict is taken when the
@@ -4703,7 +4703,10 @@ data class RepMetricsExport(
      */
     @SerialName("bottomPause_s") val bottomPauseS: Double? = null,
     @SerialName("con_s") val conS: Double,
-    /** Seconds still at the TOP turnaround, on the same rule as [bottomPauseS]. */
+    /**
+     * Seconds still at the TOP turnaround, on the same rule as [bottomPauseS]:
+     * the segmenter's gap between the two phases, not a measured dwell (#92).
+     */
     @SerialName("topPause_s") val topPauseS: Double? = null,
     /** Mean drive velocity, positive in the direction the drive moves. */
     @SerialName("meanConVel_mps") val meanConVelMps: Double,
@@ -4787,7 +4790,9 @@ data class TempoComplianceExport(
      * Reps within tolerance on every scored phase THAT REP RESOLVED, out of
      * [of], the reps that resolved at least one (every rep, on a set
      * analysed before v0.1.36). Pauses are reported but
-     * never scored (on a set analysed by v0.1.31 or later). A phase the
+     * never scored (on a set analysed by v0.1.31 or later), and a reported
+     * pause is the segmenter's gap between the phases, not a measured dwell
+     * (#92). A phase the
      * sensor did not measure is not counted against the lifter (on a set
      * analysed by v0.1.36 or later) and does not appear in [scoredPhases], so read that field to
      * know what this ratio covers: on a slow concentric-first lift it is
