@@ -1958,7 +1958,7 @@ internal fun ChangeSetDialog(
                 PlanValueCaptions(state, slot)
                 PerImplementEcho(state, slot)
                 LoadSignHint(slot)
-                if (next) SideAdjuster(state, viewModel, slot)
+                SideAdjuster(state, viewModel, slot)
                 TempoAdjuster(state, viewModel)
                 PrepAdjuster(state, viewModel)
             }
@@ -2441,7 +2441,7 @@ private fun LoadSignHint(slot: PlannedSlot?) {
 }
 
 /**
- * Which arm the NEXT set works, on a unilateral set (#215).
+ * Which arm the set being set up works, on a unilateral set (#215).
  *
  * DRAWN ONLY WHERE THE SET IS UNILATERAL. [SideChoicePolicy.offersChoice]
  * decides, in the module a test runs in, and a bilateral set gets no control at
@@ -2450,13 +2450,13 @@ private fun LoadSignHint(slot: PlannedSlot?) {
  * used two, and unlike the ad-hoc selector one field over, what is chosen here
  * is RECORDED against a prescription.
  *
- * NEXT SET ONLY, which is #215's own scope and the owner's words -- "adjust the
- * arrow on one-sided exercises in the adjust next set". READY's "Change this
- * set" therefore does not offer it, so set one of a unilateral block cannot be
- * swapped. That is a real gap and it is named rather than folded in: the
- * mechanism would carry over unchanged, `startedFromReadyState` bakes through
- * the same function, and the only thing missing is this line without its
- * `next` guard.
+ * ON BOTH SURFACES since the UX review of 2026-11-06 (record-setup F7). #215
+ * scoped it to the next set, so READY's "Change this set" did not offer it and
+ * set one of a unilateral block could not be swapped -- the plan's side was
+ * recorded against what the lifter did. The mechanism carries over unchanged:
+ * the card on READY already draws `carriedIntoNextSet(slot.side, statedSide)`,
+ * and `startedFromReadyState` bakes the statement through the same function
+ * the rest screen's START uses. The `next` guard at the call site is gone.
  *
  * NO ARROW IN THE CHIPS, deliberately. #129 is open on [SideArrow] being sized
  * in dp beside text sized in sp, so it shrinks against its neighbours at large
