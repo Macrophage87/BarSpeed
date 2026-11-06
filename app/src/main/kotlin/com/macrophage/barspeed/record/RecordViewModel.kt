@@ -1089,6 +1089,41 @@ private fun analysedSetOf(p: PendingSetWrite): SetAnalysis = SetAnalyzer.analyze
 )
 
 /**
+ * What `RecordViewModel.runSetWrite` stores as the set's analysis, from the
+ * pending write alone. Moved out of that function unchanged -- the same four
+ * branches in the same order -- for [analysedSetOf]'s reason: `RecordViewModel`
+ * is the class detekt's `LargeClass` counts. Sensor data is analysed even on
+ * manually-counted sets: the manual count overrides the rep COUNT, but
+ * velocity and power still come from the bar sensor when it was recording.
+ */
+private fun setAnalysisOf(p: PendingSetWrite): SetAnalysis = when {
+    p.isTimed -> SetAnalysis(
+        emptyList(),
+        0.0,
+        null,
+        null,
+        // The working target, the same figure the rest
+        // screen's hold verdict reads: "Held 30s -- full 30s
+        // target" on a hold the lifter shortened to 30, not
+        // "30s of 45s -- just short".
+        timedVerdicts(p.actualDurationS, p.targetDurationS),
+    )
+    // A set measured on reps whose kind has no reps for the
+    // segmenter to find (#63): its figures are withheld and its
+    // stream is still written with the row.
+    // RepAnalysisPolicyTest pins which shapes reach here.
+    !RepAnalysisPolicy.segmentsReps(p.isTimed, p.exercise.kind) ->
+        SetAnalyzer.withheldCarry(p.samples.size)
+    p.samples.size >= SensorCapturePolicy.MIN_ANALYSABLE_FRAMES ->
+        // See analysedSetOf: the set's own cue track, work start,
+        // fallback flag and roll signal, all frozen on the write.
+        analysedSetOf(p)
+    p.manualReps != null ->
+        SetAnalysis(emptyList(), 0.0, null, null, listOf("Reps counted manually — no bar sensor."))
+    else -> SetAnalysis(emptyList(), 0.0, null, null, listOf("No sensor data recorded."))
+}
+
+/**
  * The four link fields THIS STATE is holding, as `:core:model` wants them.
  *
  * The one place they are bundled, so the two readings -- the card on READY and
@@ -6057,35 +6092,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // Sensor data is analyzed even on manually-counted sets — the manual
         // count overrides the rep COUNT, but velocity/power metrics still come
         // from the bar sensor when it was recording.
-        val analysis =
-            withContext(Dispatchers.Default) {
-                when {
-                    p.isTimed -> SetAnalysis(
-                        emptyList(),
-                        0.0,
-                        null,
-                        null,
-                        // The working target, the same figure the rest
-                        // screen's hold verdict reads: "Held 30s -- full 30s
-                        // target" on a hold the lifter shortened to 30, not
-                        // "30s of 45s -- just short".
-                        timedVerdicts(p.actualDurationS, p.targetDurationS),
-                    )
-                    // A set measured on reps whose kind has no reps for the
-                    // segmenter to find (#63): its figures are withheld and its
-                    // stream is still written with the row.
-                    // RepAnalysisPolicyTest pins which shapes reach here.
-                    !RepAnalysisPolicy.segmentsReps(p.isTimed, p.exercise.kind) ->
-                        SetAnalyzer.withheldCarry(p.samples.size)
-                    p.samples.size >= SensorCapturePolicy.MIN_ANALYSABLE_FRAMES ->
-                        // See analysedSetOf: the set's own cue track, work start,
-                        // fallback flag and roll signal, all frozen on the write.
-                        analysedSetOf(p)
-                    p.manualReps != null ->
-                        SetAnalysis(emptyList(), 0.0, null, null, listOf("Reps counted manually — no bar sensor."))
-                    else -> SetAnalysis(emptyList(), 0.0, null, null, listOf("No sensor data recorded."))
-                }
-            }
+        val analysis = withContext(Dispatchers.Default) { setAnalysisOf(p) }
         sessionRepository.ensureExerciseExists(p.exercise.id)
 
         // Stopped early = failed. Judged only where the count is trustworthy:
