@@ -125,6 +125,7 @@ import com.macrophage.barspeed.model.StoredSet
 import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.TempoAdjustPolicy
 import com.macrophage.barspeed.model.TimedSetEndPolicy
+import com.macrophage.barspeed.model.UnguidedSetCall
 import com.macrophage.barspeed.model.UnwrittenClose
 import com.macrophage.barspeed.model.VelocityLossRegime
 import com.macrophage.barspeed.model.VoiceCue
@@ -2667,6 +2668,11 @@ private fun recordedTimedEnd(
  * tick loop asks before it speaks a countdown word, `LeadInPolicy.speaks` over
  * the set's [prepCase] and the audio setting -- one predicate, so a set whose
  * countdown was silent cannot be the one set that speaks its ending (#288).
+ *
+ * Where `SetEnd` asks for nothing, an UNGUIDED set with the voice on still
+ * answers the END tap out loud (UX review 2026-11-06, voice F7), as a call
+ * with NO recorded words: `speakCues` then speaks it and writes nothing, so
+ * the record stays exactly what #141 left it. [UnguidedSetCall] says why.
  */
 private fun RecordState.endingCall(clockEnded: Boolean, prepCase: PrepCase, spoken: List<VoiceCue>): SpokenCall? =
     SetEnd.terminalCall(
@@ -2675,7 +2681,7 @@ private fun RecordState.endingCall(clockEnded: Boolean, prepCase: PrepCase, spok
         clockEnded = clockEnded,
         voiceSpeaks = LeadInPolicy.speaks(prepCase, audioCues),
         spoken = spoken,
-    )
+    ) ?: UnguidedSetCall.atEnd(prepCase, currentIsTimed, audioCues)?.let { SpokenCall(it, emptyList()) }
 
 /**
  * The voice after the audio-cue toggle moved to [enabled] (#340).
@@ -5261,6 +5267,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // lead-in renders as a set already under way.
         stateFlow.value =
             inSetState(s, manualSet, guidedSet, sensorCounted, leadInRunning = timedStartWord != null || guidedSet)
+        // Voice F7: an unguided set answers the START tap; spoken, never recorded.
+        UnguidedSetCall.atStart(prepCase, s.currentIsTimed, s.audioCues)?.let { speakOnly(it) }
         if (timedStartWord != null) {
             val speaks = LeadInPolicy.speaks(prepCase, s.audioCues)
             startTimedPrep(prepS, timedStartWord, speaks) { startSetTimer(timedTargetS) }
