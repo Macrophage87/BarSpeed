@@ -1,11 +1,55 @@
 # BarSpeed
 
-Android app for velocity-based strength training. A WitMotion **WT901BLECL** BLE
-IMU on the barbell measures bar speed and the duration of every rep phase — so a
-prescribed 4-second eccentric provably takes 4 seconds — and an optional Garmin
-**HRM 600** (any standard BLE strap works) adds heart rate. Training plans import
-from, and completed sessions export to, LLM-friendly JSON so Claude can analyze
-your training and write the next block.
+Android app for velocity-based strength training. Two WitMotion **WT901BLECL**
+BLE IMUs, labelled **A** and **B**, clip to the barbell or to a weight stack and
+measure bar speed and the duration of every rep phase, so a prescribed
+4-second eccentric provably takes 4 seconds. An optional Garmin **HRM 600** (any
+standard BLE strap works) adds heart rate. The phone counts tempo and reps out
+loud (voice is on by default). Plans import from JSON, and every session
+exports as a raw zip that robocoach reads to write the next plan.
+
+## Install and update
+
+- Use **one** install channel and stay on it: either the Play internal testing
+  track, or the `BarSpeed-vX.Y.Z.apk` from
+  [Releases](https://github.com/Macrophage87/BarSpeed/releases) installed over
+  the old one.
+- **Never uninstall.** Uninstalling deletes every session, plan, sensor
+  pairing and body weight on the phone.
+- The two channels are signed with different keys (Play re-signs with its own
+  Google-generated key), so a Play build cannot update a GitHub APK, or the
+  reverse. Switching channels means uninstalling. Before any switch, use
+  **Export all sessions** and save the zips off the phone.
+
+## Exporting to robocoach
+
+Open the session (tap it in History on Home, or **View session & export** at the
+end of a workout), then **Raw zip**:
+
+- under **Share**, pick robocoach (or wherever you hand it files), or
+- under **Save to phone**, save it (defaults to Downloads).
+
+The zip holds a CSV per set and sensor, `meta.json` (described by
+[`docs/schemas/raw-meta.schema.json`](docs/schemas/raw-meta.schema.json)) and
+`session.json`, the full analysis (described by
+[`docs/schemas/session-export.schema.json`](docs/schemas/session-export.schema.json)).
+
+## Importing a plan
+
+Plans come from robocoach. In the app: **Plans → Import plan (paste JSON)** or
+**Import plan from file → Approve**. The plan contract for any LLM is in the app
+at **Guide → COPY PLAN PROMPT**; that is the one copy kept in step with the
+code. The machine-readable form is
+[`docs/schemas/plan.schema.json`](docs/schemas/plan.schema.json).
+
+## Reporting a bug
+
+- If the app crashed, Home shows a **CRASH REPORT** card: tap **SEND IT TO ME**
+  and share the file.
+- Otherwise, [open an issue](https://github.com/Macrophage87/BarSpeed/issues/new/choose)
+  with the bug form. Give the app version (shown on the **Guide** screen), what
+  you did and what happened, and attach the crash file or the session's raw zip
+  if you have one.
 
 ## Features
 
@@ -15,76 +59,32 @@ your training and write the next block.
   peak concentric velocity, velocity-loss %, and rule-based verdicts; plus a
   preview of the next planned set, editable before you start it (deviations are
   recorded as such).
-- **Auto-connect**: pair each sensor once; the app reconnects to both in parallel
-  from then on. The HRM being absent never blocks the bar sensor.
+- **Two sensors**: pair each unit once in Devices and label it A or B (the app
+  cannot tell two unlabelled streams apart), and mount it on the bar or on the
+  weight stack. The app reconnects to every paired unit in parallel from then
+  on; a missing HR strap never blocks the IMUs.
 - **HRV**: R-R intervals from the strap (standard BLE, incl. Garmin HRM 600)
   drive a live RMSSD readout on the rest screen and a per-session HRV stored,
   shown in history, and included in exports for recovery analysis.
-- **Plan import with approval gate**: paste plan JSON from Claude — or pick a
+- **Plan import with approval gate**: paste plan JSON — or pick a
   `.json` file — it's validated against `docs/schemas/plan.schema.json`,
   summarized, and only activated when you approve it.
-- **Voice counting (optional)**: the phone counts each second of the eccentric
+- **Voice counting (on by default)**: the phone counts each second of the eccentric
   and concentric out loud (hit that 4-second lowering without watching the
   screen), calls each rep at lockout ("rep 3"), "last rep" going into the
   final planned rep, "done" when you hit the count, and counts down the last
   seconds of rest.
-- **Exports**: token-efficient session JSON for LLM analysis (optionally with
-  per-rep detail incl. drive power), and a self-contained raw zip for Python/R
-  — per-set sensor CSVs plus the full session.json analysis in one archive.
+- **Exports**: the raw zip robocoach reads (per-set sensor CSVs, `meta.json`
+  and the full `session.json` analysis in one archive), plus token-efficient
+  session JSON for LLM analysis (optionally with per-rep detail incl. drive
+  power).
 
-## Get a training plan out of Claude and into the app
+## For developers
 
-Copy this prompt into Claude (fill in the bracketed context), then in the app:
-**Plans → Import plan → paste → Approve**.
-
-The short version below is enough to get started. The app's own **Guide →
-COPY PLAN PROMPT** carries the full contract and is the copy kept in step with
-the code; when the two disagree, that one is right.
-
-> Create a strength training plan for me. My context: [goals, experience,
-> days/week, equipment, current working weights or estimated 1RMs].
->
-> Reply with ONLY a JSON document (no prose, no code fences) conforming exactly to
-> this schema: top level `{"schemaVersion": "1.15", "planName": string,
-> "sessions": [...]}`. Each session is `{"name": string, "exercises": [...]}`.
-> Each exercise is `{"exercise": snake_case_id, "sets": [...]}` plus an optional
-> `"description"` string (the form cue I read between sets without touching the
-> phone — MAXIMUM 220 characters, front-loaded with the part that decides how
-> the set is performed) and an optional `"additional_notes"` string (no limit —
-> the rest of the cue, which I see only after tapping to expand). The older
-> single-blob `"notes"` string is still accepted — use ids like
-> `back_squat`, `bench_press`, `deadlift`, `overhead_press`, `barbell_row`,
-> `romanian_deadlift`, `front_squat`, `hip_thrust`; for timed work `plank`,
-> `side_plank`, `dead_hang`, `farmers_walk`, `suitcase_carry`; and for
-> explosive/ballistic lifts `snatch`, `power_snatch`, `clean`, `power_clean`,
-> `push_press`, `kettlebell_swing`, `kettlebell_snatch`, `kettlebell_clean`
-> (the app tracks peak velocity per rep and cadence on these — no tempo
-> prescriptions). Each set has
-> exactly one of `{"reps": int}` (dynamic sets) or `{"duration_s": int}` (holds
-> and carries — planks, farmer's walks). Load is `"load_kg"` or `"load_lb"` (at
-> most one, whichever unit I use; omit both for bodyweight). Optional per set:
-> `"tempo"` (4-digit notation like "4010" or "30X0"; dynamic sets only — on
-> vertical work the digits are positional: down stroke, bottom pause, up
-> stroke, top pause seconds; on horizontal work digit 1 is the eccentric and
-> digit 3 the concentric. X = as fast as possible, on a stroke only: put it on
-> the drive, so a lat pulldown driven hard is "X010". The plan schema's tempo
-> description has the whole rule),
-> `"side"` ("left" or "right" for unilateral exercises like side planks,
-> suitcase carries, or single-leg work — emit one set per side),
-> `"targetMeanConcentricVelocity_mps"` (number),
-> `"velocityLossStop_pct"` (number, e.g. 20), and `"rest_s"` (int).
->
-> The app measures bar velocity and phase durations with a bar-mounted IMU, so
-> use tempo prescriptions and velocity targets deliberately: set
-> `targetMeanConcentricVelocity_mps` and `velocityLossStop_pct` on primary
-> barbell lifts to enable auto-regulation, and tempos where they serve the goal.
-
-The full machine-readable contract is
-[`docs/schemas/plan.schema.json`](docs/schemas/plan.schema.json); more prompts
-(session analysis, plan revision from velocity data, raw-CSV deep dives) are in
+More LLM prompts (session analysis, raw-data deep dives) are in
 [`PROMPTS.md`](PROMPTS.md).
 
-## Repository layout
+### Repository layout
 
 | Module | Contents |
 |---|---|
@@ -96,9 +96,9 @@ The full machine-readable contract is
 | `:core:ble` | GATT clients, scanner, device registry, auto-connect manager |
 | `:core:data` | Room persistence, plan/session repositories, JSON + raw CSV exporters |
 
-`PROMPT.md` is the original engineered specification the app is built against.
+`PROMPT.md` is the historical seed prompt; it does not describe the current app.
 
-## Building
+### Building
 
 ```sh
 ./gradlew assembleDebug          # full build (needs Android SDK)
@@ -106,8 +106,11 @@ The full machine-readable contract is
 ```
 
 CI (GitHub Actions) runs ktlint, detekt, unit tests, Android lint, schema
-validation, and assembles a debug APK on every push; tagging `v*` builds a
-release APK and attaches it to a GitHub Release.
+validation, and assembles a debug APK on every push. Tagging `v*` (or
+dispatching the Release workflow, which creates the tag) runs the unit tests and
+a minified build, then builds a signed APK and AAB, attaches them to a GitHub
+Release, and uploads the AAB to the Play internal track when the
+`PLAY_SERVICE_ACCOUNT_JSON` secret is set.
 
 To protect `main`, run `./scripts/protect-branch.sh` (or `scripts\protect-branch.ps1`
 on Windows) once with an authenticated [GitHub CLI](https://cli.github.com). It
