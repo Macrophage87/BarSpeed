@@ -36,6 +36,25 @@ class LiveRepFiguresTest {
     }
 
     @Test
+    fun `a call takes the run its drive overlaps most`() {
+        val bars = LiveRepFigures()
+        val runs = listOf(run(0.2, 1.05, 0.3), run(1.1, 1.8, 0.5), run(3.0, 3.6, 0.9))
+        bars.onCall(call(1, 1.0, 1.5), runs)
+        assertEquals(listOf<RepFigure?>(RepFigure(0.5, 1.0)), bars.figures)
+    }
+
+    @Test
+    fun `a run gives at most one bar, and a run before the last one claimed gives none`() {
+        val bars = LiveRepFigures()
+        val runs = listOf(run(1.1, 1.8, 0.5))
+        bars.onCall(call(1, 1.0, 1.5), runs)
+        bars.onCall(call(2, 1.2, 1.6), runs)
+        assertNull(bars.figures[1], "the second call over the same run")
+        bars.onCall(call(3, 0.0, 1.0), listOf(run(0.1, 0.9, 0.4)) + runs)
+        assertNull(bars.figures[2], "a run older than the one already claimed")
+    }
+
+    @Test
     fun `a drive no run overlaps is a bar with no figure`() {
         val bars = LiveRepFigures()
         bars.onCall(call(1, 5.0, 5.5), listOf(run(1.1, 1.8, 0.5)))

@@ -279,6 +279,34 @@ class DeadliftLiveCountFieldTest {
     }
 
     /**
+     * Which bars carry a figure. On role a that is 3, 1 and 2 -- the same
+     * number the tracker paired, because on a concentric-first lift its pairing
+     * counts every qualified drive run -- but now in the slots of the calls they
+     * belong to, so on set 6 the last bar is rep 5's figure and not rep 2's.
+     */
+    @Test
+    fun `each figured bar sits in the slot of the call whose drive its run overlaps`() {
+        assertEquals(
+            listOf(
+                listOf(true, true, false, true, false),
+                listOf(true, false, false, false, false),
+                listOf(true, false, false, false, true),
+            ),
+            sets.map { set -> liveBars(set.name).second.map { it != null } },
+            "role a: which bars carry a figure, set by set",
+        )
+        assertEquals(
+            listOf(0, 0, 2),
+            sets.map { set -> liveBars("${set.name}-imu-b").second.count { it != null } },
+            "role b: figured bars, set by set",
+        )
+        val set6 = liveBars("field-deadlift-straight-5rep-s43-set06").second
+        assertEquals(0.336, set6[4]!!.meanMps, 1e-3, "set 6 rep 5's bar: mean")
+        assertEquals(0.452, set6[4]!!.peakMps, 1e-3, "set 6 rep 5's bar: peak")
+        set6.filterNotNull().forEach { assertTrue(it.peakMps >= it.meanMps, "peak under mean: $it") }
+    }
+
+    /**
      * The second unit is not a spare copy of the first.
      *
      * Role b, the same code and the same declared geometry, calls 0, 0 and 3
