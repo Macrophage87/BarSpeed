@@ -125,7 +125,9 @@ sealed interface RecoveryTarget {
      * set is placed, after the decode, so that hold is either a leak (every
      * way out of Record pops it and its ViewModel releases the hold) or a
      * Record screen opened on top of Home during the decode, with a set
-     * recording now (whole-branch review of 0.2.0, round 2, CAP-R2-B1).
+     * started there -- recording, or resting after it, since that screen
+     * holds SESSION from its first set to the session's close (whole-branch
+     * review of 0.2.0, round 2, CAP-R2-B1; round 3, CAP-R3-N1).
      * Nothing is decided until it is released;
      * [JournalRecoveryPolicy.waitNote] says which.
      */
@@ -362,7 +364,10 @@ object JournalRecoveryPolicy {
      *   holds live in process memory. That a force-stop clears it on a device
      *   is reasoned, not observed;
      * - a Record screen opened on top of Home during the decode, with a set
-     *   recording now. Its leaving releases the hold.
+     *   started there: recording now, or resting after it, since that screen
+     *   acquires SESSION at its first set and releases it only at the
+     *   session's close or its own clearing (round 3, CAP-R3-N1). Its leaving
+     *   releases the hold.
      *
      * The policy cannot tell the two apart, so [RECORDING_NOTE] covers both:
      * its "If you are not recording" hedge is what keeps the force-stop
@@ -396,9 +401,12 @@ object JournalRecoveryPolicy {
 
     /**
      * [waitNote] while only the record screen's own hold is held: a leaked
-     * hold, or a set recording now on a Record screen opened during the
-     * decode. The "If you are not recording" hedge keeps it true in the
-     * second case ([waitNote]).
+     * hold, or a Record screen opened during the decode with a set started
+     * there, recording now or resting after it. The "If you are not
+     * recording" hedge keeps it true while a set records ([waitNote]); at a
+     * rest a force-stop loses no saved set, since that set's row has landed
+     * (a write still running would hold [RecordingHold.SET_WRITE] and answer
+     * [SAVING_NOTE]) and a wait keeps the capture.
      */
     const val RECORDING_NOTE =
         "BarSpeed still counts a recording as running. If you are not recording, force-stop BarSpeed in " +

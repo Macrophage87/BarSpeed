@@ -315,8 +315,9 @@ class JournalRecoveryPolicyTest {
         assertTrue("still counts a recording as running" in recording, recording)
         assertTrue("force-stop" in recording, recording)
         // CAP-R2-B1: a SESSION seen after the decode may be a Record screen
-        // opened on top of Home with a set recording now; the hedge keeps
-        // the force-stop advice from reaching a lifter mid-set.
+        // opened on top of Home with a set started there (recording now, or
+        // resting after it); the hedge keeps the force-stop advice from
+        // reaching a lifter mid-set.
         assertTrue("If you are not recording, force-stop" in recording, recording)
     }
 
