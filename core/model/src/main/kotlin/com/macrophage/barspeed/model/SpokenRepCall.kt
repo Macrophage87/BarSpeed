@@ -57,4 +57,11 @@ object SpokenRepCall {
         val number = match.groups[1]?.let { Span(it.range.first, it.range.last + 1, Reading.CARDINAL, it.value) }
         listOfNotNull(word, number).asSequence()
     }.toList()
+
+    /**
+     * The text the engine is handed for [utterance]: the same characters at
+     * the same positions, so every [Span] of [spansOf] still covers what it
+     * marks.
+     */
+    fun utterance(utterance: String): String = utterance
 }

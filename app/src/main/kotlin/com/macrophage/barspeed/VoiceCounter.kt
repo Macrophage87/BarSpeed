@@ -248,8 +248,9 @@ class VoiceCounter(context: Context) {
         }
     }
 
-    private fun marked(text: String): CharSequence {
-        val spans = SpokenRepCall.spansOf(text)
+    private fun marked(cue: String): CharSequence {
+        val spans = SpokenRepCall.spansOf(cue)
+        val text = SpokenRepCall.utterance(cue)
         if (spans.isEmpty()) return text
         return SpannableString(text).apply {
             for (span in spans) {
