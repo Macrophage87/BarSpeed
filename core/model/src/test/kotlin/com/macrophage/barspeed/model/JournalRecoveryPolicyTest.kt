@@ -295,10 +295,14 @@ class JournalRecoveryPolicyTest {
      * N4). A set-end write or a session close finishes on its own, so the
      * lifter is told to wait. The record screen's own hold, SESSION, is
      * released when that screen goes away, and every way out of Record pops
-     * it, so held under Home it has leaked: "try again in a moment" would
-     * never come true, and neither is a set recording anywhere (#100 review
-     * round 2, Lens B B1 -- the round-1 note said one was). The note says
-     * what the app holds and what clears it, `rescuedRestoreNote`'s reading.
+     * it, so held under Home with Record gone it has leaked: "try again in a
+     * moment" would never come true, and no set is recording anywhere (#100
+     * review round 2, Lens B B1 -- the round-1 note said one was). The note
+     * says what the app holds and what clears it, `rescuedRestoreNote`'s
+     * reading. The holds are read after the decode, so the same SESSION may
+     * instead be a Record screen opened on top of Home with a set recording
+     * now (whole-branch review of 0.2.0, round 2, CAP-R2-B1); the note's
+     * "If you are not recording" hedge keeps it true there, and is pinned.
      */
     @Test
     fun `a wait names what it waits for`() {
@@ -306,10 +310,14 @@ class JournalRecoveryPolicyTest {
         assertEquals(SAVING, saving)
         val recording = JournalRecoveryPolicy.waitNote(setOf(RecordingHold.SESSION))
         assertFalse("in a moment" in recording, recording)
-        assertFalse("still recording" in recording, "a held SESSION under Home is no set recording: $recording")
-        assertFalse("Record screen" in recording, "there is no Record screen to finish a set on: $recording")
+        assertFalse("still recording" in recording, "a held SESSION may be a leak, with no set recording: $recording")
+        assertFalse("Record screen" in recording, "a leaked hold has no Record screen to finish a set on: $recording")
         assertTrue("still counts a recording as running" in recording, recording)
         assertTrue("force-stop" in recording, recording)
+        // CAP-R2-B1: a SESSION seen after the decode may be a Record screen
+        // opened on top of Home with a set recording now; the hedge keeps
+        // the force-stop advice from reaching a lifter mid-set.
+        assertTrue("If you are not recording, force-stop" in recording, recording)
     }
 
     /**

@@ -121,9 +121,12 @@ sealed interface RecoveryTarget {
 
     /**
      * A recording hold is held: a set write or a session close still
-     * running, or the record screen's own hold, which under Home has leaked
-     * -- every way out of Record pops it and its ViewModel releases the
-     * hold. Nothing is decided until it is released;
+     * running, or the record screen's own hold. The holds are read when the
+     * set is placed, after the decode, so that hold is either a leak (every
+     * way out of Record pops it and its ViewModel releases the hold) or a
+     * Record screen opened on top of Home during the decode, with a set
+     * recording now (whole-branch review of 0.2.0, round 2, CAP-R2-B1).
+     * Nothing is decided until it is released;
      * [JournalRecoveryPolicy.waitNote] says which.
      */
     data object Wait : RecoveryTarget
@@ -349,13 +352,23 @@ object JournalRecoveryPolicy {
      * reading (#100 review round 1, Lens A N5, Lens B N4). A set-end write
      * or a session close finishes on its own: wait. The record screen's own
      * hold, [RecordingHold.SESSION], is released when that screen goes away,
-     * and every way out of Record pops it, so held under Home it has leaked
-     * -- its KDoc names a task swipe -- and no set is recording anywhere
-     * (#100 review round 2, Lens B B1: the round-1 note said one was).
-     * Nothing will finish it, so the note says what the app still holds and
-     * names what clears it, the process ending, since the holds live in
-     * process memory. That a force-stop clears it on a device is reasoned,
-     * not observed.
+     * and every way out of Record pops it. The recovery reads the holds when
+     * it places the set, after the decode, so a SESSION seen then is one of
+     * two things (whole-branch review of 0.2.0, round 2, CAP-R2-B1):
+     * - a leak, Record gone -- its KDoc names a task swipe -- with no set
+     *   recording anywhere (#100 review round 2, Lens B B1: the round-1 note
+     *   said one was). Nothing will finish it, so the note says what the app
+     *   still holds and names what clears it, the process ending, since the
+     *   holds live in process memory. That a force-stop clears it on a device
+     *   is reasoned, not observed;
+     * - a Record screen opened on top of Home during the decode, with a set
+     *   recording now. Its leaving releases the hold.
+     *
+     * The policy cannot tell the two apart, so [RECORDING_NOTE] covers both:
+     * its "If you are not recording" hedge is what keeps the force-stop
+     * advice from being given to a lifter mid-set, where a force-stop would
+     * lose the live set. The hedge must not be dropped; it is pinned in
+     * JournalRecoveryPolicyTest `a wait names what it waits for`.
      */
     fun waitNote(held: Set<RecordingHold>): String =
         if (RecordingServicePolicy.writing(held)) SAVING_NOTE else RECORDING_NOTE
@@ -381,7 +394,12 @@ object JournalRecoveryPolicy {
      */
     const val SAVING_NOTE = "A set or session is still saving -- try again in a moment"
 
-    /** [waitNote] while only the record screen's own hold is held. */
+    /**
+     * [waitNote] while only the record screen's own hold is held: a leaked
+     * hold, or a set recording now on a Record screen opened during the
+     * decode. The "If you are not recording" hedge keeps it true in the
+     * second case ([waitNote]).
+     */
     const val RECORDING_NOTE =
         "BarSpeed still counts a recording as running. If you are not recording, force-stop BarSpeed in " +
             "Android settings or restart the phone, and try again."
