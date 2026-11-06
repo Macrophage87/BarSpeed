@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
  * states which version made it").
  *
  * WHAT WAS WRONG. `PLAN_PROMPT` told the coach that nothing in the export says
- * which build recorded a set. False: `SessionDetailViewModel.exportName` names
+ * which build recorded a set. False: `SessionDetailViewModel.exportName` named
  * every export `BarSpeed-v<BuildConfig.VERSION_NAME>-<session start>-<suffix>`,
  * and `RawExporter` writes `appVersion` into the raw zip's `meta.json`. Both
  * name the build that WROTE the export, which is the recording build unless
@@ -25,6 +25,11 @@ import kotlin.test.assertTrue
  * Narrow, and said so: this checks the documents STATE it. The Kotlin twin of
  * the `liveReps` description and of the log, on [SessionExport], is kept in
  * step by hand; nothing here can see a KDoc.
+ *
+ * SINCE HISTORY-EXPORT F4 (UX review 2026-11-06) the raw zip's filename
+ * carries no version ([ExportNaming.rawZipName]); only the JSON exports' names
+ * still do. Both documents say so, so neither sends a reader to look for a
+ * version in a raw zip's name.
  */
 class SchemaExportBuildContractTest {
     private val schema = Json.parseToJsonElement(
@@ -46,6 +51,7 @@ class SchemaExportBuildContractTest {
 
     private val names = "name the build that WROTE the export"
     private val unlessUpdated = "the recording build unless the session was exported after an update"
+    private val rawNameUnversioned = "the raw zip's own filename carries no version"
 
     @Test
     fun `the plan prompt names the filename and appVersion instead of saying nothing does`() {
@@ -56,6 +62,7 @@ class SchemaExportBuildContractTest {
         assertTrue(names in prompt, "PLAN_PROMPT does not say the filename and appVersion name the writing build")
         assertTrue(unlessUpdated in prompt, "PLAN_PROMPT does not say when the writing build is not the recorder")
         assertTrue("filename" in prompt && "\"appVersion\"" in prompt, "PLAN_PROMPT does not name both places")
+        assertTrue(rawNameUnversioned in prompt, "PLAN_PROMPT still implies the raw zip's name carries the version")
         assertTrue(
             "started before 2026-09-18 cannot have been counted by the impulse detector" in prompt,
             "PLAN_PROMPT lost the date rule",
@@ -71,6 +78,7 @@ class SchemaExportBuildContractTest {
         assertTrue(names in liveReps, "liveReps does not say the filename and appVersion name the writing build")
         assertTrue(unlessUpdated in liveReps, "liveReps does not say when the writing build is not the recorder")
         assertTrue("`meta.json` `appVersion`" in liveReps, "liveReps does not name the raw zip's appVersion")
+        assertTrue(rawNameUnversioned in liveReps, "liveReps still implies the raw zip's name carries the version")
     }
 
     @Test

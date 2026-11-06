@@ -3512,13 +3512,14 @@ data class SetExport(
      * A set recorded by v0.1.53, the only earlier release that stored this
      * key, was counted by `LiveRepCaller` -- the segmenter's pairing rule over
      * a causal velocity estimate -- and keeps that figure when re-exported.
-     * Nothing in the document records which build recorded a set; the
+     * Nothing in the document records which build recorded a set; a JSON
      * export's filename as the app names it
      * (`BarSpeed-v<version>-<session start>-<suffix>`, from
-     * `SessionDetailViewModel.exportName`) and the raw zip's `meta.json`
+     * [ExportNaming.versionedName]) and the raw zip's `meta.json`
      * `appVersion` (`RawExporter`) name the build that WROTE the export, which
      * is the recording build unless the session was exported after an update
-     * (#312). A session whose `startedAt` precedes v0.1.54's release on
+     * (#312). The raw zip's own filename carries no version
+     * ([ExportNaming.rawZipName], history-export F4). A session whose `startedAt` precedes v0.1.54's release on
      * 2026-09-18 cannot have been counted by the impulse detector. The sentence that stood here said
      * the live detector runs the same pairing rule over a causal velocity
      * estimate; that was v0.1.53's detector, it was false for every set
