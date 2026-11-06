@@ -1695,6 +1695,7 @@ private fun RecordState.nextSetPhrase(): String? {
         reps = statedReps ?: next.reps,
         durationS = statedDurationS ?: next.durationS,
         side = SideChoicePolicy.carriedIntoNextSet(declaredSide = next.side, statedSide = statedSide),
+        implementCount = next.implementCount,
     )
 }
 

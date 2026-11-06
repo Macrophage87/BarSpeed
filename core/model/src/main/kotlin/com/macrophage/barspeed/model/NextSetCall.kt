@@ -15,6 +15,7 @@ package com.macrophage.barspeed.model
  *  - "Next: Pull-up, body weight plus 10 kilos, 6"
  *  - "Next: Single-arm row, left, 20 kilos, 8"
  *  - "Next: Plank, body weight, 60 seconds"
+ *  - "Next: DB bench press, 20 kilos each, 8" (a pair at 2 × 20 kg)
  *
  * Spoken outside any set, as part of the same utterance as "Rest over" (the
  * voice speaks with QUEUE_FLUSH, so a second utterance would cut the first
@@ -32,6 +33,13 @@ object NextSetCall {
      * loaded work a missing or non-positive load says nothing about the load,
      * except on a timed set, which the lifter's own body loads ("body
      * weight", the card's rule). [timed] picks [durationS] over [reps].
+     *
+     * [implementCount] is the plan's declared count of identical objects.
+     * At two or more, loaded work says the load on EACH -- the figure the
+     * card's "2 × 20 kg" loads per hand -- because the total ("40 kilos")
+     * heard on the floor reads as two 40s (whole-release review). The split
+     * is [ImplementLoad.perImplementAddedKg]'s; one object or none declared
+     * says the total, as before. Body-weight work keeps its own wording.
      */
     @Suppress("LongParameterList")
     fun phrase(
@@ -43,11 +51,12 @@ object NextSetCall {
         reps: Int?,
         durationS: Int?,
         side: String?,
+        implementCount: Int? = null,
     ): String? {
         if (exerciseName.isBlank()) return null
         val load = when {
             bodyweight -> bodyweightLoad(loadKg, unit)
-            loadKg != null && loadKg > 0 && amount(loadKg, unit) != "0" -> amountWithUnit(loadKg, unit)
+            loadKg != null && loadKg > 0 && amount(loadKg, unit) != "0" -> loadedLoad(loadKg, implementCount, unit)
             timed -> BODY_WEIGHT
             else -> null
         }
@@ -60,6 +69,13 @@ object NextSetCall {
     fun restOver(next: String?): String = if (next == null) REST_OVER else "$REST_OVER. $next"
 
     private const val BODY_WEIGHT = "body weight"
+
+    private fun loadedLoad(totalKg: Double, implementCount: Int?, unit: WeightUnit): String =
+        if (ImplementLoad.count(implementCount) < 2) {
+            amountWithUnit(totalKg, unit)
+        } else {
+            amountWithUnit(ImplementLoad.perImplementAddedKg(totalKg, implementCount), unit) + " each"
+        }
 
     private fun bodyweightLoad(addedKg: Double?, unit: WeightUnit): String {
         val kg = addedKg ?: 0.0
