@@ -1078,10 +1078,9 @@ private fun SetupStage(state: RecordState, viewModel: RecordViewModel, hideResum
  */
 private fun imuAdviceText(advice: SensorAdvice): String = when (advice) {
     SensorAdvice.PAIR_OR_POWER ->
-        "Pair or power on the WitMotion sensor, or check the phone's own Bluetooth."
+        "Turn the bar sensor on, or pair it under Devices. Check the phone's Bluetooth too."
     SensorAdvice.UNRESPONSIVE ->
-        "The sensor answered and then stopped responding -- pairing again is unlikely to help. " +
-            "Power-cycle it."
+        "The bar sensor answered, then stopped. Turn it off and on; pairing again won't help."
     SensorAdvice.TURN_ON_PHONE_BLUETOOTH ->
         "Your phone's Bluetooth is off. Turn it on; the app keeps retrying the sensor on its own."
 }
@@ -1357,7 +1356,7 @@ private fun SensorCaptureLine(state: RecordState) {
 private fun sensorCaptureDetail(roster: SensorRoster): String? {
     roster.shortfall?.let { return DualSensorSetup.recordLine(it) }
     return if (roster.isDual) {
-        "Both streams are recorded from whichever units are delivering; nothing is derived from the second one yet"
+        "A and B both record while switched on"
     } else {
         null
     }
@@ -1467,8 +1466,8 @@ private fun PrepAdjuster(state: RecordState, viewModel: RecordViewModel) {
             Text(
                 when {
                     prepS == plannedS -> "Time to get set before the set begins"
-                    slot != null -> "Plan says ${plannedS}s - your change is recorded in the export"
-                    else -> "Default is ${plannedS}s - your change is recorded in the export"
+                    slot != null -> "Plan: ${plannedS}s · changed"
+                    else -> "Default: ${plannedS}s · changed"
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = BarColors.Sub,
@@ -1574,8 +1573,8 @@ private fun TempoAdjuster(state: RecordState, viewModel: RecordViewModel) {
     // deleted. The caption is unchanged.
     Text(
         when {
-            planned == null || tempo == planned -> "Seconds per phase for the coming set"
-            else -> "Plan says $planned - the rest of this exercise runs $tempo unless the plan changes it"
+            planned == null || tempo == planned -> "Seconds for each phase of the next set"
+            else -> "Plan: $planned · $tempo for the rest of this exercise"
         },
         style = MaterialTheme.typography.bodySmall,
         color = BarColors.Sub,
@@ -1874,7 +1873,8 @@ private fun ChangeSetButton(
  *
  * The caption stays attached to the load and reps row rather than being
  * promoted to the dialog's subtitle, and that is the one thing here it would
- * be easy to get wrong. "deviations are recorded" is a claim about the export.
+ * be easy to get wrong. "Changes are noted against the plan" (it read
+ * "deviations are recorded" until UX review 2026-11-06) is a claim about the export.
  * From export 1.23 it is true of load, reps, hold and tempo -- each publishes
  * its planned figure beside the working one (#157) -- and of prep, which
  * publishes a planned/actual pair. The tempo control carries its own caption,
@@ -1910,11 +1910,7 @@ internal fun ChangeSetDialog(
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text(
-                    if (next) {
-                        "Adjust next set (deviations are recorded)"
-                    } else {
-                        "Adjust this set (deviations are recorded)"
-                    },
+                    "Changes are noted against the plan",
                     style = MaterialTheme.typography.bodySmall,
                     color = BarColors.Sub,
                 )
@@ -3454,7 +3450,7 @@ private fun SavingSetNotice() {
         letterSpacing = 2.sp,
     )
     Spacer(Modifier.height(6.dp))
-    SectionCaption("Keeping this screen open is not required — the set finishes saving either way")
+    SectionCaption("Safe to leave this screen")
 }
 
 /**
@@ -3555,7 +3551,7 @@ private fun FailSetButton(state: RecordState, viewModel: RecordViewModel, gridBe
         // the gap between the red button and the first tile row.
         Spacer(Modifier.height(18.dp))
     } else {
-        SectionCaption("How that set felt is asked once it is finished · you can still rate this one while you rest")
+        SectionCaption("You can still rate it while you rest")
     }
 }
 

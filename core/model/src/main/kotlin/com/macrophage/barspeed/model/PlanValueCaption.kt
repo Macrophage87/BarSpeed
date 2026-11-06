@@ -13,13 +13,14 @@ package com.macrophage.barspeed.model
  *
  * NO FOURTH PHRASING. Two sentences ship today and both are re-used verbatim:
  *
- *  - "Plan says X - your change is recorded in the export", from the prep
- *    adjuster and the sensor-count line. It is a claim about the export and it
- *    is TRUE of all three of these boxes, each of which publishes a
- *    planned/actual pair -- load_kg beside plannedLoad_kg, reps beside
- *    plannedReps, actualDuration_s beside plannedDuration_s.
- *  - "Plan says X - the rest of this exercise runs Y unless the plan changes
- *    it", from the tempo steppers. It is a claim about REACH.
+ *  - "Plan: X · changed", from the prep adjuster. It used to say "your
+ *    change is recorded in the export", which was true of all three of these
+ *    boxes (each publishes a planned/actual pair -- load_kg beside
+ *    plannedLoad_kg, reps beside plannedReps, actualDuration_s beside
+ *    plannedDuration_s) but was export talk on the screen he reads between
+ *    sets (UX review 2026-11-06, copy F5).
+ *  - "Plan: X · Y for the rest of this exercise", from the tempo steppers.
+ *    It is a claim about REACH.
  *
  * WHICH OF THE TWO, AND WHY IT MATTERS MORE THAN IT LOOKS. With the rep and
  * hold carries landed (#174) beside the load carry (#124), a number in one of
@@ -58,7 +59,7 @@ package com.macrophage.barspeed.model
  * a caption ends up drawn through the label beside it.
  *
  * ABSENCE IS ABSENCE. An unchanged value gets no caption, an ad-hoc set gets no
- * caption rather than "Plan says none", and a plan that declared no number for
+ * caption rather than "Plan: none", and a plan that declared no number for
  * a box gets no caption for that box -- with one deliberate exception, stated
  * at [load].
  *
@@ -72,7 +73,7 @@ package com.macrophage.barspeed.model
  * THE BODY-WEIGHT BOX IS WHY IT IS NOT ENOUGH TO RELY ON A NULL. [load] goes
  * through [plannedLoadText], which answers "BW" for a body-weight set that
  * declared no load -- deliberately, because BW is the zero of that notation --
- * so an appended pull-up would be captioned "Plan says BW" on a set nothing
+ * so an appended pull-up would be captioned "Plan: BW" on a set nothing
  * prescribed -- a claim stronger than its evidence, in one line of UI text.
  * [reps] and [hold] already answer null on a null prescription, so for them
  * this is belt-and-braces rather than a live defect; the guard is on all three
@@ -85,7 +86,7 @@ package com.macrophage.barspeed.model
  * READY layouts keep their inline form -- so the guard is structural at the one
  * call site that exists; a rule enforced only by which composable happens to
  * call you is a rule nothing states, and on a body-weight ad-hoc set the answer
- * without it would be "Plan says BW" on a set that has no plan.
+ * without it would be "Plan: BW" on a set that has no plan.
  */
 object PlanValueCaption {
     /**
@@ -93,7 +94,7 @@ object PlanValueCaption {
      * body-weight BW± form on body-weight work (#160), a plain figure
      * otherwise, and both in the display unit the box is in.
      *
-     * Null on loaded work the plan declared no load for. "Plan says 0 kg" would
+     * Null on loaded work the plan declared no load for. "Plan: 0 kg" would
      * be an invention there -- a barbell movement with the weight left to the
      * lifter has no prescription to name -- and that is the same reading #170
      * item 2 asks for one screen over.
@@ -209,7 +210,7 @@ object PlanValueCaption {
     ): String? = when {
         planned == shown -> null
         standsForLaterSets && !stepsAfterThis ->
-            "Plan says $planned - the rest of this exercise runs $shown unless the plan changes it"
-        else -> "Plan says $planned - your change is recorded in the export"
+            "Plan: $planned · $shown for the rest of this exercise"
+        else -> "Plan: $planned · changed"
     }
 }

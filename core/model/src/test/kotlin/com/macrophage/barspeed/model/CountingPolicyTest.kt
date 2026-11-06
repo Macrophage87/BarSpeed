@@ -208,7 +208,7 @@ class CountingPolicyTest {
     fun `the start label names the counter and says you count only on a manual set`() {
         assertEquals("START SET — you count", CountingPolicy.startSetLabel(RepCounter.MANUAL))
         assertEquals("START SET — sensor counts", CountingPolicy.startSetLabel(RepCounter.SENSOR))
-        assertEquals("START SET — the guide counts", CountingPolicy.startSetLabel(RepCounter.METRONOME))
+        assertEquals("START SET — voice counts", CountingPolicy.startSetLabel(RepCounter.METRONOME))
         assertEquals("START SET", CountingPolicy.startSetLabel(RepCounter.NOBODY))
         assertEquals(
             1,

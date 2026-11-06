@@ -209,7 +209,7 @@ object CountingPolicy {
     fun startSetLabel(counter: RepCounter): String = when (counter) {
         RepCounter.MANUAL -> "START SET — you count"
         RepCounter.SENSOR -> "START SET — sensor counts"
-        RepCounter.METRONOME -> "START SET — the guide counts"
+        RepCounter.METRONOME -> "START SET — voice counts"
         RepCounter.NOBODY -> "START SET"
     }
 

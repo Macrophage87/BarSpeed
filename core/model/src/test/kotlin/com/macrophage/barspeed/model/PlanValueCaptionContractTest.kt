@@ -19,12 +19,12 @@ import kotlin.test.assertTrue
  *
  * The two sentence forms are quoted here in full deliberately. They are the two
  * already shipping in RecordScreen.kt -- the prep adjuster's and sensor-count
- * line's "Plan says X - your change is recorded in the export", and the tempo
- * steppers' "Plan says X - the rest of this exercise runs Y unless the plan
- * changes it" -- and nothing mechanically couples this file to those literals,
- * so a differing character here is a fourth phrasing being minted. The
- * separator is an ASCII hyphen surrounded by spaces in both, as it is at all
- * four shipped sites.
+ * line's "Plan: X · changed", and the tempo
+ * steppers' "Plan: X · Y for the rest of this exercise" -- and nothing
+ * mechanically couples this file to those literals, so a differing character
+ * here is a fourth phrasing being minted. The separator is a middle dot
+ * surrounded by spaces in both, as it is at all four shipped sites (UX review
+ * 2026-11-06, copy F5, shortened them from export talk).
  */
 class PlanValueCaptionContractTest {
     /** Green before the fix and after it: an unchanged value needs no caption. */
@@ -75,7 +75,7 @@ class PlanValueCaptionContractTest {
     @Test
     fun `a changed load names the plan's figure and how far the change reaches`() {
         assertEquals(
-            "Plan says 90 kg - the rest of this exercise runs 100 kg unless the plan changes it",
+            "Plan: 90 kg · 100 kg for the rest of this exercise",
             PlanValueCaption.load(
                 adHoc = false,
                 added = false,
@@ -101,7 +101,7 @@ class PlanValueCaptionContractTest {
     @Test
     fun `a stepping block does not claim a fixed number carries forward`() {
         assertEquals(
-            "Plan says 45 kg - your change is recorded in the export",
+            "Plan: 45 kg · changed",
             PlanValueCaption.load(
                 adHoc = false,
                 added = false,
@@ -126,7 +126,7 @@ class PlanValueCaptionContractTest {
     @Test
     fun `a block with no next declaration still claims the fixed number`() {
         assertEquals(
-            "Plan says 45 kg - the rest of this exercise runs 50 kg unless the plan changes it",
+            "Plan: 45 kg · 50 kg for the rest of this exercise",
             PlanValueCaption.load(
                 adHoc = false,
                 added = false,
@@ -150,7 +150,7 @@ class PlanValueCaptionContractTest {
     @Test
     fun `a change that reaches no further says what it does reach`() {
         assertEquals(
-            "Plan says 90 kg - your change is recorded in the export",
+            "Plan: 90 kg · changed",
             PlanValueCaption.load(
                 adHoc = false,
                 added = false,
@@ -168,7 +168,7 @@ class PlanValueCaptionContractTest {
     @Test
     fun `a changed load on body-weight work names the plan's figure in the BW notation`() {
         assertEquals(
-            "Plan says BW + 10 lb - the rest of this exercise runs BW + 25 lb unless the plan changes it",
+            "Plan: BW + 10 lb · BW + 25 lb for the rest of this exercise",
             PlanValueCaption.load(
                 adHoc = false,
                 added = false,
@@ -190,7 +190,7 @@ class PlanValueCaptionContractTest {
     @Test
     fun `a body-weight set the plan declared no load for is still named as BW`() {
         assertEquals(
-            "Plan says BW - the rest of this exercise runs BW + 20 kg unless the plan changes it",
+            "Plan: BW · BW + 20 kg for the rest of this exercise",
             PlanValueCaption.load(
                 adHoc = false,
                 added = false,
@@ -218,7 +218,7 @@ class PlanValueCaptionContractTest {
     @Test
     fun `a body-weight block whose next set declares no load loses the reach sentence`() {
         assertEquals(
-            "Plan says BW + 10 kg - your change is recorded in the export",
+            "Plan: BW + 10 kg · changed",
             PlanValueCaption.load(
                 adHoc = false,
                 added = false,
@@ -234,7 +234,7 @@ class PlanValueCaptionContractTest {
 
     /**
      * Green before the fix and after it. Loaded work with the weight left to
-     * the lifter has no prescription to name, and "Plan says 0 kg" would invent
+     * the lifter has no prescription to name, and "Plan: 0 kg" would invent
      * one.
      */
     @Test
@@ -255,7 +255,7 @@ class PlanValueCaptionContractTest {
 
     /**
      * Green before the fix and after it. An ad-hoc set has no plan, so it gets
-     * no caption rather than "Plan says none" -- including on body-weight work,
+     * no caption rather than "Plan: none" -- including on body-weight work,
      * where the notation would otherwise supply a "BW" nothing prescribed.
      */
     @Test
@@ -298,7 +298,7 @@ class PlanValueCaptionContractTest {
     @Test
     fun `a changed rep count names the plan's count`() {
         assertEquals(
-            "Plan says 8 - the rest of this exercise runs 6 unless the plan changes it",
+            "Plan: 8 · 6 for the rest of this exercise",
             PlanValueCaption.reps(
                 adHoc = false,
                 added = false,
@@ -309,7 +309,7 @@ class PlanValueCaptionContractTest {
             ),
         )
         assertEquals(
-            "Plan says 8 - your change is recorded in the export",
+            "Plan: 8 · changed",
             PlanValueCaption.reps(
                 adHoc = false,
                 added = false,
@@ -329,7 +329,7 @@ class PlanValueCaptionContractTest {
     @Test
     fun `a stepping rep scheme does not claim a fixed count carries forward`() {
         assertEquals(
-            "Plan says 10 - your change is recorded in the export",
+            "Plan: 10 · changed",
             PlanValueCaption.reps(
                 adHoc = false,
                 added = false,
@@ -345,7 +345,7 @@ class PlanValueCaptionContractTest {
     @Test
     fun `a changed hold names the plan's seconds`() {
         assertEquals(
-            "Plan says 45s - the rest of this exercise runs 30s unless the plan changes it",
+            "Plan: 45s · 30s for the rest of this exercise",
             PlanValueCaption.hold(
                 adHoc = false,
                 added = false,
@@ -364,7 +364,7 @@ class PlanValueCaptionContractTest {
     @Test
     fun `a stepping hold scheme does not claim a fixed duration carries forward`() {
         assertEquals(
-            "Plan says 45s - your change is recorded in the export",
+            "Plan: 45s · changed",
             PlanValueCaption.hold(
                 adHoc = false,
                 added = false,
@@ -404,7 +404,7 @@ class PlanValueCaptionContractTest {
     /**
      * Green before the fix and after it. A box mid-keystroke holds "" or "1x",
      * which parses to nothing. There is no change to describe yet, and shouting
-     * "Plan says 8" at a lifter who has cleared the box to retype it is noise.
+     * "Plan: 8" at a lifter who has cleared the box to retype it is noise.
      */
     @Test
     fun `a box holding nothing readable says nothing`() {
@@ -504,8 +504,8 @@ class PlanValueCaptionContractTest {
                     ),
                 )
             }
-        val planned = listOf("Plan says 90 kg", "Plan says 8", "Plan says 45s")
-        val shownAsPlan = listOf("Plan says 100 kg", "Plan says 6", "Plan says 30s")
+        val planned = listOf("Plan: 90 kg", "Plan: 8", "Plan: 45s")
+        val shownAsPlan = listOf("Plan: 100 kg", "Plan: 6", "Plan: 30s")
         captions.forEachIndexed { i, caption ->
             val expected = planned[i % 3]
             assertTrue(caption != null && caption.startsWith(expected), "caption $i: $caption")
@@ -521,8 +521,8 @@ class PlanValueCaptionContractTest {
      * `plannedLoadText` answers "BW" for a body-weight set that declared no
      * load -- deliberately, because BW is the zero of that notation and a
      * pull-up prescribed at body weight HAS prescribed something -- so an
-     * appended pull-up is captioned "Plan says BW - the rest of this exercise
-     * runs BW + 20 kg unless the plan changes it" on a set nothing prescribed.
+     * appended pull-up is captioned "Plan: BW · BW + 20 kg for the rest of
+     * this exercise" on a set nothing prescribed.
      * That is a claim stronger than its evidence in one line of UI text: it
      * tells the lifter the plan asked for a set the plan does not know about.
      *
