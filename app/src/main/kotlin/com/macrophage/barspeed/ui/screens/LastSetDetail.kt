@@ -386,6 +386,9 @@ private fun applyDraft(
 @Composable
 private fun DraftLoadRow(state: RecordState, feedback: SetFeedback, addedKg: Double, onDraft: (Double) -> Unit) {
     val step = SetLoadPolicy.correctionStepKg(state.weightUnit)
+    // One bar plate's worth in a tap (UX review 2026-11-06, rest F5): a wrong
+    // 45 lb or 20 kg plate was nine or eight taps of the fine step.
+    val bigStep = SetLoadPolicy.correctionBigStepKg(state.weightUnit)
     val corrected = addedKg != feedback.addedKg
     Stepper(
         label = SetLoadPolicy.correctionLabel(corrected),
@@ -398,6 +401,17 @@ private fun DraftLoadRow(state: RecordState, feedback: SetFeedback, addedKg: Dou
         onDown = { onDraft(SetLoadPolicy.correctedAddedKg(addedKg, -step, feedback.bodyweight)) },
         onUp = { onDraft(SetLoadPolicy.correctedAddedKg(addedKg, step, feedback.bodyweight)) },
     )
+    // On their own row: four steppers and a figure do not fit across a dialog.
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        OutlinedButton(
+            onClick = { onDraft(SetLoadPolicy.correctedAddedKg(addedKg, -bigStep, feedback.bodyweight)) },
+            contentPadding = ButtonDefaults.TextButtonContentPadding,
+        ) { Text(SetLoadPolicy.correctionBigStepLabel(state.weightUnit, up = false)) }
+        OutlinedButton(
+            onClick = { onDraft(SetLoadPolicy.correctedAddedKg(addedKg, bigStep, feedback.bodyweight)) },
+            contentPadding = ButtonDefaults.TextButtonContentPadding,
+        ) { Text(SetLoadPolicy.correctionBigStepLabel(state.weightUnit, up = true)) }
+    }
     SectionCaption(
         SetLoadPolicy.correctionCaption(
             SetLoadPolicy.carryFollowsCorrection(
