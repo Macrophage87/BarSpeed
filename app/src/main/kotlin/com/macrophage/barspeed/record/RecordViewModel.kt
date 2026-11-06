@@ -4959,22 +4959,18 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     // to endSet.
     fun selectExercise(id: String) = stateFlow.value.copy(selectedExerciseId = id).let { stateFlow.value = it }
 
-    fun updateLoadInput(text: String) {
-        val s = stateFlow.value
-        stateFlow.value = s.copy(loadInput = text, statedLoadKg = s.weightUnit.parseToKg(text))
-    }
+    // One line each, these input updaters, for selectExercise's reason above;
+    // the copies are RecordInputEdits.kt's.
+    fun updateLoadInput(text: String) = stateFlow.value.withLoadInput(text).let { stateFlow.value = it }
 
     // The keystroke is the only thing that makes a count a STATEMENT, which is
     // updateLoadInput's arrangement one target over: the text and the statement
     // are written together here and nowhere else, so a re-seed of the text
     // cannot manufacture one. An unparseable box states nothing rather than
     // stating zero -- a lifter mid-retype has not asked for a zero-rep set.
-    fun updateRepsInput(text: String) =
-        stateFlow.value.copy(repsInput = text, statedReps = text.trim().toIntOrNull()).let { stateFlow.value = it }
+    fun updateRepsInput(text: String) = stateFlow.value.withRepsInput(text).let { stateFlow.value = it }
 
-    fun updateDurationInput(text: String) {
-        stateFlow.value = stateFlow.value.copy(durationInput = text, statedDurationS = text.trim().toIntOrNull())
-    }
+    fun updateDurationInput(text: String) = stateFlow.value.withDurationInput(text).let { stateFlow.value = it }
 
     fun selectSide(side: String?) = stateFlow.value.copy(sideInput = side).let { stateFlow.value = it }
 
