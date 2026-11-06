@@ -3,6 +3,8 @@ package com.macrophage.barspeed.data
 import com.macrophage.barspeed.dsp.ImuCsv
 import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ImuSample
+import com.macrophage.barspeed.model.JournalSetFacts
+import com.macrophage.barspeed.model.PrepWindow
 import com.macrophage.barspeed.model.SensorCapturePolicy
 import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.model.VoiceCue
@@ -135,6 +137,22 @@ data class SetJournalHeader(
      * directory is dropped and the capture is never offered back.
      */
     val secondaryImuConnected: Boolean = false,
+    /**
+     * What this capture needs, from the moment its set began, to be written
+     * back into History as a set row (#100): the definition and geometry it
+     * was armed under, the load, whether it was timed, its prep case and its
+     * armed sensors. [JournalSetFacts] states each one.
+     *
+     * Null on every header an earlier build wrote, and on one whose caller
+     * could not state them; `JournalRecoveryPolicy.refusal` answers
+     * `NOT_JOURNALED` for it, so such a capture is still offered as a zip or
+     * a discard -- #42 stage 1 in full -- and nothing invents the load or the
+     * definition it would need to become a row. Defaulted for
+     * [secondaryImuConnected]'s reason: a field an older header cannot
+     * supply would otherwise drop the whole directory. JOURNAL_VERSION does
+     * not move, for [sensorRoles]'s.
+     */
+    val facts: JournalSetFacts? = null,
 )
 
 /**
@@ -374,6 +392,26 @@ class SetJournal internal constructor(
         channel.trySend(Row(REPS, timestampMs.toString()))
     }
 
+    /**
+     * The prep before this set ended and the work began, at [window]'s two
+     * instants (#100).
+     *
+     * Journaled so that a capture recovered after a kill can bound its reps
+     * the way the set's own write would have: `SetAnalyzer` is handed the
+     * work start so movement made during the countdown is not a rep (#245),
+     * and without the instant on disk a recovered prepped set would have to
+     * count it by an amount nothing bounds. One row, in
+     * [PrepWindowCsv]'s stored format, so the journal and the stored
+     * `prep_window` stream are one format.
+     *
+     * Called once, at the instant the work starts, and never on a set with
+     * no prep. A set the lifter ended during its prep has no file, which is
+     * the same "no window" `PrepWindowPolicy.of` answers for it.
+     */
+    fun appendPrepWindow(window: PrepWindow) {
+        channel.trySend(Row(PREP, "${window.startedAtMs},${window.workStartedAtMs}"))
+    }
+
     private fun append(row: Row) {
         val writer =
             writers.getOrPut(row.kind) {
@@ -403,12 +441,13 @@ class SetJournal internal constructor(
         IMU -> ImuCsv.HEADER
         HRM -> HrCsv.HEADER
         REPS -> REPS_HEADER
+        PREP -> PrepWindowCsv.HEADER
         // Matched by prefix rather than by equality because the secondary
         // capture's filename carries its role -- imu-a.csv, imu-b.csv -- and
         // there is no reason to enumerate two of them here. The prefix is safe
-        // in a way `kind` prefixes are not: this is a fixed set of four
-        // filenames chosen in this file, not a free-form column, and `hrm.csv`,
-        // `cues.csv` and `reps.csv` cannot begin with `imu`.
+        // in a way `kind` prefixes are not: this is a fixed set of filenames
+        // chosen in this file, not a free-form column, and `hrm.csv`,
+        // `cues.csv`, `reps.csv` and `prep.csv` cannot begin with `imu`.
         else -> if (kind.startsWith(IMU_PREFIX)) ImuCsv.HEADER else CueCsv.HEADER
     }
 
@@ -449,6 +488,9 @@ class SetJournal internal constructor(
         const val HRM = "hrm.csv"
         const val CUES = "cues.csv"
         const val REPS = "reps.csv"
+
+        /** The prep window, one row in [PrepWindowCsv]'s format; absent on a set that ran no prep (#100). */
+        const val PREP = "prep.csv"
 
         /** What [IMU] and every [secondaryImuFile] begin with, and nothing else here does. */
         const val IMU_PREFIX = "imu"
