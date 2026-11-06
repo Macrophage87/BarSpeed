@@ -428,6 +428,31 @@ object SetLoadPolicy {
         "This set is loaded by your own body weight, and none is stored - so the app has no " +
             "load to record it against. Enter one to start; an estimate is fine."
 
+    /**
+     * Whether the load box's text may stand for the set it is typed for, or
+     * the set must not start (and a dialog must not close) on it (UX review
+     * 2026-11-06, record-setup F4, core-model F3).
+     *
+     * A number is accepted, any number, 0 included: an explicit "0" is how a
+     * body-weight or unloaded set says nothing was added, and a negative is
+     * assistance. Text that is not blank and does not parse ("60kg", a stray
+     * letter) is refused on both paths. Before this, [resolve] read it as
+     * absent, so an ad-hoc set was recorded at 0 kg and a plan set silently
+     * ran the plan's load while the box showed the lifter's figure.
+     *
+     * A BLANK box depends on what absence means on that path, which is
+     * [resolve]'s reading and not a second rule. On a plan set it states
+     * nothing, and the plan's load stands. On an ad-hoc set there is no plan,
+     * so blank would be recorded as 0 kg added; that is the truth only on a
+     * [bodyweight] movement, where nothing added is the ordinary case, and a
+     * fabricated zero on anything else, so it is refused there.
+     */
+    fun loadEntryAccepted(adHoc: Boolean, typedText: String, unit: WeightUnit, bodyweight: Boolean): Boolean =
+        unit.parseToKg(typedText) != null || (typedText.isBlank() && (!adHoc || bodyweight))
+
+    /** What a refused load box says under itself; see [loadEntryAccepted]. */
+    const val ENTER_A_LOAD = "Enter a load"
+
     // ---- Correcting the load of the set that has just been recorded (#205) ----
     //
     // THE SET JUST FINISHED, FROM THE REST SCREEN, AND NOTHING ELSE. Editing an
