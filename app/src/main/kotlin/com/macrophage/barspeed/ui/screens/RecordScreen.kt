@@ -440,8 +440,7 @@ internal fun exitBody(prompt: ExitPrompt, unwritten: UnwrittenClose?): String = 
         "Every completed set is already saved. Finishing writes the session's end time and its heart-rate " +
             "summary, and its HRV unless it was continued from an earlier visit. Leaving without finishing " +
             "leaves the session open: coming back to Record within three hours of your last set offers to " +
-            "continue it, and after that it stays open with no end time. Either way the rest of the planned " +
-            "sets are dropped."
+            "continue it at your next set, and after that it stays open with no end time."
     // Now says leaving is safe for the set, because as of this commit it is:
     // the write runs on a scope the pop cannot cancel. That sentence was
     // deliberately absent while the prompt was unreachable and the claim would
