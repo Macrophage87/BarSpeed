@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.macrophage.barspeed.BuildConfig
 import com.macrophage.barspeed.model.PlanFile
 import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.SectionCaption
@@ -237,6 +238,16 @@ fun GuideScreen(navController: NavController) {
                         color = BarColors.Sub,
                     )
                 }
+                Spacer(Modifier.height(20.dp))
+            }
+            // Which build this phone runs, so a field check asked in chat can be
+            // answered from the phone (UX review 2026-11-06, settings F9).
+            item {
+                Text(
+                    "BarSpeed ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = BarColors.Sub,
+                )
                 Spacer(Modifier.height(20.dp))
             }
         }
