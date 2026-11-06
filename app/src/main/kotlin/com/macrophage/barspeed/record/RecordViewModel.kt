@@ -6284,8 +6284,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      *
      * NO PARAMETER AND NO DEFAULT ON [finishSession], deliberately. Every route
      * that closes a session now states its own answer at its own call site --
-     * a number, or null for the skip, or null for the exit dialog's Finish
-     * session, which closes immediately and does not ask. A default would let a
+     * a number, or null for the skip. The exit dialog's Finish session asks
+     * through here too (UX review 2026-11-06, rest F7). A default would let a
      * new caller record an absence without deciding to.
      */
     fun askSessionRpe() {

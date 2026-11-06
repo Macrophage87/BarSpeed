@@ -256,21 +256,13 @@ fun RecordScreen(
         exitOpenFor = null
         when (action) {
             ExitAction.STAY -> Unit
-            // Closes the session row and stays put. Not because popping would
-            // race the write — it no longer can, the close runs on appScope —
-            // but because FINISHED is where the lifter asked to go, and it is
-            // the screen that offers the session and its export.
-            //
-            // UNRATED, stated at the call site rather than defaulted (#159).
-            // This route is a lifter pressing Back and being asked what to do
-            // about an open session; interposing a rating panel would leave
-            // them on the record screen with the dialog gone and the session
-            // still open, which is not what the button they tapped promised.
-            // So it closes immediately and records no rating, and the absence
-            // is a real absence rather than a midpoint. Whether the Back route
-            // is common enough that it should ask too is a [Field] question,
-            // not something this file can answer.
-            ExitAction.FINISH_SESSION -> viewModel.finishSession(null)
+            // Asks for the session rating, like every other Finish session
+            // (UX review 2026-11-06, rest F7). SESSION_OPEN is only raised on
+            // the rest screen, which draws the rating panel in the finish
+            // control's place, and the close writes the rating once: closing
+            // here with null lost it for good. The panel's own "Finish without
+            // rating" still closes unrated, so no route is taken away.
+            ExitAction.FINISH_SESSION -> viewModel.askSessionRpe()
             // The landed CANCEL SET path: nothing written, the journal
             // discarded, READY or the rest screen back with the same set next.
             // cancelSet itself refuses if the first rep landed after the
