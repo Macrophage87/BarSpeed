@@ -2777,7 +2777,11 @@ private fun ManualSetStage(state: RecordState, viewModel: RecordViewModel, slot:
  */
 @Composable
 private fun ExplosiveSetStage(state: RecordState, viewModel: RecordViewModel, slot: PlannedSlot?) {
-    val peaks = state.live.repPeakVelocities
+    // One entry per rep the count stands at, from the counter's own calls --
+    // not `live.repPeakVelocities`, the tracker's retired pairing rule
+    // (dsp-core F1). Null is a rep with no figure, so the headline of a rep the
+    // lifter added by hand is a dash, not an earlier rep's peak.
+    val peaks = state.sensorRepFigures.map { it?.peakMps }
     val plannedReps = if (state.adHoc) state.repsInput.toIntOrNull() else slot?.reps
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         InSetHeader(state, slot)
@@ -2844,7 +2848,7 @@ private fun ExplosiveSetStage(state: RecordState, viewModel: RecordViewModel, sl
             RepBars(
                 values = peaks,
                 plannedSlots = plannedReps,
-                colorFor = { _, v -> velocityLossColor(v, peaks, slot?.velocityLossStopPct) },
+                colorFor = { _, v -> velocityLossColor(v, peaks.filterNotNull(), slot?.velocityLossStopPct) },
             )
         }
         Spacer(Modifier.height(24.dp))
@@ -3121,11 +3125,14 @@ private fun LiveRepBars(state: RecordState, slot: PlannedSlot?) {
             }
         }
         Spacer(Modifier.height(6.dp))
-        val values = state.live.repMeanVelocities
+        // The counter's calls, not the tracker's pairing (dsp-core F1): as many
+        // bars as the number on screen, a null one for a rep with no figure.
+        val values = state.sensorRepFigures.map { it?.meanMps }
+        val measured = values.filterNotNull()
         RepBars(
             values = values,
             plannedSlots = plannedReps,
-            colorFor = { _, v -> velocityLossColor(v, values, stopPct) },
+            colorFor = { _, v -> velocityLossColor(v, measured, stopPct) },
         )
     }
 }

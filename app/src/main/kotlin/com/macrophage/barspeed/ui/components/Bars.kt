@@ -48,10 +48,14 @@ fun velocityLossColor(value: Double, all: List<Double>, stopPct: Double?): Color
 /**
  * Per-rep bar chart: one bar per completed rep plus dashed placeholder slots
  * up to the planned rep count. Values are labelled beneath each bar.
+ *
+ * A null entry is a rep that happened with no figure (a `+1 REP` tap, or a
+ * call no tracker run lined up with): it is drawn as an empty slot labelled
+ * with a dash, never as a short bar.
  */
 @Composable
 fun RepBars(
-    values: List<Double>,
+    values: List<Double?>,
     plannedSlots: Int?,
     colorFor: (index: Int, value: Double) -> Color,
     modifier: Modifier = Modifier,
@@ -59,7 +63,7 @@ fun RepBars(
     valueLabel: (Double) -> String = { String.format(Locale.US, "%.2f", it) },
 ) {
     val slots = maxOf(plannedSlots ?: 0, values.size, 1)
-    val peak = values.maxOrNull()?.takeIf { it > 0 } ?: 1.0
+    val peak = values.filterNotNull().maxOrNull()?.takeIf { it > 0 } ?: 1.0
     Column(modifier.fillMaxWidth()) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -99,7 +103,7 @@ fun RepBars(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             repeat(slots) { i ->
                 Text(
-                    values.getOrNull(i)?.let(valueLabel) ?: "·",
+                    values.getOrNull(i)?.let(valueLabel) ?: if (i < values.size) "—" else "·",
                     style = MaterialTheme.typography.bodySmall,
                     color = BarColors.Sub,
                     textAlign = TextAlign.Center,

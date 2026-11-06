@@ -21,8 +21,10 @@ import com.macrophage.barspeed.dsp.HoldRelease
 import com.macrophage.barspeed.dsp.LiftDirection
 import com.macrophage.barspeed.dsp.LiveRepCounter
 import com.macrophage.barspeed.dsp.LiveRepCounters
+import com.macrophage.barspeed.dsp.LiveRepFigures
 import com.macrophage.barspeed.dsp.LiveSetState
 import com.macrophage.barspeed.dsp.RepCall
+import com.macrophage.barspeed.dsp.RepFigure
 import com.macrophage.barspeed.dsp.RestStart
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.SetAnalyzer
@@ -2555,6 +2557,7 @@ private fun inSetState(
     // would be drawn as this one's until the detector resolves a drive.
     sensorCounted = sensorCounted,
     sensorReps = 0,
+    sensorRepFigures = emptyList(),
     // Cleared with the count it qualifies. A set that gave up its count must
     // not start the NEXT one with a blank ring (#280).
     liveCountWithheld = false,
@@ -3634,6 +3637,15 @@ data class RecordState(
      * Set with [liveCountWithheld] and cleared only at the start of a set.
      */
     val liveTrackerDropped: Boolean = false,
+    /**
+     * The per-rep bars of a sensor-counted set: one entry per rep [sensorReps]
+     * stands at, null for a rep with no figure (a `+1 REP` tap, or a call no
+     * tracker run matched). `LiveRepFigures` builds it from the counter's own
+     * calls, so the bars are as many as the number spoken. NOT [live]'s
+     * `repMeanVelocities`, which the tracker's retired pairing rule fills
+     * (UX review 2026-11-06, dsp-core F1).
+     */
+    val sensorRepFigures: List<RepFigure?> = emptyList(),
     /** Active guided-cadence set: the app calls the tempo and counts the reps. */
     val guidedSet: Boolean = false,
     val guidedLabel: String = "",
@@ -4332,6 +4344,13 @@ data class RecordState(
 private class SensorRepCounter {
     private var counter: LiveRepCounter? = null
 
+    /** One bar per rep [shown] stands at; see [RecordState.sensorRepFigures]. */
+    private val bars = LiveRepFigures()
+
+    /** The bars, read after every change to the count. */
+    val figures: List<RepFigure?>
+        get() = bars.figures
+
     /** What the detector has called, 0 before the first rep and after a reset. */
     var called = 0
         private set
@@ -4365,6 +4384,7 @@ private class SensorRepCounter {
         counter = LiveRepCounters.forCounted(setCounter, direction)
         called = 0
         correctionDelta = 0
+        bars.clear()
     }
 
     /**
@@ -4390,6 +4410,7 @@ private class SensorRepCounter {
     fun rebuild(setCounter: RepCounter, direction: LiftDirection): Int {
         counter = LiveRepCounters.forCounted(setCounter, direction)
         called = 0
+        bars.onRebuild()
         return shown()
     }
 
@@ -4398,16 +4419,18 @@ private class SensorRepCounter {
      * and null where it said nothing -- which is every sample but one per rep,
      * and every sample of a set nothing is counting.
      */
-    fun feed(live: LiveSetState, timestampMs: Long): Int? {
+    fun feed(live: LiveSetState, timestampMs: Long, tracker: StreamingSetTracker): Int? {
         val call = counter?.feed(live, timestampMs) ?: return null
         if (call !is RepCall.Speak) return null
         called = call.count
+        bars.onCall(call, tracker.recentDriveRuns)
         return shown()
     }
 
     /** One `+1 REP` tap: the count the set now stands at. */
     fun correct(): Int {
         correctionDelta += 1
+        bars.onCorrection()
         return shown()
     }
 
@@ -5231,7 +5254,12 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 val measured = declared.forMeasuredMount(answer.sensorOnStack)
                 tracker = StreamingSetTracker.forLift(measured)
                 stateFlow.value = stateFlow.value
-                    .copy(live = LiveSetState(), sensorReps = sensorCounter.rebuild(setCounter, measured))
+                    .copy(
+                        live = LiveSetState(),
+                        sensorReps = sensorCounter.rebuild(setCounter, measured),
+                        // After the rebuild: argument order is evaluation order.
+                        sensorRepFigures = sensorCounter.figures,
+                    )
             }
             LiveFallback.Withhold -> {
                 tracker = null
@@ -5244,7 +5272,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
 
     /** The body [onSample] carried until #210, now reachable from either collector. */
     private fun feedTracker(sample: ImuSample) {
-        val live = tracker?.feed(sample) ?: return
+        val fed = tracker ?: return
+        val live = fed.feed(sample)
         stateFlow.value = stateFlow.value.copy(live = live)
         // Manual/guided sets: the app (or the lifter) is the counter — the
         // sensor keeps recording for velocity metrics, but its phase counts and
@@ -5260,7 +5289,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // than a second integrator over the same stream, and the ARRIVAL stamp
         // rather than the reconstructed clock, so a cue written from it lines up
         // against the IMU stream and the rep marks.
-        sensorCounter.feed(live, sample.timestampMs)?.let(::saySensorCount)
+        sensorCounter.feed(live, sample.timestampMs, fed)?.let(::saySensorCount)
     }
 
     /**
@@ -5279,7 +5308,11 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // lifter's own `+1 REP` tap, and the ring may draw a figure the lifter
         // stated (#280). [RecordState.liveTrackerDropped] stays set: the
         // tracker is still gone, and the figures read from `live` with it.
-        stateFlow.value = stateFlow.value.copy(sensorReps = shown, liveCountWithheld = false)
+        stateFlow.value = stateFlow.value.copy(
+            sensorReps = shown,
+            sensorRepFigures = sensorCounter.figures,
+            liveCountWithheld = false,
+        )
         if (stateFlow.value.audioCues) milestones.announceRep(shown)
     }
 
