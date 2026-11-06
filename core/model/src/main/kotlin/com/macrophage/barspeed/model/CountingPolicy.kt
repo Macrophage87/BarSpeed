@@ -191,12 +191,11 @@ object CountingPolicy {
      * existed the sensor was handed none (`milestonePlannedReps`), which was
      * the only way to keep `"Done"` off it.
      */
-    fun milestones(counter: RepCounter): VoiceMilestonePolicy.Milestones =
-        if (counter == RepCounter.SENSOR) {
-            VoiceMilestonePolicy.Milestones.MARKS_TARGET
-        } else {
-            VoiceMilestonePolicy.Milestones.CALLS_SET_OVER
-        }
+    fun milestones(counter: RepCounter): VoiceMilestonePolicy.Milestones = if (counter == RepCounter.SENSOR) {
+        VoiceMilestonePolicy.Milestones.MARKS_TARGET
+    } else {
+        VoiceMilestonePolicy.Milestones.CALLS_SET_OVER
+    }
 
     /**
      * What the START SET button says about who is about to count.
