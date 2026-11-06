@@ -390,7 +390,8 @@ object ArmedSilencePolicy {
      */
     fun advice(delivery: ArmedDelivery, role: SensorRole?): String? {
         val subject = role?.let { "Sensor ${it.name}" } ?: "The bar sensor"
-        val which = role?.let { " -- check which sensor is paired as ${it.name}." } ?: " -- check which sensor is paired."
+        val which =
+            role?.let { " -- check which sensor is paired as ${it.name}." } ?: " -- check which sensor is paired."
         return when (delivery) {
             ArmedDelivery.DELIVERING, ArmedDelivery.TOO_SOON -> null
             ArmedDelivery.NOT_LINKED ->
