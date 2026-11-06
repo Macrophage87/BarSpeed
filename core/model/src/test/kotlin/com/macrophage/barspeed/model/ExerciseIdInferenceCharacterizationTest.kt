@@ -339,6 +339,20 @@ class ExerciseIdInferenceCharacterizationTest {
             Row("step_up_jump", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
             Row("dumbbell_bench_press", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
             Row("cable_fly", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+
+            // --- a cable, band or machine overhead extension starts with the
+            // elbows bent behind the head and the first move is the extension,
+            // unlike the free-weight one, which starts locked out overhead. So
+            // only free-weight modifiers may prefix an ECCENTRIC table id; these
+            // keep the "overhead" hint's CONCENTRIC (re-review of the
+            // modifier rule). ---
+            Row("cable_overhead_triceps_extension", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("cable_overhead_tricep_extension", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("band_overhead_triceps_extension", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("banded_overhead_tricep_extension", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("machine_overhead_triceps_extension", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("seated_dumbbell_overhead_triceps_extension", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("barbell_overhead_squat", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
         )
 
     @Test
