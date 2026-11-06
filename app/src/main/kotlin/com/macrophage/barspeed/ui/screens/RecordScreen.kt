@@ -499,10 +499,8 @@ internal fun exitBody(prompt: ExitPrompt, unwritten: UnwrittenClose?): String = 
     // RecordExitPolicyTest states the rule for the sibling prompt: naming a
     // control that is not on screen is worse than naming none.
     ExitPrompt.SET_IN_PROGRESS ->
-        "Nothing about this set has been saved — the reps, the sensor data and the effort rating all go. " +
-            "To keep it, tap Keep recording and end the set with its end control on this screen. " +
-            "On a tempo-guided or timed set that is under way that control ends the set short of target, and " +
-            "you can still rate the set while you rest."
+        "This set isn't saved yet; leave now and it's lost. To keep it, end it with its end control on this " +
+            "screen (on a tempo or timed set, that control ends the set short of target)."
     // The discard that stays (record-live F6): CANCEL SET's path. "Nothing has
     // been recorded" rather than "no rep counted", because a hold or a carry
     // in its lead-in reaches this prompt too.
@@ -511,39 +509,28 @@ internal fun exitBody(prompt: ExitPrompt, unwritten: UnwrittenClose?): String = 
     // Says the session can be picked up again, and for how long, because as
     // of #48 it can: coming back to Record asks "Continue this session?" while
     // SessionResumePolicy.offer would (an open row with sets, its last set
-    // within RESUME_WINDOW_MS). The HRV clause is conditional because a
-    // continued session's close withholds it (SessionResumePolicy.closeRrMs).
+    // within RESUME_WINDOW_MS). Cut from five sentences to two in the UX
+    // review of 2026-11-06 (copy F7, rest F7): what finishing writes is the
+    // app's business, not a choice the lifter makes at the bar.
     ExitPrompt.SESSION_OPEN ->
-        "Every completed set is already saved. Finishing writes the session's end time and its heart-rate " +
-            "summary, and its HRV unless it was continued from an earlier visit. Leaving without finishing " +
-            "leaves the session open: coming back to Record within three hours of your last set offers to " +
-            "continue it at your next set, and after that it stays open with no end time."
+        "All your sets are saved. Finish now, or leave it open and pick up at your next set within 3 hours."
     // Now says leaving is safe for the set, because as of this commit it is:
     // the write runs on a scope the pop cannot cancel. That sentence was
     // deliberately absent while the prompt was unreachable and the claim would
     // have been false. It is the session, not the set, that is still at risk
-    // here, and the wording points at that instead.
-    //
-    // The heart-rate summary only, never "and HRV" (#333). endSession
-    // averages the heart rate over the set ROWS, so a set whose row has not
-    // landed is missing from it. The HRV is computed over sessionRrMs, which
-    // the passive collector fills in READY, IN_SET and RESTING alike, so the
-    // set's beats are in it whether or not the row has landed. Read from
-    // source, not observed on a device.
+    // here; the offered exit leaves it open rather than closing it, so the
+    // body no longer explains the heart-rate summary a close would miss
+    // (UX review 2026-11-06, copy F7).
     ExitPrompt.SET_SAVING ->
-        "This set is being written to your history now, and it will finish saving even if you leave. " +
-            "What will not finish is the session: closing it while a set is still saving leaves that set " +
-            "out of the session's heart-rate summary, and nothing rewrites it afterwards."
+        "This set is saving and will finish even if you leave."
     ExitPrompt.SET_UNSAVED ->
-        "This set could not be written to your history. It is still held in memory, so tapping SAVE THIS " +
-            "SET AGAIN on this screen can still store it — freeing some space on the phone first if that " +
-            "is what stopped it. Leaving now loses the reps, the sensor data and the effort rating."
+        "This set didn't save. Free some space if the phone is full, then tap SAVE THIS SET AGAIN: " +
+            "leaving now loses it."
     // Says the finish lands either way, because it does: the close runs on a
     // scope the pop cannot cancel. Nothing here offers to call it off — nothing
     // can, and offering it would be a race dressed up as a choice.
     ExitPrompt.SESSION_CLOSING ->
-        "You asked to finish this session and it is being written now. It will finish even if you leave, " +
-            "including the end time and the heart-rate and HRV summary. There is nothing left to decide here."
+        "Finishing the session. It will finish even if you leave."
     // The one prompt that must not undersell what is at stake. Its words live
     // in :core:model, where SessionNotClosedCopyTest pins them (#331).
     ExitPrompt.SESSION_NOT_CLOSED,

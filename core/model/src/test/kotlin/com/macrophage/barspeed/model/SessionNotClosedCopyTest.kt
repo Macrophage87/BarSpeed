@@ -96,17 +96,15 @@ class SessionNotClosedCopyTest {
 
     /**
      * `SessionHrv.rmssdMs` returns null, never 0, where fewer than ten
-     * successive differences survive, so where the HRV is rebuilt at all the
-     * body must not promise it unconditionally.
+     * successive differences survive, so the body must not promise a rebuilt
+     * HRV. Since the UX review of 2026-11-06 cut it to two sentences it names
+     * no HRV at all, which is the strongest form of not promising one.
      */
     @Test
-    fun `the body does not promise a rebuilt HRV unconditionally`() {
-        reachable.filter { it.sessionRow }.forEach { u ->
+    fun `the body does not promise a rebuilt HRV`() {
+        reachable.forEach { u ->
             val body = SessionNotClosedCopy.body(u)
-            assertTrue(
-                body.contains("the HRV only where they hold enough usable heartbeats"),
-                "$u promises an HRV the stored streams may not support: $body",
-            )
+            assertFalse(body.contains("HRV"), "$u promises an HRV the stored streams may not support: $body")
         }
     }
 

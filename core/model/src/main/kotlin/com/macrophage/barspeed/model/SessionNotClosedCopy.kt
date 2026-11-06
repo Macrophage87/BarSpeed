@@ -46,8 +46,9 @@ object SessionNotClosedCopy {
      *    time (#62) is its heart-rate average and maximum from its set rows,
      *    and its HRV from its stored heart-rate streams, which
      *    `SessionHrv.rmssdMs` leaves null where fewer than ten successive
-     *    differences survive -- hence "only where they hold enough usable
-     *    heartbeats".
+     *    differences survive. The body used to explain that rebuild; it now
+     *    names no HRV at all, so it cannot promise one (UX review
+     *    2026-11-06, copy F7: two sentences, not five).
      *  - `endSession` landed and the rest window after it did not. The end
      *    time, the summary, the HRV, the rating and the skips are stored, so
      *    the body says the session is finished and names only the rest. That
@@ -57,10 +58,9 @@ object SessionNotClosedCopy {
      */
     fun body(unwritten: UnwrittenClose): String {
         if (!unwritten.sessionRow) {
-            return "The session is finished, and every set is saved with it. Only the heart rate recorded " +
-                "after your last set was not written. Tapping $RETRY_LABEL on this screen can still write " +
-                "it, after freeing some space on the phone if that is what stopped it. It is held only " +
-                "here, and leaving now loses it."
+            return "The session is finished and every set is saved, but the heart rate recorded after your " +
+                "last set didn't save. Free some space if the phone is full, then tap $RETRY_LABEL: " +
+                "leaving now loses it."
         }
         val missing =
             listOfNotNull(
@@ -75,10 +75,7 @@ object SessionNotClosedCopy {
                 else -> missing.dropLast(1).joinToString(", ") + " and " + missing.last()
             }
         val them = if (missing.size == 1) "it" else "them"
-        return "The finish was not written: $list. Tapping $RETRY_LABEL on this screen can still write " +
-            "$them, after freeing some space on the phone if that is what stopped it. Every set is already " +
-            "saved either way, and if you leave, the session's heart-rate and HRV figures are rebuilt from " +
-            "those sets, the HRV only where they hold enough usable heartbeats. Whatever has not been " +
-            "written is held only here, and leaving now loses it."
+        return "Every set is saved, but the finish didn't save $list. Free some space if the phone is " +
+            "full, then tap $RETRY_LABEL: leaving now loses $them."
     }
 }
