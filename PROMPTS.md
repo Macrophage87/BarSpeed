@@ -1,13 +1,12 @@
 # Ready-made Claude prompts
 
-> The quickest start — a self-contained "write me a plan" prompt that needs no
-> schema file attached — is in the [README](README.md#get-a-training-plan-out-of-claude-and-into-the-app).
-> The full plan contract lives in the app, under **Guide → COPY PLAN PROMPT**;
-> the prompts here name the schema version but do not restate it.
+> The plan contract lives in the app, under **Guide → COPY PLAN PROMPT**; the
+> prompts here name the schema version but do not restate it.
 
-Copy one of these into a Claude conversation together with your exported session
-JSON (Settings → Export, or the share button on a session). Claude's plan replies
-can be pasted straight back into the app via Plans → Import → Paste.
+Copy one of these into a Claude conversation together with an export from the
+session's detail screen (the **Share** or **Save to phone** buttons). Claude's
+plan replies can be pasted straight back into the app via **Plans → Import plan
+(paste JSON)**.
 
 ---
 
@@ -86,9 +85,25 @@ can be pasted straight back into the app via Plans → Import → Paste.
 
 ## Deep-dive raw data
 
-> Attached is a raw CSV export from a bar-mounted IMU (100 Hz; columns:
-> timestamp_ms, ax_g, ay_g, az_g, wx_dps, wy_dps, wz_dps, roll_deg, pitch_deg,
-> yaw_deg) plus the app's meta.json describing the set. Analyze the bar path and
-> velocity profile: integrate vertical acceleration to velocity, segment the reps,
-> and tell me where within the range of motion the bar decelerates most (sticking
-> point analysis).
+> Attached is a raw zip exported from my strength training app (one or two
+> IMUs on the bar or weight stack). It holds one CSV per set and sensor
+> (`setNN_<exercise>_imu*.csv`), `meta.json` (one descriptor per set; schema:
+> docs/schemas/raw-meta.schema.json) and `session.json`, the app's own analysis
+> (schema: docs/schemas/session-export.schema.json).
+>
+> Each IMU CSV has 11 columns: timestamp_ms, ax_g, ay_g, az_g, wx_dps, wy_dps,
+> wz_dps, roll_deg, pitch_deg, yaw_deg, sample_idx.
+>
+> Clock: `timestamp_ms` is the phone's BLE packet ARRIVAL time. Several rows
+> share one stamp and then it jumps ~30 ms, so it is bursty and must never be
+> used as an integration step or to derive a sample rate. Use
+> `sample_idx / sampleRate_hz` (sampleRate_hz is that set's key in meta.json)
+> as the time axis. That rate is the rate rows were delivered, not the 100 Hz
+> the sensor was asked for; it can be far lower (one unit has delivered about
+> 44 Hz). Read the set's mounting, lift direction and analysed sensor from
+> meta.json before interpreting any axis.
+>
+> Analyze the bar path and velocity profile: segment the reps, and tell me
+> where within the range of motion the bar decelerates most (sticking point
+> analysis). Compare against the per-rep figures in session.json and say where
+> and why yours differ.
