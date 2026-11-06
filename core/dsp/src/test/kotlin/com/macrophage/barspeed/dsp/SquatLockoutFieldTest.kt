@@ -69,7 +69,7 @@ class SquatLockoutFieldTest {
 
     private fun name(set: Int) = "set%02d".format(set)
 
-    private val squat = LiftDirection()
+    private val squat = LiftDirection(squat = true)
 
     private fun calls(counter: LiveRepCounter, stream: String): List<RepCall.Speak> {
         val tracker = StreamingSetTracker.forLift(squat)

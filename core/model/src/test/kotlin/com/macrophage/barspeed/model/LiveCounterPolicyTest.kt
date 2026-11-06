@@ -52,7 +52,7 @@ class LiveCounterPolicyTest {
     fun `a sensor-counted set runs the cycle counter and no other set runs one`() {
         assertEquals(
             listOf(LiveCounter.CYCLE, null, null, null),
-            RepCounter.entries.map { LiveCounterPolicy.counterFor(it, StartPhase.CONCENTRIC) },
+            RepCounter.entries.map { LiveCounterPolicy.counterFor(it, squat = false) },
             "the live detector for SENSOR, MANUAL, METRONOME, NOBODY in that order",
         )
     }
@@ -80,7 +80,7 @@ class LiveCounterPolicyTest {
         assertEquals(RepCounter.SENSOR, counter, "who counts a straight-reps set with a sensor on")
         assertEquals(
             LiveCounter.CYCLE,
-            LiveCounterPolicy.counterFor(counter, StartPhase.CONCENTRIC),
+            LiveCounterPolicy.counterFor(counter, squat = false),
             "and which detector that counter runs",
         )
     }
@@ -101,9 +101,7 @@ class LiveCounterPolicyTest {
             imuConnected = true,
         )
         assertEquals(RepCounter.METRONOME, counter, "who counts a tempo'd set")
-        for (start in StartPhase.entries) {
-            assertNull(LiveCounterPolicy.counterFor(counter, start), "the live detector a tempo'd $start set feeds")
-        }
+        assertNull(LiveCounterPolicy.counterFor(counter, squat = false), "the live detector a tempo'd set feeds")
     }
 
     /**
@@ -145,8 +143,7 @@ class LiveCounterPolicyTest {
                     for (imuConnected in listOf(false, true)) {
                         val prep = LeadInPolicy.prepCase(hasTempo, isTimed, kind)
                         val counter = CountingPolicy.counterFor(hasTempo, isTimed, kind, imuConnected)
-                        val armed = StartPhase.entries.any { LiveCounterPolicy.counterFor(counter, it) != null }
-                        if (prep != PrepCase.NONE && armed) {
+                        if (prep != PrepCase.NONE && LiveCounterPolicy.counterFor(counter, squat = false) != null) {
                             both += "tempo=$hasTempo timed=$isTimed $kind imu=$imuConnected: $prep, $counter"
                         }
                     }
@@ -169,25 +166,46 @@ class LiveCounterPolicyTest {
                     kind = ExerciseKind.DYNAMIC,
                     imuConnected = true,
                 ),
-                StartPhase.CONCENTRIC,
+                squat = false,
             ),
             "a straight-reps dynamic set with a sensor arms a live counter",
         )
     }
 
     /**
-     * An eccentric-first set the sensor counts -- a back squat, a bench press,
-     * a Romanian deadlift -- runs the lockout counter; a concentric-first one
-     * keeps the full-cycle counter the deadlift evidence chose.
+     * A squat the sensor counts runs the lockout counter; every other lift,
+     * the bench press and Romanian deadlift included, keeps the full-cycle
+     * counter.
      *
      * The owner's first v0.2.2 session (2026-11-06): on his back squats the
      * full-cycle rule called the walk-out as rep 1 and every rep a rep late,
      * so the last call fell on the rack, and it dropped two of five reps on
-     * the empty bar. `LockoutRepCounter`'s KDoc carries the measurement.
+     * the empty bar. He chose squats only, because on the bench and RDL
+     * captures held the lockout rule does worse (`LockoutCorpusTest`).
      */
     @Test
-    fun `an eccentric-first sensor set runs the lockout counter`() {
-        assertEquals(LiveCounter.LOCKOUT, LiveCounterPolicy.counterFor(RepCounter.SENSOR, StartPhase.ECCENTRIC))
-        assertEquals(LiveCounter.CYCLE, LiveCounterPolicy.counterFor(RepCounter.SENSOR, StartPhase.CONCENTRIC))
+    fun `only a squat runs the lockout counter`() {
+        assertEquals(LiveCounter.LOCKOUT, LiveCounterPolicy.counterFor(RepCounter.SENSOR, squat = true))
+        assertEquals(LiveCounter.CYCLE, LiveCounterPolicy.counterFor(RepCounter.SENSOR, squat = false))
+        for (counter in RepCounter.entries - RepCounter.SENSOR) {
+            assertNull(LiveCounterPolicy.counterFor(counter, squat = true), "$counter arms no live counter")
+        }
+    }
+
+    /**
+     * Which lifts are squats. The word in the id decides it, but only on a
+     * rep-counted lift that lowers first: the squat clean and squat snatch
+     * start with the pull, and the bench, RDL and deadlift never name it.
+     */
+    @Test
+    fun `a squat is a lowering-first dynamic lift that names the word`() {
+        val squats = listOf("back_squat", "front_squat", "box_squat", "goblet_squat", "overhead_squat", "split_squat")
+        for (id in squats) {
+            assertEquals(true, ExerciseDef.resolvedById(id).isSquat, id)
+        }
+        val others = listOf("bench_press", "romanian_deadlift", "deadlift", "squat_clean", "squat_snatch", "leg_press")
+        for (id in others) {
+            assertEquals(false, ExerciseDef.resolvedById(id).isSquat, id)
+        }
     }
 }

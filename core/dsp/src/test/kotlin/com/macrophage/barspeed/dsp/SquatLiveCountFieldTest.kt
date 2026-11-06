@@ -70,7 +70,7 @@ class SquatLiveCountFieldTest {
     )
 
     /** The geometry all five sets declared, as `CandidateCorpus` carries it. */
-    private val squat = CandidateCorpus.capture(sets[0].name).direction
+    private val squat = CandidateCorpus.capture(sets[0].name).direction.copy(squat = true)
 
     /** Every [RepCall.Speak] [counter] makes over [fixture], fed by the app's own tracker. */
     private fun calls(counter: LiveRepCounter, fixture: String): List<RepCall.Speak> {

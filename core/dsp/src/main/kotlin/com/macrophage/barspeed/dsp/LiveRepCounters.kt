@@ -49,5 +49,5 @@ object LiveRepCounters {
      * function instead of an `if` beside a `when`.
      */
     fun forCounted(counter: RepCounter, direction: LiftDirection, config: DspConfig = DspConfig()): LiveRepCounter? =
-        LiveCounterPolicy.counterFor(counter, direction.startsWith)?.let { of(it, direction, config) }
+        LiveCounterPolicy.counterFor(counter, squat = direction.squat)?.let { of(it, direction, config) }
 }

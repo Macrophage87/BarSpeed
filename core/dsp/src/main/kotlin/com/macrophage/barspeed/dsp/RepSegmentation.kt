@@ -43,6 +43,12 @@ data class LiftDirection(
      * stack is a vertical measurement of a horizontal exercise.
      */
     val sensorOnStack: Boolean = false,
+    /**
+     * The lift is a squat, [ExerciseDef.isSquat]. Not geometry: it is read
+     * only by `LiveRepCounters.forCounted`, to choose the live rep counter,
+     * and nothing that measures a rep looks at it.
+     */
+    val squat: Boolean = false,
 ) {
     /**
      * The plane to actually measure in. A stack-mounted sensor moves up and
@@ -181,6 +187,7 @@ fun ExerciseDef.liftDirection(): LiftDirection = LiftDirection(
     travelRatio = travelRatio,
     plane = if (horizontal) MovementPlane.HORIZONTAL else MovementPlane.VERTICAL,
     sensorOnStack = sensorOnStack,
+    squat = isSquat,
 )
 
 /** One segmented rep, expressed as index spans into the [VelocitySeries]. */

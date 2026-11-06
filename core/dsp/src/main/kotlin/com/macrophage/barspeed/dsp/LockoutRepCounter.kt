@@ -67,12 +67,12 @@ import kotlin.math.exp
  * and 5, 5, 4, 4, 5 on field-46, inside "at least 4, likely 5", where
  * [CycleRepCounter] called 6, 4, 5, 5, 5.
  *
- * - ONE LIFTER'S BACK SQUAT. Every constant is fitted there. Bench press,
- *   Romanian deadlift and every other eccentric-first lift reach this rule
- *   with no untempo'd capture behind it. On their tempo'd captures -- which
- *   the sensor never counts in the app -- it does WORSE than
- *   [CycleRepCounter]: on the bench and RDL rows its summed miss is 12
- *   against 6, the slow 3-s eccentrics rising too little
+ * - ONE LIFTER'S BACK SQUAT. Every constant is fitted there, and the app
+ *   arms it on squats alone (`LiftDirection.squat`, the owner's choice).
+ *   Front, box, goblet, split and the other squats reach it by name with no
+ *   capture behind them. Bench press and Romanian deadlift do not reach it:
+ *   on their tempo'd captures it does WORSE than [CycleRepCounter], a
+ *   summed miss of 12 against 6, the slow 3-s eccentrics rising too little
  *   (`LockoutCorpusTest`).
  * - THE RISE MARGIN IS A FEW HUNDREDTHS. A re-rack that rises a little more,
  *   or a grinding rep that rises a little less, than this session's will be
