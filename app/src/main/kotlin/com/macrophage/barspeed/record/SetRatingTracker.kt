@@ -22,6 +22,29 @@ interface SetRowWriter {
     suspend fun overrideLoad(setId: Long, loadKg: Double)
     suspend fun setWarmupMark(setId: Long, warmupMark: Boolean?)
     suspend fun setLimiter(setId: Long, limiter: String?, limiterNote: String?)
+
+    /**
+     * One Correct-popup SAVE's hold, count and rating, in that order. The
+     * repository runs the three as ONE transaction, so a failure between
+     * them cannot leave a corrected count beside the old failure verdict --
+     * the split the DAO's `updateRpe` comment says must never happen. UX
+     * review 2026-11-06, data-layer F4.
+     *
+     * The default issues the three statements in sequence, each awaited,
+     * exactly as [SetRatingTracker.correct] did before; it is what a test's
+     * writer inherits, so the order pins keep reaching the order.
+     */
+    suspend fun correctCountAndRating(
+        setId: Long,
+        seconds: Int?,
+        reps: Int?,
+        rating: CorrectedRatingRow,
+        warmup: Boolean,
+    ) {
+        seconds?.let { overrideDuration(setId, it) }
+        reps?.let { overrideReps(setId, it) }
+        rateSet(setId, rating.rpe, rating.failed, failedByLifter = rating.failedByLifter, warmup = warmup)
+    }
 }
 
 /** The repository as a [SetRowWriter]: each call is the repository's own, as before. */
@@ -49,6 +72,16 @@ private class RepositoryRowWriter(private val repository: SessionRepository) : S
     override suspend fun setLimiter(setId: Long, limiter: String?, limiterNote: String?) {
         repository.setLimiter(setId, limiter, limiterNote)
     }
+
+    override suspend fun correctCountAndRating(
+        setId: Long,
+        seconds: Int?,
+        reps: Int?,
+        rating: CorrectedRatingRow,
+        warmup: Boolean,
+    ) {
+        repository.correctCountAndRating(setId, seconds, reps, rating.rpe, rating.failed, rating.failedByLifter, warmup)
+    }
 }
 
 /**
@@ -67,9 +100,18 @@ private class RepositoryRowWriter(private val repository: SessionRepository) : S
  * Every method returns what to mirror into UI state -- the effective failed
  * flag, or from [correct] the whole row it wrote -- or null when there is no
  * recorded set to rate.
+ *
+ * [onWriteFailed] is what the rest-screen launches in LastSetCorrections.kt
+ * call when one of these writes throws (data-layer F4). The default rethrows,
+ * which is how every launch behaved before it; production passes
+ * `correctionFailed()`, which logs, records and tells the lifter.
  */
-class SetRatingTracker(private val writer: SetRowWriter) {
-    constructor(repository: SessionRepository) : this(RepositoryRowWriter(repository))
+class SetRatingTracker(
+    private val writer: SetRowWriter,
+    val onWriteFailed: (Throwable) -> Unit = { throw it },
+) {
+    constructor(repository: SessionRepository, onWriteFailed: (Throwable) -> Unit) :
+        this(RepositoryRowWriter(repository), onWriteFailed)
 
     private var setId: Long? = null
     private var autoFailed = false
@@ -183,13 +225,20 @@ class SetRatingTracker(private val writer: SetRowWriter) {
      */
     suspend fun rate(rpe: Int?, failed: Boolean, warmup: Boolean): CorrectedRatingRow? {
         val id = setId ?: return null
+        val before = tappedFailed
         tappedFailed = failed
         val row = CorrectedRatingRow(
             rpe = FailedSetRatingPolicy.storedRpe(rpe, failedByLifter = failed, shortfall = autoFailed),
             failed = failed || autoFailed,
             failedByLifter = failed,
         )
-        writer.rateSet(id, row.rpe, row.failed, failedByLifter = row.failedByLifter, warmup = warmup)
+        try {
+            writer.rateSet(id, row.rpe, row.failed, failedByLifter = row.failedByLifter, warmup = warmup)
+        } catch (e: Exception) {
+            // The row kept its old rating, so this does too (data-layer F4).
+            tappedFailed = before
+            throw e
+        }
         return row
     }
 
@@ -220,12 +269,19 @@ class SetRatingTracker(private val writer: SetRowWriter) {
      */
     suspend fun correct(draft: CountAndRatingDraft, warmup: Boolean): CorrectedRatingRow? {
         val id = setId ?: return null
+        val before = autoFailed to tappedFailed
         autoFailed = SetCorrectionPolicy.shortfall(draft, plannedReps, plannedDurationS, standing = autoFailed)
         val row = SetCorrectionPolicy.row(draft, autoFailed)
         tappedFailed = row.failedByLifter
-        draft.seconds?.let { writer.overrideDuration(id, it) }
-        draft.reps?.let { writer.overrideReps(id, it) }
-        writer.rateSet(id, row.rpe, row.failed, failedByLifter = row.failedByLifter, warmup = warmup)
+        try {
+            writer.correctCountAndRating(id, draft.seconds, draft.reps, row, warmup)
+        } catch (e: Exception) {
+            // One transaction, so the row kept all three old values; so does
+            // this (data-layer F4).
+            autoFailed = before.first
+            tappedFailed = before.second
+            throw e
+        }
         return row
     }
 

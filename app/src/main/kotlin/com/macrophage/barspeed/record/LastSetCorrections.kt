@@ -11,17 +11,67 @@
 // that did.
 package com.macrophage.barspeed.record
 
+import android.app.Application
+import android.widget.Toast
+import androidx.lifecycle.AndroidViewModel
+import com.macrophage.barspeed.AppLog
+import com.macrophage.barspeed.CrashReporting
+import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.model.CorrectedRatingRow
 import com.macrophage.barspeed.model.CountAndRatingDraft
 import com.macrophage.barspeed.model.HoldEndSource
 import com.macrophage.barspeed.model.SetLimiter
 import com.macrophage.barspeed.model.SetLoadPolicy
 import com.macrophage.barspeed.model.WarmupMarkPolicy
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
+
+/** What the lifter reads when a rest-screen correction did not save. */
+internal const val CORRECTION_NOT_SAVED = "Couldn't save that change. Try again."
+
+/**
+ * What a rest-screen correction does when its write throws: log it, write it
+ * as a crash report so it can be sent, and say so in one line. UX review
+ * 2026-11-06, data-layer F4.
+ *
+ * Before this every correction write ran on `appScope` with no catch and no
+ * handler, so a full disk or any SQLite error between sets ended the process
+ * and took with it everything held only in memory: the skipped sets, the rest
+ * heart-rate window, the voice and the rest timer. The set itself was already
+ * stored; only the correction is lost, and the lifter is told.
+ *
+ * Runs on the launch's dispatcher, Main.immediate, which the toast needs.
+ * Handed to [SetRatingTracker] where `RecordViewModel` builds it, so the
+ * launches below reach it as `ratings.onWriteFailed` and no call site moves.
+ */
+internal fun AndroidViewModel.correctionFailed(): (Throwable) -> Unit {
+    val app = getApplication<Application>()
+    return { error ->
+        AppLog.w("LastSetCorrections", "a rest-screen correction did not save", error)
+        (app as LiftingApp).container.crashLogs.write(CrashReporting.recordOf(Thread.currentThread(), error))
+        Toast.makeText(app, CORRECTION_NOT_SAVED, Toast.LENGTH_SHORT).show()
+    }
+}
+
+/**
+ * [write], with any failure but cancellation handed to [onFailed] after
+ * [undo] has put back whatever was published before the write. One shape for
+ * every launch in this file, so none of them can end the process.
+ */
+private suspend fun saving(onFailed: (Throwable) -> Unit, undo: () -> Unit = {}, write: suspend () -> Unit) {
+    try {
+        write()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        undo()
+        onFailed(e)
+    }
+}
 
 /**
  * The state a rest-screen effort correction leaves behind.
@@ -120,9 +170,10 @@ internal fun applyWarmupMark(
     val before = s.lastSetWarmupMark
     val mark = WarmupMarkPolicy.toggled(s.lastSetWarmup, before)
     stateFlow.value = s.copy(lastSetWarmupMark = mark)
+    val undo = { stateFlow.value = stateFlow.value.copy(lastSetWarmupMark = before) }
     appScope.launch(Dispatchers.Main.immediate) {
-        if (ratings.markWarmup(mark) == null) {
-            stateFlow.value = stateFlow.value.copy(lastSetWarmupMark = before)
+        saving(ratings.onWriteFailed, undo) {
+            if (ratings.markWarmup(mark) == null) undo()
         }
     }
 }
@@ -158,12 +209,14 @@ internal fun applyLimiter(
 ) {
     val normalized = if (limiter == SetLimiter.OTHER) SetLimiter.normalizeNote(note) else null
     appScope.launch(Dispatchers.Main.immediate) {
-        ratings.limit(limiter?.stored, normalized) ?: return@launch
-        stateFlow.value =
-            stateFlow.value.copy(
-                lastSetLimiter = limiter,
-                lastSetLimiterNote = normalized,
-            )
+        saving(ratings.onWriteFailed) {
+            ratings.limit(limiter?.stored, normalized) ?: return@saving
+            stateFlow.value =
+                stateFlow.value.copy(
+                    lastSetLimiter = limiter,
+                    lastSetLimiterNote = normalized,
+                )
+        }
     }
 }
 
@@ -227,11 +280,13 @@ internal fun applyCountAndRating(
     val bounded = if ((draft.reps ?: 0) < 0) draft.copy(reps = null) else draft
     if (!bounded.changesAnything) return
     appScope.launch(context) {
-        // The stored warm-up flag is handed back unchanged, for the reason
-        // applyRating gives (#187).
-        val warmup = stateFlow.value.lastSetWarmup
-        val row = ratings.correct(bounded, warmup) ?: return@launch
-        stateFlow.value = countAndRatingState(stateFlow.value, bounded, row)
+        saving(ratings.onWriteFailed) {
+            // The stored warm-up flag is handed back unchanged, for the reason
+            // applyRating gives (#187).
+            val warmup = stateFlow.value.lastSetWarmup
+            val row = ratings.correct(bounded, warmup) ?: return@saving
+            stateFlow.value = countAndRatingState(stateFlow.value, bounded, row)
+        }
     }
 }
 
@@ -355,9 +410,10 @@ internal fun applyLoadCorrection(
     val carryFollows =
         SetLoadPolicy.carryFollowsCorrection(standingAddedKg(s0), before, s0.weightUnit, carryBlock(s0))
     stateFlow.value = loadCorrectedState(s0, after, carryFollows)
+    val undo = { stateFlow.value = loadCorrectionRolledBack(stateFlow.value, s0, carryFollows) }
     appScope.launch(Dispatchers.Main.immediate) {
-        if (ratings.correctLoad(total) == null) {
-            stateFlow.value = loadCorrectionRolledBack(stateFlow.value, s0, carryFollows)
+        saving(ratings.onWriteFailed, undo) {
+            if (ratings.correctLoad(total) == null) undo()
         }
     }
 }
@@ -394,12 +450,14 @@ internal fun applyRating(
     appScope: CoroutineScope,
 ) {
     appScope.launch(Dispatchers.Main.immediate) {
-        // The stored warm-up flag is handed back unchanged rather than
-        // taken from the correction: `updateRpe` writes the column on every
-        // correction, so passing anything else here would let re-rating a
-        // ramp set silently turn it into work (#187).
-        val warmup = stateFlow.value.lastSetWarmup
-        val row = ratings.rate(rpe, failed, warmup) ?: return@launch
-        stateFlow.value = ratedState(stateFlow.value, row.rpe, row.failedByLifter, row.failed)
+        saving(ratings.onWriteFailed) {
+            // The stored warm-up flag is handed back unchanged rather than
+            // taken from the correction: `updateRpe` writes the column on every
+            // correction, so passing anything else here would let re-rating a
+            // ramp set silently turn it into work (#187).
+            val warmup = stateFlow.value.lastSetWarmup
+            val row = ratings.rate(rpe, failed, warmup) ?: return@saving
+            stateFlow.value = ratedState(stateFlow.value, row.rpe, row.failedByLifter, row.failed)
+        }
     }
 }

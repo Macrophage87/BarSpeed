@@ -125,4 +125,27 @@ class SessionRepositoryHoldEndTest {
             "a second correction says something different from the first",
         )
     }
+
+    /**
+     * The Correct popup's SAVE goes through `correctCountAndRating`, one
+     * transaction since data-layer F4 (UX review 2026-11-06). Its seconds
+     * must carry the same word the single-statement path does; the fake's
+     * inherited default body is what hands them to [RecordingDao].
+     */
+    @Test
+    fun `a hold corrected with its rating in one transaction still says corrected`() = runTest {
+        val dao = RecordingDao()
+        repo(dao).correctCountAndRating(
+            setId = 31L,
+            seconds = 47,
+            reps = null,
+            rpe = 8,
+            failed = false,
+            failedByLifter = false,
+            warmup = false,
+        )
+        val expected: List<Triple<Long, Int, String?>> =
+            listOf(Triple(31L, 47, HoldEndSource.CORRECTED.published))
+        assertEquals(expected, dao.durationWrites, "the transactional path lost the word")
+    }
 }

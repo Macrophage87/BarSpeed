@@ -1004,6 +1004,31 @@ class SessionRepository(
     suspend fun overrideDuration(setId: Long, seconds: Int) =
         sessionDao.overrideDuration(setId, seconds, HoldEndSource.CORRECTED.published)
 
+    /**
+     * [overrideDuration], [overrideReps] and [rateSet] for one Correct-popup
+     * SAVE, as one transaction (`SessionDao.correctCountAndRating`). The
+     * seconds carry [HoldEndSource.CORRECTED], the word [overrideDuration]
+     * decides. UX review 2026-11-06, data-layer F4.
+     */
+    suspend fun correctCountAndRating(
+        setId: Long,
+        seconds: Int?,
+        reps: Int?,
+        rpe: Int?,
+        failed: Boolean,
+        failedByLifter: Boolean?,
+        warmup: Boolean,
+    ) = sessionDao.correctCountAndRating(
+        setId = setId,
+        seconds = seconds,
+        endedBy = HoldEndSource.CORRECTED.published,
+        reps = reps,
+        rpe = rpe,
+        failed = failed,
+        failedByLifter = failedByLifter,
+        warmup = warmup,
+    )
+
     suspend fun deleteSession(id: Long) = sessionDao.deleteSession(id)
 
     fun decodeAnalysis(entity: SetRecordEntity): SetAnalysis? = try {

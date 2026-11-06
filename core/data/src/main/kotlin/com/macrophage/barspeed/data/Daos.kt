@@ -219,6 +219,33 @@ interface SessionDao {
     @Query("UPDATE set_records SET actualDurationS = :seconds, durationEndedBy = :endedBy WHERE id = :setId")
     suspend fun overrideDuration(setId: Long, seconds: Int, endedBy: String?)
 
+    /**
+     * One Correct-popup SAVE's hold or count and its rating, in one
+     * transaction. UX review 2026-11-06, data-layer F4.
+     *
+     * Three statements issued one after another let a failure between them
+     * store the corrected count beside the old `failed`/`failedByLifter`,
+     * which is the split [updateRpe]'s own comment says must never happen.
+     * Default-bodied for [insertSetWithStreams]'s reason; whether the database
+     * commits the three together or not at all is Room's `@Transaction`,
+     * which no test in this module can observe.
+     */
+    @Transaction
+    suspend fun correctCountAndRating(
+        setId: Long,
+        seconds: Int?,
+        endedBy: String?,
+        reps: Int?,
+        rpe: Int?,
+        failed: Boolean,
+        failedByLifter: Boolean?,
+        warmup: Boolean,
+    ) {
+        seconds?.let { overrideDuration(setId, it, endedBy) }
+        reps?.let { overrideReps(setId, it) }
+        updateRpe(setId, rpe, failed, failedByLifter, warmup)
+    }
+
     @Query("SELECT * FROM sessions WHERE startedAtMs >= :fromMs AND startedAtMs <= :toMs ORDER BY startedAtMs")
     suspend fun sessionsInRange(fromMs: Long, toMs: Long): List<SessionEntity>
 

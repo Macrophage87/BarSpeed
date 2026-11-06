@@ -4553,7 +4553,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * stored are a whole durable write apart, and this is what covers that gap.
      */
     private var journal: SetJournal? = null
-    private val ratings = SetRatingTracker(sessionRepository)
+    private val ratings = SetRatingTracker(sessionRepository, correctionFailed())
 
     /**
      * The effort grid is seven separately clickable tiles, and finishing a set
