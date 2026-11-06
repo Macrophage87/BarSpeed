@@ -292,7 +292,10 @@ object JournalRecoveryPolicy {
      * given the recording holds [held] at the moment of asking.
      */
     @Suppress("UNUSED_PARAMETER", "UnusedParameter")
-    fun waitNote(held: Set<RecordingHold>): String = "A set is still being saved -- try again in a moment"
+    fun waitNote(held: Set<RecordingHold>): String = SAVING_NOTE
+
+    /** [waitNote] while a set-end write or a session close, which finishes on its own, is held. */
+    const val SAVING_NOTE = "A set is still being saved -- try again in a moment"
 
     /** What the card says in place of [ACTION_LABEL] when [refusal] refused. */
     fun refusalNote(refusal: RecoveryRefusal): String = when (refusal) {
