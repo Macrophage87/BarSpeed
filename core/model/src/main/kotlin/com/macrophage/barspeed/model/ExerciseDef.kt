@@ -434,8 +434,9 @@ data class ExerciseDef(
         fun isBodyweightByConstruction(id: String): Boolean = id.lowercase() in BODYWEIGHT_IDS
 
         private val EXPLOSIVE_HINTS = listOf("swing", "snatch", "clean", "jerk", "push_press", "throw", "slam")
-        private val HOLD_HINTS = listOf("plank", "hold", "hang", "wall_sit", "l_sit")
-        private val CARRY_HINTS = listOf("carry", "walk", "farmer", "yoke", "sled")
+        // "plank" and "sled" are read in inferKind, each with its own veto.
+        private val HOLD_HINTS = listOf("hold", "hang", "wall_sit", "l_sit")
+        private val CARRY_HINTS = listOf("carry", "walk", "farmer", "yoke")
 
         /**
          * Slow strength work built on an Olympic grip: a snatch-grip deadlift is
@@ -484,13 +485,30 @@ data class ExerciseDef(
         fun inferKind(id: String): ExerciseKind {
             val tokens = tokens(id)
             val explosive = EXPLOSIVE_HINTS.any { tokens.name(it) } && SLOW_LIFT_VETO.none { tokens.name(it) }
+            val plankHeld = tokens.name("plank") && PLANK_REP_WORK.none { tokens.name(it) }
+            val sledMoved = tokens.name("sled") && SLED_MACHINE.none { tokens.name(it) }
             return when {
                 explosive -> ExerciseKind.EXPLOSIVE
-                HOLD_HINTS.any { tokens.name(it) } -> ExerciseKind.HOLD
-                CARRY_HINTS.any { tokens.name(it) } -> ExerciseKind.CARRY
+                plankHeld || HOLD_HINTS.any { tokens.name(it) } -> ExerciseKind.HOLD
+                sledMoved || CARRY_HINTS.any { tokens.name(it) } -> ExerciseKind.CARRY
                 else -> ExerciseKind.DYNAMIC
             }
         }
+
+        /**
+         * Rep work done FROM a plank -- a plank row, a side-plank hip dip --
+         * is counted in reps, not held for time, so "plank" alone must not
+         * make it a HOLD. Scoped to the plank: `inverted_row_hold` is still a
+         * hold through "hold" (core-model review 2026-11-06, F4).
+         */
+        private val PLANK_REP_WORK = listOf("row", "dip")
+
+        /**
+         * A leg-press or hack-squat sled is a machine the lifter presses or
+         * squats on, not a sled pushed across the floor, so "sled" beside one
+         * of these words is not a CARRY (F4).
+         */
+        private val SLED_MACHINE = listOf("press", "squat")
 
         private val CONCENTRIC_START_HINTS =
             listOf(
