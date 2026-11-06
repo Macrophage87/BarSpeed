@@ -6,6 +6,7 @@ import androidx.core.content.IntentCompat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.getAndUpdate
+import kotlinx.coroutines.flow.update
 
 /**
  * A plan handed to the app from outside it: "Open with BarSpeed" on a file,
@@ -55,8 +56,19 @@ object IncomingPlanInbox {
 
     val pending: StateFlow<IncomingPlan?> = held
 
+    private val count = MutableStateFlow(0)
+
+    /**
+     * How many hand-offs this process has received. The navigation reacts to
+     * this rather than to [pending], because a Plans screen already open can
+     * take a plan before the navigation sees it, and the lifter must still be
+     * told it arrived.
+     */
+    val arrivals: StateFlow<Int> = count
+
     fun offer(plan: IncomingPlan) {
         held.value = plan
+        count.update { it + 1 }
     }
 
     /** Takes the held plan, once: a second caller gets null. */

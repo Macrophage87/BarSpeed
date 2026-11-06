@@ -16,6 +16,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -25,6 +28,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.macrophage.barspeed.model.BlePermissionPolicy
+import com.macrophage.barspeed.model.RecordingHold
 import com.macrophage.barspeed.ui.LiftingTheme
 import com.macrophage.barspeed.ui.components.LocalBlePermissionUi
 import com.macrophage.barspeed.ui.components.PermissionUi
@@ -38,6 +42,7 @@ import com.macrophage.barspeed.ui.screens.SessionDetailScreen
 
 class MainActivity : ComponentActivity() {
     private val gate by lazy { (application as LiftingApp).container.blePermissionGate }
+    private val recordingHolds by lazy { (application as LiftingApp).container.recordingHolds }
 
     /**
      * The result is read now, where it used to be discarded by an empty lambda.
@@ -58,7 +63,8 @@ class MainActivity : ComponentActivity() {
         // A recreated Activity is handed the intent it was launched with
         // again; that plan was already taken into the gate the first time.
         if (savedInstanceState == null) receivePlan(intent)
-        // launchMode singleTop: a share while the app is open arrives here.
+        // launchMode singleTask: every share or Open with, including one sent
+        // while the app is already open, reaches this one instance here.
         addOnNewIntentListener { receivePlan(it) }
         setContent {
             LiftingTheme {
@@ -70,7 +76,7 @@ class MainActivity : ComponentActivity() {
                             openSettings = ::openAppSettings,
                         ),
                 ) {
-                    AppNav()
+                    AppNav(sessionLive = { RecordingHold.SESSION in recordingHolds.held.value })
                 }
             }
         }
@@ -152,7 +158,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun AppNav() {
+private fun AppNav(sessionLive: () -> Boolean) {
     val navController = rememberNavController()
     // #272: the one thing a crash report can say about WHERE the app was.
     // The ROUTE PATTERN, not the resolved path -- `session/{sessionId}`, never
@@ -166,17 +172,27 @@ private fun AppNav() {
         }
     }
     // A plan handed in from outside goes to Plans, where its ViewModel takes it
-    // into the import gate. Not while Record is on the stack: navigating over
-    // a session in progress would strand it, so the plan waits in the inbox
-    // and is staged when Plans next opens.
-    val incomingPlan by IncomingPlanInbox.pending.collectAsState()
+    // into the import gate. Not while a session is on: navigating over it
+    // would strand it, and APPROVE & START from that gate would open a second
+    // Record beside the one capturing. "On" is both this instance's back
+    // stack and the process-wide SESSION hold; singleTask in the manifest is
+    // what makes this the only instance whose back stack there is to ask. The
+    // plan then waits in the inbox, or is taken by a Plans screen lower in
+    // the stack, and either way the toast says where it is.
+    //
+    // Keyed on the arrival count, not on the held plan: a Plans ViewModel
+    // already alive can take the plan before this effect runs, and the toast
+    // must still be shown. The handled count is saved so a rotation does not
+    // act on the same arrival twice.
+    val arrivals by IncomingPlanInbox.arrivals.collectAsState()
+    var handledArrivals by rememberSaveable { mutableIntStateOf(0) }
     val context = LocalContext.current
-    LaunchedEffect(incomingPlan) {
-        if (incomingPlan == null) return@LaunchedEffect
-        val recording = runCatching { navController.getBackStackEntry("record") }.isSuccess
-        if (recording) {
-            Toast.makeText(context, "Plan received. Open Plans after this session to review it.", Toast.LENGTH_LONG)
-                .show()
+    LaunchedEffect(arrivals) {
+        if (arrivals <= handledArrivals) return@LaunchedEffect
+        handledArrivals = arrivals
+        val onRecord = runCatching { navController.getBackStackEntry("record") }.isSuccess
+        if (onRecord || sessionLive()) {
+            Toast.makeText(context, "Plan received: open Plans to review it.", Toast.LENGTH_LONG).show()
         } else {
             navController.navigate("plans") {
                 popUpTo("home")
