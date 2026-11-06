@@ -9,6 +9,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -197,6 +199,7 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
                         crashReports,
                         busyCrashReports,
                         viewModel::shareCrashReport,
+                        viewModel::copyCrashReport,
                         viewModel::deleteCrashReport,
                     )
                 }
@@ -706,11 +709,13 @@ private fun InterruptedSetNotice(
  * on this card from the file name and the directory entry, which is #271's
  * lesson: that crash was a launch-time listing that decoded what it listed.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun CrashReportNotice(
     reports: List<CrashReport>,
     busy: Set<File>,
     onShare: (CrashReport) -> Unit,
+    onCopy: (CrashReport) -> Unit,
     onDelete: (CrashReport) -> Unit,
 ) {
     val newest = reports.firstOrNull() ?: return
@@ -732,20 +737,26 @@ private fun CrashReportNotice(
             Text(newest.label, style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(2.dp))
             Text(
-                "${ByteSize.format(newest.bytes)} · the stack, the app version and the free memory",
+                "${ByteSize.format(newest.bytes)} · the stack, the app version, the phone and the free memory",
                 style = MaterialTheme.typography.bodySmall,
                 color = BarColors.Sub,
             )
             Spacer(Modifier.height(6.dp))
             SectionCaption("Kept on this phone, newest ten. Nothing sends it but you")
             Spacer(Modifier.height(6.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // A FlowRow since COPY joined (UX review 2026-11-06, reliability F7): four
+            // buttons do not fit one row on a narrow phone.
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
                     onClick = { onShare(newest) },
                     enabled = !newestBusy,
                     contentPadding = ButtonDefaults.TextButtonContentPadding,
                 ) {
                     Text("SEND IT TO ME", color = BarColors.Volt)
+                }
+                // The whole text on the clipboard, for a chat that takes text better than a file.
+                TextButton(onClick = { onCopy(newest) }) {
+                    Text("COPY", color = BarColors.Volt)
                 }
                 // Kept a TextButton (#201): destructive, so it stays quieter than the SEND beside
                 // it.

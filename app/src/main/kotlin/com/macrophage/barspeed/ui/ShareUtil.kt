@@ -75,22 +75,44 @@ object ShareUtil {
      * is named here and left alone rather than fixed inside this change --
      * but it is not a reason to decline a cleanup that does not exist yet.
      */
-    suspend fun shareStreamed(context: Context, fileName: String, mimeType: String, write: (File) -> Unit) {
+    suspend fun shareStreamed(
+        context: Context,
+        fileName: String,
+        mimeType: String,
+        subject: String? = null,
+        text: String? = null,
+        write: (File) -> Unit,
+    ) {
         val file =
             withContext(Dispatchers.IO) {
                 val dir = File(context.cacheDir, "exports").apply { mkdirs() }
                 File(dir, fileName).also(write)
             }
-        shareCachedFile(context, fileName, file, mimeType)
+        shareCachedFile(context, fileName, file, mimeType, subject, text)
     }
 
-    /** The share-sheet Intent, common to [shareFile] and [shareStreamed] once each has its cache file. */
-    private fun shareCachedFile(context: Context, fileName: String, file: File, mimeType: String) {
+    /**
+     * The share-sheet Intent, common to [shareFile] and [shareStreamed] once each has its cache file.
+     *
+     * [subject] and [text] ride beside the attachment when given, so an email
+     * arrives titled and a chat app that ignores files still gets a line
+     * (UX review 2026-11-06, reliability F7). Null leaves the Intent as before.
+     */
+    private fun shareCachedFile(
+        context: Context,
+        fileName: String,
+        file: File,
+        mimeType: String,
+        subject: String? = null,
+        text: String? = null,
+    ) {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         val intent =
             Intent(Intent.ACTION_SEND).apply {
                 type = mimeType
                 putExtra(Intent.EXTRA_STREAM, uri)
+                subject?.let { putExtra(Intent.EXTRA_SUBJECT, it) }
+                text?.let { putExtra(Intent.EXTRA_TEXT, it) }
                 // ClipData is what actually propagates the URI grant to the chosen app.
                 clipData = ClipData.newRawUri(fileName, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)

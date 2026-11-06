@@ -2,7 +2,9 @@ package com.macrophage.barspeed
 
 import com.macrophage.barspeed.model.CrashLogPolicy
 import com.macrophage.barspeed.model.CrashRecord
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.OutputStream
 
 /**
  * One crash file, as a card can draw it WITHOUT opening it. Issue #272.
@@ -117,24 +119,38 @@ class CrashLogStore(private val root: File) {
      * reason issue #111 gave for the rescued-database archive.
      */
     fun copyBounded(source: File, destination: File) {
-        destination.outputStream().use { out ->
-            source.inputStream().use { input ->
-                val buffer = ByteArray(BUFFER_BYTES)
-                var written = 0L
-                while (true) {
-                    val read = input.read(buffer)
-                    if (read <= 0) break
-                    val room = MAX_SHARE_BYTES - written
-                    if (room <= 0L) {
-                        out.write(TRUNCATION_NOTICE.toByteArray(Charsets.UTF_8))
-                        return
-                    }
-                    val take = minOf(read.toLong(), room).toInt()
-                    out.write(buffer, 0, take)
-                    written += take
+        destination.outputStream().use { out -> copyBounded(source, out) }
+    }
+
+    /** [copyBounded] into a stream the caller owns and closes. */
+    private fun copyBounded(source: File, out: OutputStream) {
+        source.inputStream().use { input ->
+            val buffer = ByteArray(BUFFER_BYTES)
+            var written = 0L
+            while (true) {
+                val read = input.read(buffer)
+                if (read <= 0) break
+                val room = MAX_SHARE_BYTES - written
+                if (room <= 0L) {
+                    out.write(TRUNCATION_NOTICE.toByteArray(Charsets.UTF_8))
+                    return
                 }
+                val take = minOf(read.toLong(), room).toInt()
+                out.write(buffer, 0, take)
+                written += take
             }
         }
+    }
+
+    /**
+     * One crash report's text, for the COPY button and the share sheet's
+     * subject and summary (UX review 2026-11-06, reliability F7). Read up to
+     * [MAX_SHARE_BYTES] only, for [copyBounded]'s reason. Call off Main.
+     */
+    fun readBounded(file: File): String {
+        val out = ByteArrayOutputStream()
+        copyBounded(file, out)
+        return out.toString(Charsets.UTF_8.name())
     }
 
     companion object {

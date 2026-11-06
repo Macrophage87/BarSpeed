@@ -1,13 +1,17 @@
 package com.macrophage.barspeed.ui.screens
 
 import android.app.Application
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.provider.DocumentsContract
 import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.macrophage.barspeed.AppLog
+import com.macrophage.barspeed.BuildConfig
 import com.macrophage.barspeed.CrashReport
 import com.macrophage.barspeed.CrashReporting
 import com.macrophage.barspeed.LiftingApp
@@ -15,6 +19,7 @@ import com.macrophage.barspeed.data.OrphanedSet
 import com.macrophage.barspeed.data.RecoveryOutcome
 import com.macrophage.barspeed.data.RescuedDatabase
 import com.macrophage.barspeed.data.SessionEntity
+import com.macrophage.barspeed.model.CrashShareText
 import com.macrophage.barspeed.model.ExportNaming
 import com.macrophage.barspeed.model.HomeHero
 import com.macrophage.barspeed.model.HomeHeroPolicy
@@ -734,7 +739,15 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             busyCrashReportsFlow.update { it + report.file }
             try {
-                ShareUtil.shareStreamed(getApplication(), report.file.name, "text/plain") { destination ->
+                // Subject and one-line summary beside the file (UX review 2026-11-06, reliability F7).
+                val text = withContext(Dispatchers.IO) { container.crashLogs.readBounded(report.file) }
+                ShareUtil.shareStreamed(
+                    getApplication(),
+                    report.file.name,
+                    "text/plain",
+                    subject = CrashShareText.subject(text, fallbackVersion = BuildConfig.VERSION_NAME),
+                    text = CrashShareText.summary(text),
+                ) { destination ->
                     container.crashLogs.copyBounded(report.file, destination)
                 }
             } catch (e: CancellationException) {
@@ -743,6 +756,29 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 Toast.makeText(getApplication(), "Couldn't send that crash report", Toast.LENGTH_SHORT).show()
             } finally {
                 busyCrashReportsFlow.update { it - report.file }
+            }
+        }
+    }
+
+    /**
+     * Put one crash report's whole text on the clipboard, for pasting into a
+     * chat that takes text better than a file (UX review 2026-11-06,
+     * reliability F7). Android 13 and later confirm a copy themselves, so the
+     * Toast is only for the versions that do not.
+     */
+    fun copyCrashReport(report: CrashReport) {
+        viewModelScope.launch {
+            try {
+                val text = withContext(Dispatchers.IO) { container.crashLogs.readBounded(report.file) }
+                val clipboard = getApplication<Application>().getSystemService(ClipboardManager::class.java)
+                clipboard.setPrimaryClip(ClipData.newPlainText("BarSpeed crash report", text))
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                    Toast.makeText(getApplication(), "Crash report copied", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Toast.makeText(getApplication(), "Couldn't copy that crash report", Toast.LENGTH_SHORT).show()
             }
         }
     }
