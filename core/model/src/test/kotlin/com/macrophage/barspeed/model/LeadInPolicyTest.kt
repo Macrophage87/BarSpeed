@@ -333,4 +333,28 @@ class LeadInPolicyTest {
         assertTrue(LeadInPolicy.speaks(PrepCase.NONE, audioCues = true))
         assertFalse(LeadInPolicy.speaks(PrepCase.NONE, audioCues = false))
     }
+
+    // ---- the per-exercise override, and clearing it (settings F4) ------------
+
+    /**
+     * Tapping back to the plan's value CLEARS the override. Before this a copy
+     * of the plan's 10 was stored, and next week's plan saying 15 still played
+     * 10.
+     */
+    @Test
+    fun `a tap that lands on the plan's prep clears the override`() {
+        assertNull(LeadInPolicy.overrideAfterTap(declaredS = 10, currentS = 15, deltaS = -5))
+        assertNull(LeadInPolicy.overrideAfterTap(declaredS = null, currentS = 10, deltaS = -5))
+    }
+
+    @Test
+    fun `use plan prep clears an override that already equals the plan`() {
+        assertNull(LeadInPolicy.overrideAfterTap(declaredS = 10, currentS = 10, deltaS = 0))
+    }
+
+    @Test
+    fun `a tap away from the plan's prep is stored, clamped`() {
+        assertEquals(15, LeadInPolicy.overrideAfterTap(declaredS = 10, currentS = 10, deltaS = 5))
+        assertEquals(0, LeadInPolicy.overrideAfterTap(declaredS = 10, currentS = 0, deltaS = -5))
+    }
 }
