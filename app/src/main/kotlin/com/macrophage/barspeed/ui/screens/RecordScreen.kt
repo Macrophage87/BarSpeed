@@ -188,7 +188,7 @@ fun RecordScreen(
     // Saveable, so a rotation does not act twice; after a process death the
     // entry is spent and the dialog asks as on a plain entry.
     var entryDone by rememberSaveable { mutableStateOf(entry == null) }
-    LaunchedEffect(state.resumeOffer, state.planSessions, state.stage) {
+    LaunchedEffect(state.resumeOffer, state.resumeChecked, state.planSessions, state.stage) {
         if (!entryDone) entryDone = viewModel.applyHomeEntry(entry, planSession)
     }
     // CONTINUE from Home answers the dialog itself; drawing it meanwhile

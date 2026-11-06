@@ -74,6 +74,7 @@ import com.macrophage.barspeed.model.NextSetInputs
 import com.macrophage.barspeed.model.NextSetSlot
 import com.macrophage.barspeed.model.NextSetStatements
 import com.macrophage.barspeed.model.Phase
+import com.macrophage.barspeed.model.PlanSessionAutoOpen
 import com.macrophage.barspeed.model.PlanSessionDef
 import com.macrophage.barspeed.model.PrepCase
 import com.macrophage.barspeed.model.PrepWindow
@@ -3077,8 +3078,15 @@ internal fun homeEntryStep(entry: RecordEntry?, s: RecordState, planSessionName:
             else -> HomeEntryStep.CONTINUE
         }
         RecordEntry.NEW -> if (offer == null) HomeEntryStep.WAIT else HomeEntryStep.START_NEW
-        RecordEntry.PREVIEW ->
-            if (s.planSessions.any { it.name == planSessionName }) HomeEntryStep.PREVIEW else HomeEntryStep.WAIT
+        // Waits for the resume check and for any offer to be answered
+        // (PlanSessionAutoOpen): opening the preview first left SETUP, where
+        // alone "Continue this session?" is offered.
+        RecordEntry.PREVIEW -> when {
+            s.resumeContinued -> HomeEntryStep.DROP
+            !PlanSessionAutoOpen.mayOpen(s.resumeChecked, offer != null, s.resumeContinued) -> HomeEntryStep.WAIT
+            s.planSessions.any { it.name == planSessionName } -> HomeEntryStep.PREVIEW
+            else -> HomeEntryStep.WAIT
+        }
     }
 }
 
@@ -3123,11 +3131,19 @@ private fun CoroutineScope.offerResume(
     holds: RecordingHolds,
     state: MutableStateFlow<RecordState>,
 ) = launch {
-    val nowMs = System.currentTimeMillis()
-    val writing = RecordingServicePolicy.writing(holds.held.value)
-    val latest = repository.latestSession(nowMs - SessionResumePolicy.LOOKBACK_MS, nowMs)
-    val offer = SessionResumePolicy.offer(latest, nowMs, writing) ?: return@launch
-    if (state.value.stage == Stage.SETUP) state.value = state.value.copy(resumeOffer = offer)
+    // resumeChecked is set on EVERY way out -- an offer, no offer, a
+    // recovery hold, a failed read -- because a PREVIEW entry (Home's next
+    // session, Plan detail's per-session START) waits for it before opening
+    // a preview (PlanSessionAutoOpen). Left unset, it would open nothing.
+    try {
+        val nowMs = System.currentTimeMillis()
+        val writing = RecordingServicePolicy.writing(holds.held.value)
+        val latest = repository.latestSession(nowMs - SessionResumePolicy.LOOKBACK_MS, nowMs)
+        val offer = SessionResumePolicy.offer(latest, nowMs, writing) ?: return@launch
+        if (state.value.stage == Stage.SETUP) state.value = state.value.copy(resumeOffer = offer)
+    } finally {
+        state.value = state.value.copy(resumeChecked = true)
+    }
 }
 
 /**
@@ -3186,6 +3202,9 @@ private fun CoroutineScope.continueOffered(
     onStart: (PlanSessionDef) -> Unit,
 ) = launch {
     val offer = state.value.resumeOffer ?: return@launch
+    // Recorded before anything else: whatever this lands on, a PREVIEW entry
+    // must not then open a different preview on top of it.
+    state.value = state.value.copy(resumeContinued = true)
     val planSession = offer.planSessionName?.let { name -> state.value.planSessions.firstOrNull { it.name == name } }
     val remaining = planSession?.let { resumedQueue(repository.flattenPlan(it), offer.storedSets) }.orEmpty()
     if (state.value.resumeOffer != offer) return@launch
@@ -3834,6 +3853,14 @@ data class RecordState(
      * whether there is one to ask about.
      */
     val resumeOffer: LatestSession? = null,
+    /**
+     * True once the entry check behind [resumeOffer] has answered, whatever
+     * it found. A PREVIEW entry waits for it ([homeEntryStep],
+     * [com.macrophage.barspeed.model.PlanSessionAutoOpen]).
+     */
+    val resumeChecked: Boolean = false,
+    /** True once "Continue it" was tapped on this visit; see [resumeChecked]. */
+    val resumeContinued: Boolean = false,
     /**
      * The SETUP caption after "Continue it" found a plan row it could not
      * continue ([SessionResumePolicy.newSessionNotice]), or null.

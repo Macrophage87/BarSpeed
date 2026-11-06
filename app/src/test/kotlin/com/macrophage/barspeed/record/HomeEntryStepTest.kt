@@ -65,11 +65,39 @@ class HomeEntryStepTest {
 
     @Test
     fun `preview waits for the named session, then opens it`() {
-        assertEquals(HomeEntryStep.WAIT, homeEntryStep(RecordEntry.PREVIEW, RecordState(), "Push A"))
+        val checked = RecordState(resumeChecked = true)
+        assertEquals(HomeEntryStep.WAIT, homeEntryStep(RecordEntry.PREVIEW, checked, "Push A"))
         assertEquals(
             HomeEntryStep.PREVIEW,
-            homeEntryStep(RecordEntry.PREVIEW, RecordState(planSessions = listOf(pushA)), "Push A"),
+            homeEntryStep(RecordEntry.PREVIEW, checked.copy(planSessions = listOf(pushA)), "Push A"),
         )
+    }
+
+    /**
+     * Focused review of batch1-plan-warnings: opening the preview before the
+     * resume check answered left SETUP, where alone "Continue this session?"
+     * is offered, so a died-mid-session lifter got a second row instead.
+     */
+    @Test
+    fun `preview waits for the resume check even when its session is loaded`() {
+        val loaded = RecordState(planSessions = listOf(pushA))
+        assertEquals(HomeEntryStep.WAIT, homeEntryStep(RecordEntry.PREVIEW, loaded, "Push A"))
+    }
+
+    @Test
+    fun `preview waits while a Continue offer is up, and opens once it is declined`() {
+        val offered = RecordState(planSessions = listOf(pushA), resumeChecked = true, resumeOffer = offer("Push A"))
+        assertEquals(HomeEntryStep.WAIT, homeEntryStep(RecordEntry.PREVIEW, offered, "Push A"))
+        assertEquals(
+            HomeEntryStep.PREVIEW,
+            homeEntryStep(RecordEntry.PREVIEW, offered.copy(resumeOffer = null), "Push A"),
+        )
+    }
+
+    @Test
+    fun `preview is dropped once Continue it was taken`() {
+        val continued = RecordState(planSessions = listOf(pushA), resumeChecked = true, resumeContinued = true)
+        assertEquals(HomeEntryStep.DROP, homeEntryStep(RecordEntry.PREVIEW, continued, "Push A"))
     }
 
     @Test
