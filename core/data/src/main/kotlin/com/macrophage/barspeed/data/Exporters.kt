@@ -593,6 +593,11 @@ class SessionExporter(
             // this build's version on a set it did not analyse is the very
             // claim the key exists to stop making.
             analysisSchemaVersion = record.analysisSchemaVersion,
+            // Written back into History from an interrupted set's capture
+            // rather than by the set ending (#100), copied from the row.
+            // Omitted when false: every set that ended, and every row from
+            // before database v21, keeps its bytes.
+            recovered = record.recovered,
             repMetrics =
             if (includeRepDetail && reps.isNotEmpty()) {
                 reps.map {
@@ -1494,6 +1499,10 @@ class RawExporter(
         // session's manifest for no gain -- the rule `added` follows one line
         // above.
         flag("voided", record.voided)
+        // A set written back from an interrupted capture (#100): the same
+        // fact session.json publishes, and [flag] for the reason `added`
+        // gives -- absence keeps reading as "the set ended" in every archive.
+        flag("recovered", record.recovered)
         str("voidReason", record.publishedVoidReason)
         flag("repsManual", record.repsManual)
         // Whose count `reps` above is, and what the sensor counted (#286). Here
