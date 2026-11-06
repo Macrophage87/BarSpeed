@@ -62,7 +62,11 @@ internal sealed interface PreparedRecovery {
  * and the figures by `SetAnalyzer.analyze` with the journaled cue track and
  * prep window -- the same three calls `RecordViewModel.endSet` and
  * `runSetWrite` make, over the same kinds of input, read back from disk instead
- * of from the heap.
+ * of from the heap. Whether the analyzer runs at all is endSet's rule too: the
+ * stream `armedCaptureOf` chose reaches
+ * `SensorCapturePolicy.MIN_ANALYSABLE_FRAMES`. Span and stillness (#242,
+ * #287) are not a second test here; they are inside `armedCaptureOf`'s choice
+ * of that stream, as they are for a live set.
  *
  * WHAT A RECOVERED ROW DOES NOT HAVE, said once here and in the card's
  * confirmation. No plan targets, side or effort rating: they were never
@@ -92,8 +96,9 @@ class JournalRecovery(
      * scan alone, so the card can ask without decoding anything (#271).
      *
      * The answer can still change at [recover], which decodes: a stream the
-     * scan counted whole can turn out not to parse, and a prep file can be
-     * present and say nothing. Both are refused there with the same words.
+     * scan counted whole can turn out not to parse, a prep file can be
+     * present and say nothing, and a sensor-counted set's analysis can find
+     * no rep. Each is refused there with the same words.
      */
     fun refusal(orphan: OrphanedSet): RecoveryRefusal? {
         val analysedFrames = analysedScan(orphan)?.rows ?: 0L
@@ -245,6 +250,11 @@ class JournalRecovery(
                     cues = streams.cues,
                     workStartedAtMs = prepWindow?.workStartedAtMs,
                     analysedUnitFellBack = capture.sensors?.analysedFellBack == true,
+                    // The analysed unit's own roll, as endSet hands it: a
+                    // fallback under a declaration naming no mount onto a
+                    // unit that reads as riding a load is refused (#279;
+                    // #100 review round 2, Lens A B1).
+                    analysedSignal = capture.analysedSignal,
                 )
             } else {
                 SetAnalysis(emptyList(), 0.0, null, null, listOf(MARKS_ONLY_NOTE))

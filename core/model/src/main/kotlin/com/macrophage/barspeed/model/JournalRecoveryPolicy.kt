@@ -98,8 +98,12 @@ enum class RecoveryRefusal {
 
     /**
      * The counter the set ran under made no count the capture holds: a tally
-     * counter with no mark, or a sensor-counted set with no analysable stream.
-     * The row would have to state a count nobody made.
+     * counter with no mark, whatever the stream beside it could count, or a
+     * sensor-counted set whose stream is not analysable or whose analysis
+     * found no rep -- a withheld analysis among them. The row would have to
+     * state a count nobody made, and on a set counted in reps 0 is a count.
+     * The listing cannot run the analysis, so the last case is answered at
+     * recover, not on the card.
      */
     NOTHING_TO_COUNT,
 }
@@ -117,9 +121,10 @@ sealed interface RecoveryTarget {
 
     /**
      * A recording hold is held: a set write or a session close still
-     * running, or a set still recording on the record screen (or that
-     * screen's hold, leaked by a task swipe). Nothing is decided until it is
-     * released; [JournalRecoveryPolicy.waitNote] says which.
+     * running, or the record screen's own hold, which under Home has leaked
+     * -- every way out of Record pops it and its ViewModel releases the
+     * hold. Nothing is decided until it is released;
+     * [JournalRecoveryPolicy.waitNote] says which.
      */
     data object Wait : RecoveryTarget
 }
@@ -224,7 +229,10 @@ object JournalRecoveryPolicy {
      * the rows in `reps.csv`, and [workStartJournaled] whether the instant the
      * work began after a prep reached the journal. Whether the set can be
      * counted is [count]'s question, asked with the journaled counter, so the
-     * refusal and the count cannot disagree.
+     * refusal and the count cannot disagree. The listing cannot run the
+     * analysis, so it asks [count] as if the segmenter found [ANY_REP]: a
+     * sensor-counted set whose analysis then finds none is refused at
+     * recover, with the same [RecoveryRefusal.NOTHING_TO_COUNT].
      *
      * The order is the order the facts are needed in, so a capture refused
      * for two reasons names the one that stops everything after it.
@@ -241,7 +249,7 @@ object JournalRecoveryPolicy {
         facts.exercise.kind !in repBased -> RecoveryRefusal.NOT_REP_BASED
         !imuReadable -> RecoveryRefusal.STREAM_UNREADABLE
         facts.prepCase != PrepCase.NONE && !workStartJournaled -> RecoveryRefusal.WORK_START_UNKNOWN
-        count(facts.counter, analysable, 0, repMarks.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()) == null ->
+        count(facts.counter, analysable, ANY_REP, repMarks.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()) == null ->
             RecoveryRefusal.NOTHING_TO_COUNT
         else -> null
     }
@@ -257,8 +265,12 @@ object JournalRecoveryPolicy {
      * states them, an analysable stream beside them or not; a tally of none
      * is no count. On a [RepCounter.SENSOR] set the live count the lifter
      * heard died with the process and no mark was journaled, so the count is
-     * the batch segmenter's over an analysable stream, unstated, or none.
-     * [RepCounter.NOBODY] counts nothing.
+     * the batch segmenter's over an analysable stream, unstated, or none --
+     * and none where it found no rep (#100 review round 2, Lens A B2). The
+     * segmenter answers an empty list over a full stream whenever it
+     * withholds (a mount it may not read, a stream that did not move), and
+     * that is no count of zero; the set's own write would have stored the
+     * live count beside it. [RepCounter.NOBODY] counts nothing.
      *
      * The previous rule, "the sensor's count wins and the marks count only
      * where no stream can be analysed", threw a lifter's taps away beside
@@ -267,7 +279,7 @@ object JournalRecoveryPolicy {
     fun count(counter: RepCounter, analysable: Boolean, analysedReps: Int, repMarks: Int): RecoveredCount? =
         when (counter) {
             RepCounter.MANUAL, RepCounter.METRONOME -> RecoveredCount(repMarks, stated = true).takeIf { repMarks > 0 }
-            RepCounter.SENSOR -> RecoveredCount(analysedReps, stated = false).takeIf { analysable }
+            RepCounter.SENSOR -> RecoveredCount(analysedReps, stated = false).takeIf { analysable && analysedReps > 0 }
             RepCounter.NOBODY -> null
         }
 
@@ -280,6 +292,12 @@ object JournalRecoveryPolicy {
      */
     fun endedAtMs(startedAtMs: Long, journaledInstants: List<Long>): Long =
         maxOf(startedAtMs, journaledInstants.maxOrNull() ?: startedAtMs)
+
+    /**
+     * What [refusal] hands [count] for the segmenter's count, which the
+     * listing cannot know: the least count that is a count. See [refusal].
+     */
+    private const val ANY_REP = 1
 
     /** The kinds a set row can be rebuilt for: the rep-based ones. */
     private val repBased = setOf(ExerciseKind.DYNAMIC, ExerciseKind.EXPLOSIVE)
@@ -313,11 +331,13 @@ object JournalRecoveryPolicy {
      * reading (#100 review round 1, Lens A N5, Lens B N4). A set-end write
      * or a session close finishes on its own: wait. The record screen's own
      * hold, [RecordingHold.SESSION], is released when that screen goes away,
-     * so held under Home it is a set still recording there or a hold a task
-     * swipe leaked, and nothing will finish it: the note says to finish the
-     * set on Record, and that force-stopping clears a leaked hold, since the
-     * holds live in process memory. That a force-stop clears it on a device
-     * is reasoned, not observed.
+     * and every way out of Record pops it, so held under Home it has leaked
+     * -- its KDoc names a task swipe -- and no set is recording anywhere
+     * (#100 review round 2, Lens B B1: the round-1 note said one was).
+     * Nothing will finish it, so the note says what the app still holds and
+     * names what clears it, the process ending, since the holds live in
+     * process memory. That a force-stop clears it on a device is reasoned,
+     * not observed.
      */
     fun waitNote(held: Set<RecordingHold>): String =
         if (RecordingHold.SET_WRITE in held || RecordingHold.SESSION_CLOSE in held) SAVING_NOTE else RECORDING_NOTE
@@ -327,8 +347,8 @@ object JournalRecoveryPolicy {
 
     /** [waitNote] while only the record screen's own hold is held. */
     const val RECORDING_NOTE =
-        "A set is still recording on the Record screen -- finish it there first. If you are not recording, " +
-            "force-stop BarSpeed in Android settings and try again."
+        "BarSpeed still counts a recording as running. If you are not recording, force-stop BarSpeed in " +
+            "Android settings or restart the phone, and try again."
 
     /** What the card says in place of [ACTION_LABEL] when [refusal] refused. */
     fun refusalNote(refusal: RecoveryRefusal): String = when (refusal) {
@@ -337,6 +357,6 @@ object JournalRecoveryPolicy {
         RecoveryRefusal.NOT_REP_BASED -> "Only a rep-based lift can be put back into History"
         RecoveryRefusal.STREAM_UNREADABLE -> "A sensor stream is damaged, so it cannot be put back"
         RecoveryRefusal.WORK_START_UNKNOWN -> "Its prep never finished on record, so it cannot be put back"
-        RecoveryRefusal.NOTHING_TO_COUNT -> "Nothing in it can count the reps, so it cannot be put back"
+        RecoveryRefusal.NOTHING_TO_COUNT -> "No count of its reps survived, so it cannot be put back"
     }
 }
