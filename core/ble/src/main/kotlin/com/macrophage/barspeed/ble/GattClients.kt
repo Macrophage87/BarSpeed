@@ -20,6 +20,7 @@ import androidx.core.content.ContextCompat
 import com.macrophage.barspeed.hrm.HeartRateMeasurementParser
 import com.macrophage.barspeed.hrm.HeartRateProfile
 import com.macrophage.barspeed.model.BlePermissionPolicy
+import com.macrophage.barspeed.model.ConnectionFailureReason
 import com.macrophage.barspeed.model.ConnectionPriorityPolicy
 import com.macrophage.barspeed.model.ConnectionState
 import com.macrophage.barspeed.model.HrSample
@@ -93,7 +94,7 @@ abstract class GattClient(protected val context: Context) {
         }
         val adapter = BluetoothAdapter.getDefaultAdapter()
         if (adapter == null) {
-            stateFlow.value = ConnectionState.Failed("Bluetooth unavailable")
+            stateFlow.value = ConnectionState.Failed(ConnectionFailureReason.BLUETOOTH_UNAVAILABLE)
             return false
         }
         if (!BluetoothAdapter.checkBluetoothAddress(address)) {
@@ -172,22 +173,21 @@ abstract class GattClient(protected val context: Context) {
         ContextCompat.checkSelfPermission(context, android.Manifest.permission.BLUETOOTH_CONNECT) ==
             PackageManager.PERMISSION_GRANTED
 
+    /**
+     * The reason strings are `ConnectionFailureReason`'s, in `:core:model`,
+     * so the Devices screen's plain-words mapping (`SensorStatusCopy`) reads
+     * the strings this file writes rather than a copy of them (UX review
+     * 2026-11-06, ble-devices F7). Their history is unchanged: the
+     * permission reason is issue #20's own wording; the other two are
+     * #103's split of a null `connectGatt` into the phone's Bluetooth read
+     * off, and no link opened with it on. The second was briefly "The link
+     * was refused", which claimed a refusal: a null return says only that no
+     * link was opened, not that anything refused one.
+     */
     private companion object {
-        /** Issue #20's own wording; it is what the Devices screen renders. */
-        const val PERMISSION_DENIED_REASON = "Bluetooth permission not granted"
-
-        /** `connectGatt` returned null and the adapter read disabled (#103). */
-        const val PHONE_BLUETOOTH_OFF_REASON = "Phone Bluetooth is off"
-
-        /**
-         * `connectGatt` returned null with the adapter on (#103). This was
-         * "Bluetooth is off or the link was refused" while nothing here read
-         * the adapter; the first half is now its own reason. The second half
-         * was briefly "The link was refused", which claimed a refusal: a null
-         * return says only that no link was opened, not that anything refused
-         * one, so that is all this says.
-         */
-        const val NO_LINK_OPENED_REASON = "No link could be opened"
+        const val PERMISSION_DENIED_REASON = ConnectionFailureReason.PERMISSION_DENIED
+        const val PHONE_BLUETOOTH_OFF_REASON = ConnectionFailureReason.PHONE_BLUETOOTH_OFF
+        const val NO_LINK_OPENED_REASON = ConnectionFailureReason.NO_LINK_OPENED
     }
 
     /**

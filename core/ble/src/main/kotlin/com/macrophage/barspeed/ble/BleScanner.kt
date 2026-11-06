@@ -13,6 +13,7 @@ import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.os.ParcelUuid
 import com.macrophage.barspeed.hrm.HeartRateProfile
+import com.macrophage.barspeed.model.ConnectionFailureReason
 import com.macrophage.barspeed.witmotion.WitmotionProtocol
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -23,10 +24,19 @@ import java.util.UUID
 @SuppressLint("MissingPermission")
 class BleScanner {
     fun scan(): Flow<DiscoveredDevice> = callbackFlow {
+        // Two reasons rather than one "unavailable or disabled" (UX review
+        // 2026-11-06, ble-devices F5): a phone with Bluetooth switched off is
+        // the common case and has a one-tap fix, which the Devices screen
+        // offers only when it can tell that case apart. `bluetoothLeScanner`
+        // is null while the adapter is off, so that null reads as off too.
         val adapter = BluetoothAdapter.getDefaultAdapter()
-        val scanner = adapter?.bluetoothLeScanner
+        if (adapter == null) {
+            close(IllegalStateException(ConnectionFailureReason.BLUETOOTH_UNAVAILABLE))
+            return@callbackFlow
+        }
+        val scanner = adapter.bluetoothLeScanner
         if (scanner == null || !adapter.isEnabled) {
-            close(IllegalStateException("Bluetooth unavailable or disabled"))
+            close(IllegalStateException(ConnectionFailureReason.PHONE_BLUETOOTH_OFF))
             return@callbackFlow
         }
         val callback =
