@@ -149,6 +149,7 @@ import com.macrophage.barspeed.record.RecordState
 import com.macrophage.barspeed.record.RecordViewModel
 import com.macrophage.barspeed.record.SetFeedback
 import com.macrophage.barspeed.record.SetRating
+import com.macrophage.barspeed.record.adHocLoadRefused
 import com.macrophage.barspeed.record.applyHomeEntry
 import com.macrophage.barspeed.record.cardInstruction
 import com.macrophage.barspeed.record.nextSetSlot
@@ -1217,7 +1218,13 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
     AudioCueChipWithCaption(state, viewModel)
     Spacer(Modifier.height(24.dp))
     if (RestControlPolicy.readyMayStartSet(state.sessionClose)) {
-        Button(onClick = confirmTap(viewModel::beginSet), modifier = Modifier.fillMaxWidth().height(56.dp)) {
+        // Held while the ad-hoc load box would record a 0 it was not given;
+        // AdHocForm says "Enter a load" under the box. beginSet refuses too.
+        Button(
+            onClick = confirmTap(viewModel::beginSet),
+            enabled = !state.adHocLoadRefused(),
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+        ) {
             Text(CountingPolicy.startSetLabel(counter), fontWeight = FontWeight.Bold)
         }
     }
@@ -1828,7 +1835,10 @@ private fun ChangeSetButton(
  * `updateDurationInput`, `adjustTempoDigit`, `adjustPrep` -- and this holds no
  * local copy of any of them. So there is one button, "Done", and no Cancel:
  * the scrim, the system back gesture and Done are the same action because
- * nothing is buffered for either of them to discard.
+ * nothing is buffered for either of them to discard. All three are held while
+ * the load box holds text that is not a number, which would state nothing
+ * and leave the plan's load running under the lifter's figure
+ * ([SetLoadPolicy.loadEntryAccepted]); clearing the box releases them.
  *
  * That is a decision and not an omission. A Cancel here would promise a
  * rollback nothing can perform -- `adjustPrep` writes through to the DataStore
@@ -1862,8 +1872,18 @@ internal fun ChangeSetDialog(
     next: Boolean,
     onDone: () -> Unit,
 ) {
+    // A box that does not parse states nothing, so the plan's load would run
+    // while the box shows the lifter's figure (record-setup F4). The dialog
+    // stays open and says so until the box reads as a number or is cleared.
+    val loadRefused =
+        !SetLoadPolicy.loadEntryAccepted(
+            adHoc = false,
+            typedText = state.loadInput,
+            unit = state.weightUnit,
+            bodyweight = slot.exercise.bodyweight,
+        )
     AlertDialog(
-        onDismissRequest = onDone,
+        onDismissRequest = { if (!loadRefused) onDone() },
         title = { Text(if (next) "Change next set" else "Change this set") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
@@ -1886,6 +1906,12 @@ internal fun ChangeSetDialog(
                         value = state.loadInput,
                         onValueChange = viewModel::updateLoadInput,
                         label = { Text(loadFieldLabel(slot, state.weightUnit)) },
+                        isError = loadRefused,
+                        supportingText = if (loadRefused) {
+                            { Text(SetLoadPolicy.ENTER_A_LOAD) }
+                        } else {
+                            null
+                        },
                         singleLine = true,
                         keyboardOptions = DecimalKeys,
                         modifier = Modifier.weight(1f),
@@ -1920,7 +1946,7 @@ internal fun ChangeSetDialog(
         },
         // Kept a TextButton (#201): this dialog's one action; the dialog's frame already marks it
         // as its answer.
-        confirmButton = { TextButton(onClick = onDone) { Text("Done") } },
+        confirmButton = { TextButton(onClick = onDone, enabled = !loadRefused) { Text("Done") } },
     )
 }
 
@@ -2492,6 +2518,9 @@ private fun AdHocForm(state: RecordState, viewModel: RecordViewModel) {
         }
     }
     Spacer(Modifier.height(4.dp))
+    // A blank or unparseable box used to start the set at 0 kg (record-setup
+    // F4). START is held and this says why; an explicit 0 still starts.
+    val loadRefused = state.adHocLoadRefused()
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedTextField(
             value = state.loadInput,
@@ -2499,6 +2528,12 @@ private fun AdHocForm(state: RecordState, viewModel: RecordViewModel) {
             label = {
                 val suffix = state.weightUnit.suffix
                 Text(if (state.currentIsTimed) "Load ($suffix, 0 = BW)" else "Load ($suffix)")
+            },
+            isError = loadRefused,
+            supportingText = if (loadRefused) {
+                { Text(SetLoadPolicy.ENTER_A_LOAD) }
+            } else {
+                null
             },
             singleLine = true,
             keyboardOptions = DecimalKeys,
@@ -3763,6 +3798,8 @@ private fun StartNextSetButton(state: RecordState, viewModel: RecordViewModel) {
     if (RestControl.START_NEXT_SET !in restControls(state).controls) return
     Button(
         onClick = confirmTap(viewModel::startNextSet),
+        // An ad-hoc rest draws AdHocForm, whose load box says why (record-setup F4).
+        enabled = !state.adHocLoadRefused(),
         modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
     ) { Text("START NEXT SET", textAlign = TextAlign.Center) }
 }

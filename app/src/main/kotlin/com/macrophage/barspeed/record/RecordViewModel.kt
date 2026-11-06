@@ -5033,6 +5033,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             stateFlow.value = before.copy(bodyWeightRequiredForSet = true, cancelTo = null)
             return
         }
+        // An ad-hoc load box that is empty or not a number would record 0 kg
+        // (record-setup F4). READY shows the box with "Enter a load" under it.
+        if (before.adHocLoadRefused()) return
         // The rating panel goes with it. Starting another set is how a lifter
         // backs out of a mistapped Finish, and a flag left set here would
         // reopen the panel the next time they reach the rest screen -- asking
