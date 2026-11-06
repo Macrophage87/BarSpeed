@@ -214,7 +214,7 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
             Spacer(Modifier.height(8.dp))
             if (known.isEmpty()) {
                 Text(
-                    "None yet. Scan below and pair your bar sensor and heart rate strap once — " +
+                    "None yet. Scan below and pair your bar sensor and heart-rate strap once — " +
                         "the app auto-connects from then on.",
                 )
             }
@@ -260,7 +260,7 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
                                     "${device.name} · ${DevicePairingPolicy.unitTag(device.address)}",
                                     style = MaterialTheme.typography.titleSmall,
                                 )
-                                Text("${device.role} · ${device.address}", style = MaterialTheme.typography.bodySmall)
+                                Text("${roleName(device.role)} · ${device.address}", style = MaterialTheme.typography.bodySmall)
                                 DevicePairingPolicy.signalLine(rssi[device.address])?.let {
                                     // Only while a scan is running. A unit
                                     // that stops advertising mid-scan keeps
@@ -290,7 +290,7 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
                                     color = BarColors.Sub,
                                 )
                             } else {
-                                ConnectionChip(device.role.name, state, delivery = delivery)
+                                ConnectionChip(roleChip(device.role), state, delivery = delivery)
                             }
                             // Kept a TextButton (#201): it unpairs the unit, so it stays quieter
                             // than the controls that pair one.
@@ -350,7 +350,7 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
                             )
                             Text(
                                 "${device.address} · ${device.rssi} dBm" +
-                                    (device.likelyRole?.let { " · looks like $it" } ?: ""),
+                                    (device.likelyRole?.let { " · looks like a ${roleName(it).lowercase()}" } ?: ""),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = BarColors.Sub,
                             )
@@ -375,7 +375,7 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
                                         Text("Pair as bar sensor")
                                     }
                                     OutlinedButton(onClick = { viewModel.pair(device, DeviceRole.HRM) }) {
-                                        Text("Pair as HRM")
+                                        Text("Pair as heart-rate strap")
                                     }
                                 }
                             }
@@ -385,4 +385,16 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
             }
         }
     }
+}
+
+/** The role as the lifter calls it: never the enum's IMU/HRM. */
+private fun roleName(role: DeviceRole): String = when (role) {
+    DeviceRole.IMU -> "Bar sensor"
+    DeviceRole.HRM -> "Heart-rate strap"
+}
+
+/** The short form on a connection chip, matching the top-bar dots. */
+private fun roleChip(role: DeviceRole): String = when (role) {
+    DeviceRole.IMU -> "Bar"
+    DeviceRole.HRM -> "HR"
 }

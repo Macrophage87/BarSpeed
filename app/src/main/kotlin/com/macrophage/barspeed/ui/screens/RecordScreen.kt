@@ -346,7 +346,7 @@ fun RecordScreen(
                         val deliveryA =
                             rememberArmedDelivery(state.imuState, state.imuFrameAtMs, state.imuArmedAtMs)
                         SensorDot(
-                            roster.analysed?.name ?: "IMU",
+                            roster.analysed?.name ?: "Bar",
                             state.imuState,
                             delivery = deliveryA,
                         )
@@ -355,7 +355,7 @@ fun RecordScreen(
                                 rememberArmedDelivery(state.imuStateB, state.imuFrameAtMsB, state.imuArmedAtMsB)
                             SensorDot(it.name, state.imuStateB, delivery = deliveryB)
                         }
-                        SensorDot("HRM", state.hrmState)
+                        SensorDot("HR", state.hrmState)
                     }
                 },
             )

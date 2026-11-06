@@ -148,8 +148,8 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
                         // not that a link is up (#213). The strap's dot is
                         // unchanged: nothing observes its delivery.
                         val imuDelivery = rememberArmedDelivery(imuState, imuFrameAtMs, imuArmedAtMs)
-                        HomeSensorDot("IMU", imuState, imuDelivery) { navController.navigate("devices") }
-                        HomeSensorDot("HRM", hrmState, null) { navController.navigate("devices") }
+                        HomeSensorDot("Bar", imuState, imuDelivery) { navController.navigate("devices") }
+                        HomeSensorDot("HR", hrmState, null) { navController.navigate("devices") }
                         // Kept a TextButton (#201): a setting in the app bar's action slot, beside
                         // the sensor dots, not a next step.
                         TextButton(onClick = viewModel::toggleWeightUnit) {

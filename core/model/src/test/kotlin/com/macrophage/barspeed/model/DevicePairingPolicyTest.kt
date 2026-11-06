@@ -110,7 +110,7 @@ class DevicePairingPolicyTest {
      * the analysed link idling on a null address until the lifter noticed.
      *
      * Promoting the survivor is the convenience and not the only route back:
-     * the Devices screen draws "Use this one for analysis" on every paired bar
+     * the Devices screen draws "Make this the main sensor" on every paired bar
      * sensor that is not the analysed one, and the strap equivalent on a strap,
      * which in that state is the survivor. An earlier draft of this KDoc said
      * there was no way back short of forgetting the survivor too; that was
@@ -453,7 +453,7 @@ class DevicePairingPolicyTest {
      * to take that link down, or two GATT clients end up on one WT901.
      *
      * `preferenceControl(ANALYSED, SECOND)` returns `Offer`, so the second
-     * unit's row draws "Use this one for analysis" and this is one tap from
+     * unit's row draws "Make this the main sensor" and this is one tap from
      * the Devices screen. Today's rule drops the analysed client alone and
      * leaves `secondaryImuAddress` naming the address the analysed link is
      * being pointed at, so `maintain` brings both links up on the same remote.
@@ -495,15 +495,15 @@ class DevicePairingPolicyTest {
     @Test
     fun `the analysed bar sensor says so and every other one offers to take over`() {
         assertEquals(
-            PreferenceControl.InUse("Analysed · the set's numbers come from this unit"),
+            PreferenceControl.InUse("Main sensor · figures come from this one"),
             DevicePairingPolicy.preferenceControl(DeviceLinkRole.ANALYSED, DeviceLinkRole.ANALYSED),
         )
         assertEquals(
-            PreferenceControl.Offer("Use this one for analysis"),
+            PreferenceControl.Offer("Make this the main sensor"),
             DevicePairingPolicy.preferenceControl(DeviceLinkRole.ANALYSED, DeviceLinkRole.NOT_LINKED),
         )
         assertEquals(
-            PreferenceControl.Offer("Use this one for analysis"),
+            PreferenceControl.Offer("Make this the main sensor"),
             DevicePairingPolicy.preferenceControl(DeviceLinkRole.ANALYSED, DeviceLinkRole.SECOND),
             "holding the second link is not being analysed",
         )
@@ -914,7 +914,7 @@ class DevicePairingPolicyTest {
         assertNull(DualSensorSetup.devicesLine(DualSetupStep.ONE_SENSOR), "one sensor is the ordinary setup")
         assertEquals(
             "Leave two sensors paired and label them A and B - until exactly two carry different " +
-                "labels, only one stream is recorded.",
+                "labels, only one sensor records.",
             DualSensorSetup.devicesLine(DualSetupStep.LABEL_BOTH),
         )
         assertEquals(
@@ -923,7 +923,7 @@ class DevicePairingPolicyTest {
             DualSensorSetup.devicesLine(DualSetupStep.LABELS_COLLIDE),
         )
         assertEquals(
-            "Both sensors are labelled. Every set records both streams when both are switched on " +
+            "Both sensors are labelled. Every set records from both when both are switched on " +
                 "and in range.",
             DualSensorSetup.devicesLine(DualSetupStep.READY),
         )
@@ -942,8 +942,8 @@ class DevicePairingPolicyTest {
     @Test
     fun `the identify hint is offered exactly where two units must be told apart`() {
         val hint =
-            "Two units can advertise the same name. Scan below and hold one against the phone: " +
-                "the row whose signal reads strong is that unit."
+            "Two sensors can show the same name. Scan below and hold one against the phone: " +
+                "the row whose signal reads strong is that sensor."
         assertEquals(hint, DualSensorSetup.identifyHint(DualSetupStep.LABEL_BOTH))
         assertEquals(hint, DualSensorSetup.identifyHint(DualSetupStep.LABELS_COLLIDE))
         assertNull(DualSensorSetup.identifyHint(DualSetupStep.NO_SENSOR))

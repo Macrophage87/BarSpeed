@@ -236,8 +236,8 @@ class ArmedSilencePolicyTest {
 
         assertEquals(mapOf(SensorRole.B to ArmedDelivery.LINKED_SILENT), silent)
         assertEquals(
-            "Sensor B is connected but has sent no data. It will record nothing this set unless you " +
-                "power-cycle it.",
+            "Sensor B is connected but sending nothing. It will record nothing this set unless you " +
+                "turn it off and on.",
             ArmedSilencePolicy.message(silent, sole = null),
             "the sentence the SETUP window would have shown on every set of field-37",
         )
@@ -604,8 +604,8 @@ class ArmedSilencePolicyTest {
     @Test
     fun `the card speaks for one unroled unit and stays quiet otherwise`() {
         assertEquals(
-            "The bar sensor is connected but has sent no data. It will record nothing this set unless you " +
-                "power-cycle it.",
+            "The bar sensor is connected but sending nothing. It will record nothing this set unless you " +
+                "turn it off and on.",
             ArmedSilencePolicy.message(emptyMap(), ArmedDelivery.LINKED_SILENT),
             "the sentence a single-sensor lifter reads before the set starts",
         )

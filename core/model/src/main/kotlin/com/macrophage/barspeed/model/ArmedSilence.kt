@@ -390,18 +390,18 @@ object ArmedSilencePolicy {
      */
     fun advice(delivery: ArmedDelivery, role: SensorRole?): String? {
         val subject = role?.let { "Sensor ${it.name}" } ?: "The bar sensor"
-        val which = role?.let { " -- check which unit is paired as ${it.name}." } ?: " -- check which unit is paired."
+        val which = role?.let { " -- check which sensor is paired as ${it.name}." } ?: " -- check which sensor is paired."
         return when (delivery) {
             ArmedDelivery.DELIVERING, ArmedDelivery.TOO_SOON -> null
             ArmedDelivery.NOT_LINKED ->
-                "$subject is armed but not connected. It will record nothing this set unless you " +
+                "$subject isn't connected. It will record nothing this set unless you " +
                     "switch it on and bring it near the phone."
             ArmedDelivery.LINK_WITHOUT_SENSOR ->
-                "$subject answered but is not a bar sensor this app can read. It will record nothing " +
+                "$subject answered but isn't a bar sensor this app can read. It will record nothing " +
                     "this set$which"
             ArmedDelivery.LINKED_SILENT ->
-                "$subject is connected but has sent no data. It will record nothing this set unless " +
-                    "you power-cycle it."
+                "$subject is connected but sending nothing. It will record nothing this set unless " +
+                    "you turn it off and on."
         }
     }
 

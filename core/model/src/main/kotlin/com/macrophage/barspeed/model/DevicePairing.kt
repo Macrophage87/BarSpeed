@@ -138,7 +138,7 @@ object DevicePairingPolicy {
      * link idling on a null address until the lifter noticed.
      *
      * Promoting the survivor is the convenience, not the only route back: the
-     * Devices screen draws "Use this one for analysis" on every paired bar
+     * Devices screen draws "Make this the main sensor" on every paired bar
      * sensor that is not the analysed one, and the strap equivalent on a
      * strap, which in that state is the survivor. An earlier draft of this
      * KDoc said there was no way back short of forgetting the survivor too;
@@ -324,9 +324,9 @@ object DevicePairingPolicy {
         when (ownedLink) {
             DeviceLinkRole.ANALYSED ->
                 if (currentLink == DeviceLinkRole.ANALYSED) {
-                    PreferenceControl.InUse("Analysed · the set's numbers come from this unit")
+                    PreferenceControl.InUse("Main sensor · figures come from this one")
                 } else {
-                    PreferenceControl.Offer("Use this one for analysis")
+                    PreferenceControl.Offer("Make this the main sensor")
                 }
             DeviceLinkRole.HEART_RATE ->
                 if (currentLink == DeviceLinkRole.HEART_RATE) {
@@ -527,12 +527,12 @@ object DualSensorSetup {
         DualSetupStep.NO_SENSOR, DualSetupStep.ONE_SENSOR -> null
         DualSetupStep.LABEL_BOTH ->
             "Leave two sensors paired and label them A and B - until exactly two carry different " +
-                "labels, only one stream is recorded."
+                "labels, only one sensor records."
         DualSetupStep.LABELS_COLLIDE ->
             "Two sensors carry the same label - give them different labels, and leave only those " +
                 "two paired."
         DualSetupStep.READY ->
-            "Both sensors are labelled. Every set records both streams when both are switched on " +
+            "Both sensors are labelled. Every set records from both when both are switched on " +
                 "and in range."
     }
 
@@ -553,8 +553,8 @@ object DualSensorSetup {
      */
     fun identifyHint(step: DualSetupStep): String? = when (step) {
         DualSetupStep.LABEL_BOTH, DualSetupStep.LABELS_COLLIDE ->
-            "Two units can advertise the same name. Scan below and hold one against the phone: " +
-                "the row whose signal reads strong is that unit."
+            "Two sensors can show the same name. Scan below and hold one against the phone: " +
+                "the row whose signal reads strong is that sensor."
         DualSetupStep.NO_SENSOR, DualSetupStep.ONE_SENSOR, DualSetupStep.READY -> null
     }
 
