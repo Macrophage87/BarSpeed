@@ -339,10 +339,19 @@ abstract class GattClient(protected val context: Context) {
     }
 }
 
-/** WitMotion WT901BLECL client: decodes measurement frames into [ImuSample]s. */
+/**
+ * WitMotion WT901BLECL client: decodes measurement frames into [ImuSample]s.
+ *
+ * [batteryReadAllowed] is asked just before the battery read that ends
+ * [onReady] is written; when it says no (a set is capturing) the read is
+ * left out and the next rest's refresh fills the percent in.
+ */
 @SuppressLint("MissingPermission")
-class WitmotionClient(context: Context, private val clock: () -> Long = System::currentTimeMillis) :
-    GattClient(context) {
+class WitmotionClient(
+    context: Context,
+    private val clock: () -> Long = System::currentTimeMillis,
+    private val batteryReadAllowed: () -> Boolean = { true },
+) : GattClient(context) {
     override val serviceUuid: UUID = UUID.fromString(WitmotionProtocol.SERVICE_UUID)
     override val notifyCharacteristicUuid: UUID = UUID.fromString(WitmotionProtocol.NOTIFY_CHARACTERISTIC_UUID)
     override val priorityLink: ConnectionPriorityPolicy.Link = ConnectionPriorityPolicy.Link.IMU
@@ -368,7 +377,11 @@ class WitmotionClient(context: Context, private val clock: () -> Long = System::
                 WitmotionCommands.readRegister(WitmotionProtocol.REG_BATTERY),
             )
         commands.forEachIndexed { i, cmd ->
-            commandHandler.postDelayed({ writeCommand(gatt, cmd) }, COMMAND_SPACING_MS * (i + 1))
+            val isBatteryRead = i == commands.lastIndex
+            commandHandler.postDelayed(
+                { if (!isBatteryRead || batteryReadAllowed()) writeCommand(gatt, cmd) },
+                COMMAND_SPACING_MS * (i + 1),
+            )
         }
     }
 

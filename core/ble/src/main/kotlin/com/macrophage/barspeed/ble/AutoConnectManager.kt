@@ -39,7 +39,7 @@ class AutoConnectManager(
     private val scope: CoroutineScope,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
-    val imuClient = WitmotionClient(context, clock)
+    val imuClient = WitmotionClient(context, clock) { !batteryHeld }
     val hrmClient = HrmClient(context, clock)
 
     /**
@@ -60,7 +60,7 @@ class AutoConnectManager(
      * untouched. This is the sibling, and the app decides which physical unit
      * it maintains.
      */
-    val imuClientB = WitmotionClient(context, clock)
+    val imuClientB = WitmotionClient(context, clock) { !batteryHeld }
 
     val imuState: StateFlow<ConnectionState> = imuClient.connectionState
     val imuStateB: StateFlow<ConnectionState> = imuClientB.connectionState
@@ -313,8 +313,8 @@ class AutoConnectManager(
      * Hold the bar sensors' battery reads while [held]; `RecordViewModel`
      * holds from the moment a set begins until it leaves IN_SET by any path.
      * Releasing reads both bar sensors once, so the percent is fresh at the
-     * start of every rest. A connect's own read in `onReady` is not held: it
-     * goes with the unlock and rate commands a reconnect sends anyway.
+     * start of every rest. A reconnect mid-set still sends its unlock and
+     * rate commands, but its closing battery read is skipped while held.
      */
     fun holdBatteryRefresh(held: Boolean) {
         val released = batteryHeld && !held
