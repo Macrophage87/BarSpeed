@@ -65,11 +65,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.macrophage.barspeed.dsp.AccelArtefact
 import com.macrophage.barspeed.dsp.CoachingRules
-import com.macrophage.barspeed.dsp.LivePhaseCaption
-import com.macrophage.barspeed.dsp.PhaseTempoTarget
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.VelocityLoss
-import com.macrophage.barspeed.dsp.liftDirection
 import com.macrophage.barspeed.model.AddSetControl
 import com.macrophage.barspeed.model.ArmedSilencePolicy
 import com.macrophage.barspeed.model.BlePermissionStep
@@ -176,9 +173,6 @@ import java.util.Locale
 private const val DEFAULT_VELOCITY_LOSS_STOP_PCT = 20.0
 private const val VEL_LOSS_OK_PCT = 10.0
 private const val TEMPO_TOLERANCE_S = 0.5
-
-/** The tempo ring spans 150% of the target so the ghost marker sits at 2/3. */
-private const val RING_WINDOW_SCALE = 1.5f
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -2498,8 +2492,15 @@ private fun InSetStage(state: RecordState, viewModel: RecordViewModel) {
 
 /**
  * In-set display for a set the SENSOR is counting: the count the voice is
- * saying, the live velocity, the per-rep bars, and one button for the rep the
- * detector missed.
+ * saying, the live velocity, one button for the rep the detector missed, the
+ * end controls, and the per-rep bars.
+ *
+ * No ring (UX review 2026-11-06, record-live F4/F5). The tempo ring that sat
+ * here never had a target -- a set with a tempo is routed to the guided stage
+ * -- so its 64 sp centre was a phase stopwatch measuring nothing, the count
+ * showed twice, and its 230 dp pushed the effort grid below the fold. The
+ * count is now shown once, at 64 sp, and the end controls come before the rep
+ * bars so ending the set needs no scroll.
  */
 @Composable
 private fun SensorCountedSetStage(state: RecordState, viewModel: RecordViewModel, slot: PlannedSlot?) {
@@ -2507,11 +2508,8 @@ private fun SensorCountedSetStage(state: RecordState, viewModel: RecordViewModel
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         InSetHeader(state, slot)
         Spacer(Modifier.height(10.dp))
-        TempoRing(state, slot)
-        Spacer(Modifier.height(10.dp))
-        // The count, stated where a lifter mid-set can read it without waiting
-        // for the ring to settle. The SAME field the voice was handed, so the
-        // number on screen is the number that was spoken (#252).
+        // The count. The SAME field the voice was handed, so the number on
+        // screen is the number that was spoken (#252).
         Text(
             "SENSOR COUNT",
             style = MaterialTheme.typography.labelMedium,
@@ -2544,8 +2542,6 @@ private fun SensorCountedSetStage(state: RecordState, viewModel: RecordViewModel
                 modifier = Modifier.padding(bottom = 6.dp),
             )
         }
-        Spacer(Modifier.height(14.dp))
-        LiveRepBars(state, slot)
         Spacer(Modifier.height(16.dp))
         // The rep the detector missed. A CORRECTION of the sensor's count rather
         // than a count of its own -- `CountingPolicy.tapMeaning` is what makes
@@ -2564,6 +2560,8 @@ private fun SensorCountedSetStage(state: RecordState, viewModel: RecordViewModel
             Spacer(Modifier.height(10.dp))
         }
         EndSetControl(state, viewModel)
+        Spacer(Modifier.height(16.dp))
+        LiveRepBars(state, slot)
     }
 }
 
@@ -3032,86 +3030,6 @@ private fun InSetHeader(state: RecordState, slot: PlannedSlot?) {
         }
         state.hrBpm?.let {
             Text("♥ $it", style = MaterialTheme.typography.bodyMedium, color = BarColors.Red)
-        }
-    }
-}
-
-@Composable
-private fun TempoRing(state: RecordState, slot: PlannedSlot?) {
-    val tempoText = if (state.adHoc) state.tempoInput.ifBlank { null } else slot?.tempo
-    val tempo = tempoText?.let { Tempo.parseOrNull(it) }
-    val phase = state.live.phase
-    // Which digit a phase is charged against is a property of the (tempo, lift)
-    // PAIR, and it is resolved in :core:dsp against the same direction beginSet
-    // handed the tracker. `tempo` is null in every state that reaches here --
-    // InSetStage routes a set with a tempo to the guided branch first, and
-    // beginSet derives guidedSet from this same expression -- so this line
-    // changes nothing on screen. It is here so the decision has one home
-    // rather than three. #127.
-    val targetS = tempo?.let { PhaseTempoTarget.secondsFor(it, state.currentExercise.liftDirection(), phase) }
-    val elapsed = state.live.currentPhaseElapsedS
-    val moving = phase == Phase.ECCENTRIC || phase == Phase.CONCENTRIC
-
-    val (progress, ghost) =
-        if (targetS != null && targetS > 0 && moving) {
-            val window = targetS * RING_WINDOW_SCALE
-            (elapsed / window).toFloat() to (1f / RING_WINDOW_SCALE)
-        } else {
-            (if (moving) (elapsed / (elapsed + 2.0)).toFloat() else 0f) to null
-        }
-    val ringColor =
-        when {
-            targetS != null && moving && elapsed > targetS + TEMPO_TOLERANCE_S -> BarColors.Amber
-            else -> BarColors.Volt
-        }
-
-    ProgressRing(progress = progress, ghostProgress = ghost, color = ringColor) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            // The words are LivePhaseCaption's, in :core:dsp, where they are
-            // pinned against the lift's drive direction, the #95
-            // withdrawal and the #280 withhold; null draws no caption. The
-            // tracker-dropped latch and not liveCountWithheld, which a +1 REP
-            // tap clears while `live` stays the empty state.
-            LivePhaseCaption.of(
-                phase,
-                state.currentExercise.liftDirection(),
-                labelWithdrawn = state.live.phaseLabelWithdrawn,
-                countWithheld = state.liveTrackerDropped,
-            )?.let {
-                Text(
-                    it.uppercase(),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = BarColors.Sub,
-                    letterSpacing = 2.sp,
-                )
-            }
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    if (moving) {
-                        String.format(Locale.US, "%.1f", elapsed)
-                    } else {
-                        LiveCountReadout.countLabel(state.sensorReps, state.liveCountWithheld)
-                    },
-                    style = MaterialTheme.typography.displayLarge,
-                )
-                Text(
-                    if (moving) "s" else " reps",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = BarColors.Sub,
-                    modifier = Modifier.padding(bottom = 10.dp),
-                )
-            }
-            if (moving && targetS != null) {
-                Text(
-                    String.format(Locale.US, "target %.1f s", targetS),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = BarColors.Sub,
-                )
-            } else if (!moving) {
-                LiveCountReadout.nextRepCaption(state.sensorReps, state.liveCountWithheld)?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
-                }
-            }
         }
     }
 }
