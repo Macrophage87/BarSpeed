@@ -317,14 +317,17 @@ class SessionExporter(
         // one: on a guided set the marks are what `repMetricsComplete` is
         // judged against, and that flag is published in the summary too. The
         // stream is a column of integers, so the extra inflate is small.
-        val storedMarks =
+        val decodedMarks =
             streams.firstOrNull { it.kind == RawStreamEntity.KIND_REPS }
                 ?.let { stream -> runCatching { RepMarkCsv.decode(Gzip.decompress(stream.csvGzip)) }.getOrNull() }
-                .orEmpty()
+        val storedMarks = decodedMarks.orEmpty()
         val repMarks = storedMarks.takeIf { includeRepDetail && it.isNotEmpty() }
         // Whose marks they are decides whether they are a grid; see
-        // repMetricsComplete below.
-        val guideCounted = record.repsSourceOf(geometry?.kind) == RepsSource.METRONOME
+        // repMetricsComplete below. The guide's called count is the same
+        // decode's length, null where no stream is stored or it will not
+        // parse -- exactly what `guideCalls()` hands `repsSource` below, so
+        // the gate and the published word are one derivation's (#336).
+        val guideCounted = record.repsSourceOf(geometry?.kind, decodedMarks?.size) == RepsSource.METRONOME
         // Issue #83 reaches ALREADY-RECORDED sets here, not only new ones.
         // endOfSetBpm, avgBpm and maxBpm are frozen columns written when the
         // set was recorded; gating only the record path would leave every set
