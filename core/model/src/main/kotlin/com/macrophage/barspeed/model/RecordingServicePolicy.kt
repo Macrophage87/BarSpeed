@@ -38,9 +38,12 @@ enum class RecordingHold(val armsService: Boolean) {
      * describe, so short of the process dying they cannot leak. This one is a
      * flag in all but name, and it has two known non-release paths, neither of
      * them closed here and neither of them new: nothing releases it on a task
-     * swipe, and a foreground service that START_STICKY recreates after a
-     * process kill comes back with no holder able to release anything at all.
-     * Both are stated rather than fixed; see the commit body.
+     * swipe, and a foreground service that START_STICKY recreated after a
+     * process kill would come back with no holder able to release anything at
+     * all. The second is closed: `RecordingService.onStartCommand` now returns
+     * START_NOT_STICKY on every path, so a killed process is not resurrected
+     * into a holderless service. The task-swipe path is still stated rather
+     * than fixed.
      */
     SESSION(armsService = true),
 

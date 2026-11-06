@@ -122,6 +122,17 @@ class RecordingService : Service() {
      * `beginSet()`, so a bare `stopSelf()` would tear down a service a later
      * start had already re-armed. START_NOT_STICKY stops the system
      * relaunching a service that will fail again the same way.
+     *
+     * The success path is START_NOT_STICKY too. The recording lives only in
+     * this process's memory, so a service the system recreated after the
+     * process died could hold nothing: it would come back with a null intent
+     * and an empty hold set, and no holder exists in the new process to stop
+     * it. Below API 31 that is a "Recording session" notification over a
+     * recording that is not happening; from 31 the background start is
+     * refused, reported here, and Record shows a false "not protected"
+     * banner. Both are reasoned from the platform's documented
+     * sticky-restart contract, not observed. Not sticky means a killed
+     * process stays dead and the in-flight set journal is the recovery path.
      */
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val notification = buildNotification()
@@ -129,7 +140,7 @@ class RecordingService : Service() {
         return try {
             ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, foregroundServiceType())
             holds.reportForeground(null)
-            START_STICKY
+            START_NOT_STICKY
         } catch (e: RuntimeException) {
             val failure = ForegroundStartPolicy.classify(e) ?: throw e
             holds.reportForeground(failure)
