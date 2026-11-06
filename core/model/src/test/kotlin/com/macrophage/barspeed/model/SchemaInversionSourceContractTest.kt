@@ -37,10 +37,10 @@ class SchemaInversionSourceContractTest {
     private fun source(): JsonObject = schema.getValue("\$defs").jsonObject.getValue("geometrySource").jsonObject
 
     @Test
-    fun `the exporter writes 1_26, which the schema accepts, and 1_25 is still readable`() {
+    fun `1_26, shipped in v0_2_1, is still accepted, and so is 1_25`() {
         val enum = schema.getValue("properties").jsonObject.getValue("schemaVersion").jsonObject
             .getValue("enum").jsonArray.map { it.jsonPrimitive.content }
-        assertEquals("1.26", SessionExport.SCHEMA_VERSION, "the version the exporter writes")
+        // The tip literal moved to SchemaSensorTargetCueContractTest when 1.27 was minted.
         assertTrue("1.26" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "the version written is not accepted")
         assertTrue("1.26" in enum, "the published schema rejects the version the exporter writes")
         assertTrue("1.25" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "1.25, shipped in v0.1.58, left the accepted set")
@@ -97,7 +97,8 @@ class SchemaInversionSourceContractTest {
     @Test
     fun `the published example names a source for every published inversion`() {
         val example = document("examples/session-export.example.json")
-        assertEquals("1.26", example.getValue("schemaVersion").jsonPrimitive.content)
+        // At or after 1.26, which published the key; the tip literal is SchemaSensorTargetCueContractTest's.
+        assertTrue(example.getValue("schemaVersion").jsonPrimitive.content in setOf("1.26", "1.27"))
         val sources = example.getValue("exercises").jsonArray
             .flatMap { it.jsonObject.getValue("sets").jsonArray }
             .mapNotNull { it.jsonObject["geometry"]?.jsonObject }

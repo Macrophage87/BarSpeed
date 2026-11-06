@@ -3131,8 +3131,46 @@ data class SessionExport(
          * and not a mint: 1.26 is unreleased. `DATABASE_VERSION` does NOT move for
          * this entry. `HorizontalAxisOrientationTest` in `:core:dsp` is the
          * differential.
+         *
+         * 1.27 (sensor-counted target cue) MINTS NO KEY: two new strings join
+         * [SetExport.voiceCues] (UX review 2026-11-06, voice F5, as the owner
+         * ruled it). On a set the sensor counts, the rep before the planned
+         * count is spoken and recorded as `Rep N, last rep`, N being that
+         * rep's own number, and the planned count as `Rep N, target`; every
+         * other rep stays `Rep N`, a rep past the target included, and a set
+         * with no planned count says `Rep N` throughout.
+         * `VoiceMilestonePolicy.repMilestone` under
+         * `CountingPolicy.milestones` is the decision. NEITHER IS TERMINAL:
+         * neither is in `SetEnd.TERMINAL_CUES`, so neither bounds a rep list
+         * nor seeds the rest clock, and a sensor-counted set still never says
+         * `Done`. Tapped, guided and timed sets say what they said under 1.26.
+         *
+         * voiceCues' description now dates three periods of what a
+         * sensor-counted set says: may say `Last rep`/`Done` when recorded by
+         * v0.1.52 or earlier (builds writing 1.19 and earlier, when the sensor
+         * counted explosive lifts only and was handed the planned count);
+         * plain `Rep N` from v0.1.53 (#286, where `milestonePlannedReps` first
+         * withheld the planned count -- `git tag --contains f687eefc` starts
+         * at v0.1.53) through v0.2.1 (1.20 to 1.26); and the two new strings
+         * from 1.27.
+         *
+         * A MINT AND NOT A FURTHER 1.26 ENTRY: `git show
+         * v0.2.1:core/model/src/main/kotlin/com/macrophage/barspeed/model/SessionExport.kt`
+         * reads `SCHEMA_VERSION = "1.26"`, so 1.26 has SHIPPED and takes no
+         * further entries. NOT RETROACTIVE: the cue track is stored with the
+         * set, so a set recorded before 1.27 keeps the words it was recorded
+         * with, under any schemaVersion it is re-exported under; its
+         * `analysisSchemaVersion` says which build recorded it. READER IN BOTH
+         * DIRECTIONS: the 1.26 schema v0.2.1 shipped REJECTS a 1.27 document
+         * on its version string; this schema accepts a 1.26 document
+         * unchanged. No key is added, removed, renamed or retyped,
+         * `DATABASE_VERSION` does NOT move, and the plan schema is untouched.
+         *
+         * PINNED. `SchemaSensorTargetCueContractTest` asserts this entry's
+         * marker in the published log, the voiceCues sentence, the tip
+         * literal and the example's version.
          */
-        const val SCHEMA_VERSION = "1.26"
+        const val SCHEMA_VERSION = "1.27"
 
         /**
          * `"1.10"` is not the number 1.1 -- a reader that parses this field as
@@ -3143,7 +3181,7 @@ data class SessionExport(
                 "1.0", "1.1", "1.2", "1.3", "1.4", "1.5",
                 "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "1.12", "1.13", "1.14", "1.15",
                 "1.16", "1.17", "1.18", "1.19", "1.20", "1.21", "1.22", "1.23", "1.24", "1.25",
-                "1.26",
+                "1.26", "1.27",
             )
 
         /**
