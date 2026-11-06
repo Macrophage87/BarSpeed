@@ -128,10 +128,10 @@ private val SECTIONS =
         ),
         GuideSection(
             "Plans",
-            "Plans come from robocoach. Plans, then Import plan: paste the JSON or pick the " +
-                "file. Any problems are listed before anything changes. Tap a plan to see every " +
-                "set, then tap Make active. No robocoach plan? The prompt at the " +
-                "bottom of this page gets any LLM to write one.",
+            "Plans come from robocoach. Share the plan file to BarSpeed, or under Plans tap " +
+                "Import plan from file, or paste the JSON. Any problems are listed first. Then tap " +
+                "MAKE ACTIVE & START, or Make active to lift it another day. No robocoach plan? " +
+                "The prompt at the bottom of this page gets any LLM to write one.",
         ),
         GuideSection(
             "A set",
