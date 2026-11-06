@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -77,6 +78,9 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 private const val KG_PER_TONNE = 1000.0
+
+/** Interrupted-set cards drawn before the rest go behind "+N more" (home-nav F5). */
+private const val INTERRUPTED_SHOWN = 3
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -153,105 +157,124 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
             )
         },
     ) { padding ->
-        Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
+        // ONE scrolling list for the whole screen (UX review 2026-11-06,
+        // home-nav F5). The recovery cards sit above the hero, and with no
+        // scroll two interrupted sets and a rescue card could push START and
+        // the history off the bottom of the screen with no way to reach them
+        // until every card had been ruled on. History is items of this list
+        // rather than a nested LazyColumn, which cannot sit inside a scroll.
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
+            contentPadding = PaddingValues(vertical = 16.dp),
         ) {
-            // Above the hero card because this is the first screen of every
-            // cold launch and the one the first permission dialog opens over.
-            // Deliberately compact: this Column has no verticalScroll and the
-            // history LazyColumn below is unweighted, so anything added here
-            // comes out of the history list with no way to scroll it back.
-            PermissionBanner()
-            // Above InterruptedSetNotice: a rescued database can be an entire
-            // training history, where an interrupted capture is one set.
-            RescuedDatabaseNotice(
-                rescued,
-                busyRescues,
-                restoreVerdicts,
-                recordingHolds,
-                viewModel::shareRescued,
-                viewModel::discardRescued,
-                viewModel::restoreRescued,
-            )
-            InterruptedSetNotice(
-                interrupted,
-                busyInterrupted,
-                recoveryRefusals,
-                viewModel::shareInterrupted,
-                viewModel::discardInterrupted,
-                viewModel::recoverInterrupted,
-            )
-            // Below both: a crash report is a diagnostic about the app, where
-            // the two cards above it are the lifter's own data.
-            CrashReportNotice(crashReports, busyCrashReports, viewModel::shareCrashReport, viewModel::deleteCrashReport)
-            HeroCard(state) { route -> navController.navigate(route) }
-            Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                StatTile(
-                    label = "Week volume",
-                    value = volumeValue(state.weekVolumeKg, state.weightUnit),
-                    unit = volumeUnit(state.weightUnit),
-                    sub = "last 7 days",
-                    modifier = Modifier.weight(1f),
-                )
-                StatTile(
-                    label = "Sessions",
-                    value = "${state.weekSessions}",
-                    sub = "this week",
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            Spacer(Modifier.height(6.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                OutlinedButton(
-                    onClick = { navController.navigate("devices") },
-                    modifier = Modifier.weight(1f),
-                    contentPadding = ButtonDefaults.TextButtonContentPadding,
-                ) {
-                    Text("Devices", color = BarColors.Sub)
-                }
-                OutlinedButton(
-                    onClick = { navController.navigate("plans") },
-                    modifier = Modifier.weight(1f),
-                    contentPadding = ButtonDefaults.TextButtonContentPadding,
-                ) {
-                    Text("Plans", color = BarColors.Sub)
-                }
-                OutlinedButton(
-                    onClick = { navController.navigate("guide") },
-                    modifier = Modifier.weight(1f),
-                    contentPadding = ButtonDefaults.TextButtonContentPadding,
-                ) {
-                    Text("Guide", color = BarColors.Sub)
+            item {
+                Column(Modifier.fillMaxWidth()) {
+                    // Above the hero card because this is the first screen of every
+                    // cold launch and the one the first permission dialog opens over.
+                    PermissionBanner()
+                    // Above InterruptedSetNotice: a rescued database can be an entire
+                    // training history, where an interrupted capture is one set.
+                    RescuedDatabaseNotice(
+                        rescued,
+                        busyRescues,
+                        restoreVerdicts,
+                        recordingHolds,
+                        viewModel::shareRescued,
+                        viewModel::discardRescued,
+                        viewModel::restoreRescued,
+                    )
+                    InterruptedSetNotice(
+                        interrupted,
+                        busyInterrupted,
+                        recoveryRefusals,
+                        viewModel::shareInterrupted,
+                        viewModel::discardInterrupted,
+                        viewModel::recoverInterrupted,
+                    )
+                    // Below both: a crash report is a diagnostic about the app, where
+                    // the two cards above it are the lifter's own data.
+                    CrashReportNotice(
+                        crashReports,
+                        busyCrashReports,
+                        viewModel::shareCrashReport,
+                        viewModel::deleteCrashReport,
+                    )
                 }
             }
-            Spacer(Modifier.height(6.dp))
-            HistoryHeader(
-                hasSessions = state.history.isNotEmpty(),
-                progress = exportAllProgress,
-                message = exportAllMessage,
-            ) { exportAllLauncher.launch(viewModel.allSessionsArchiveName()) }
-            Spacer(Modifier.height(8.dp))
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(state.history) { row ->
+            item {
+                Column(Modifier.fillMaxWidth()) {
+                    HeroCard(state) { route -> navController.navigate(route) }
+                    Spacer(Modifier.height(10.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                        StatTile(
+                            label = "Week volume",
+                            value = volumeValue(state.weekVolumeKg, state.weightUnit),
+                            unit = volumeUnit(state.weightUnit),
+                            sub = "last 7 days",
+                            modifier = Modifier.weight(1f),
+                        )
+                        StatTile(
+                            label = "Sessions",
+                            value = "${state.weekSessions}",
+                            sub = "this week",
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        OutlinedButton(
+                            onClick = { navController.navigate("devices") },
+                            modifier = Modifier.weight(1f),
+                            contentPadding = ButtonDefaults.TextButtonContentPadding,
+                        ) {
+                            Text("Devices", color = BarColors.Sub)
+                        }
+                        OutlinedButton(
+                            onClick = { navController.navigate("plans") },
+                            modifier = Modifier.weight(1f),
+                            contentPadding = ButtonDefaults.TextButtonContentPadding,
+                        ) {
+                            Text("Plans", color = BarColors.Sub)
+                        }
+                        OutlinedButton(
+                            onClick = { navController.navigate("guide") },
+                            modifier = Modifier.weight(1f),
+                            contentPadding = ButtonDefaults.TextButtonContentPadding,
+                        ) {
+                            Text("Guide", color = BarColors.Sub)
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    HistoryHeader(
+                        hasSessions = state.history.isNotEmpty(),
+                        progress = exportAllProgress,
+                        message = exportAllMessage,
+                    ) { exportAllLauncher.launch(viewModel.allSessionsArchiveName()) }
+                    Spacer(Modifier.height(8.dp))
+                }
+            }
+            items(state.history) { row ->
+                Box(Modifier.padding(bottom = 8.dp)) {
                     HistoryCard(row) { navController.navigate("session/${row.session.id}") }
                 }
-                // History beyond the first 20 (history-export F5): opened on
-                // request so a session of any age can be opened and exported.
-                if (state.olderSessions.isNotEmpty()) {
-                    if (showOlder) {
-                        items(state.olderSessions) { session ->
+            }
+            // History beyond the first 20 (history-export F5): opened on
+            // request so a session of any age can be opened and exported.
+            if (state.olderSessions.isNotEmpty()) {
+                if (showOlder) {
+                    items(state.olderSessions) { session ->
+                        Box(Modifier.padding(bottom = 8.dp)) {
                             OlderSessionCard(session) { navController.navigate("session/${session.id}") }
                         }
-                    } else {
-                        item {
-                            TextButton(onClick = { showOlder = true }, modifier = Modifier.fillMaxWidth()) {
-                                val count = state.olderSessions.size
-                                Text(
-                                    if (count == 1) "Show 1 older session" else "Show $count older sessions",
-                                    color = BarColors.Sub,
-                                )
-                            }
+                    }
+                } else {
+                    item {
+                        TextButton(onClick = { showOlder = true }, modifier = Modifier.fillMaxWidth()) {
+                            val count = state.olderSessions.size
+                            Text(
+                                if (count == 1) "Show 1 older session" else "Show $count older sessions",
+                                color = BarColors.Sub,
+                            )
                         }
                     }
                 }
@@ -382,8 +405,7 @@ private fun HeroCard(state: HomeState, onNavigate: (String) -> Unit) {
 /**
  * The History caption with "Export all" beside it (history-export F5), and,
  * under it, the export's progress while it runs and its result line after.
- * Kept to one line in the common case: this Column does not scroll, so every
- * line here comes out of the history list.
+ * Kept to one line in the common case, so the history starts close under it.
  */
 @Composable
 private fun HistoryHeader(
@@ -487,11 +509,11 @@ private fun volumeUnit(unit: WeightUnit): String = when (unit) {
  * Sets that were interrupted before they could be stored.
  *
  * Drawn above the hero card, and above everything else on this screen, because
- * a capture the lifter has not ruled on outranks starting a new session. It
- * costs two history rows when it appears: the Column it sits in has no scroll
- * and the history list below is unweighted. That trade is taken deliberately
- * and it is paid only in the rare case, since this draws nothing at all when
- * there is nothing to report.
+ * a capture the lifter has not ruled on outranks starting a new session. The
+ * screen scrolls, so the cards can no longer push START out of reach, and at
+ * most [INTERRUPTED_SHOWN] are drawn before a "+N more" (UX review
+ * 2026-11-06, home-nav F5). This draws nothing at all when there is nothing
+ * to report.
  *
  * Not a [HistoryCard]. A history row carries a set count and a velocity
  * sparkline; an interrupted set has been through no analysis and has neither,
@@ -522,8 +544,10 @@ private fun InterruptedSetNotice(
 ) {
     if (interrupted.isEmpty()) return
     var confirmRecover by remember { mutableStateOf<OrphanedSet?>(null) }
+    var showAll by remember { mutableStateOf(false) }
+    val hidden = if (showAll) 0 else (interrupted.size - INTERRUPTED_SHOWN).coerceAtLeast(0)
     Column(modifier = Modifier.fillMaxWidth()) {
-        for (orphan in interrupted) {
+        for (orphan in interrupted.dropLast(hidden)) {
             // #304: the same busy key RescuedDatabaseNotice already disables
             // both buttons on, so a second SEND cannot reopen the share-cache
             // file a first copy is still streaming into, and DISCARD cannot
@@ -582,6 +606,16 @@ private fun InterruptedSetNotice(
                 }
             }
         }
+        // Kept TextButtons (#201): disclosure toggles, as CrashReportNotice's OLDER is.
+        if (hidden > 0) {
+            TextButton(onClick = { showAll = true }) {
+                Text("+$hidden more", color = BarColors.Sub)
+            }
+        } else if (showAll && interrupted.size > INTERRUPTED_SHOWN) {
+            TextButton(onClick = { showAll = false }) {
+                Text("Show fewer", color = BarColors.Sub)
+            }
+        }
     }
     confirmRecover?.let { orphan ->
         AlertDialog(
@@ -615,12 +649,10 @@ private fun InterruptedSetNotice(
  * `SessionDetailScreen`, and these three notice cards are the only list of
  * shareable app-private artifacts this app has.
  *
- * COLLAPSED TO ONE CARD, however many reports there are, and that is a
- * constraint of this screen rather than a preference. [HomeScreen]'s Column
- * has no `verticalScroll` and the history `LazyColumn` below it is
- * unweighted, so a card per report would push the lifter's own history off
- * the bottom with no way to scroll it back -- and ten is the number the
- * pruner keeps. The newest is named, the rest are behind OLDER.
+ * COLLAPSED TO ONE CARD, however many reports there are. [HomeScreen] scrolls
+ * now, but a card per report would still push the lifter's own history and
+ * the hero a long way down -- and ten is the number the pruner keeps. The
+ * newest is named, the rest are behind OLDER.
  *
  * THE CAPTION IS NOT [InterruptedSetNotice]'s. That card says "Nothing
  * deletes it but you", which is true of a set journal and FALSE here: the app
