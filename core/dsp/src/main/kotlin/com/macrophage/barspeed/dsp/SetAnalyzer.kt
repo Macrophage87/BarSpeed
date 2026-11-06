@@ -2,9 +2,9 @@ package com.macrophage.barspeed.dsp
 
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.PhaseCoverage
-import com.macrophage.barspeed.model.StackMountSignal
 import com.macrophage.barspeed.model.RepAnalysisPolicy
 import com.macrophage.barspeed.model.SensorCapturePolicy
+import com.macrophage.barspeed.model.StackMountSignal
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.TempoScoreLabel
