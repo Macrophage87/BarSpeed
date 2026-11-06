@@ -826,28 +826,27 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      * Record's "Continue it" would not adopt ([continuable]) is not offered as
      * CONTINUE.
      */
-    private fun heroPart() =
-        combine(
-            sessionRepository.sessions,
-            planRepository.activePlan,
-            container.recordingHolds.held,
-        ) { sessions, planEntity, held -> Triple(sessions, planEntity, held) }
-            .mapLatest { (sessions, planEntity, held) ->
-                withContext(Dispatchers.Default) {
-                    val plan = planEntity?.let { planRepository.decode(it) }
-                    val nowMs = System.currentTimeMillis()
-                    val latest = sessionRepository.latestSession(nowMs - SessionResumePolicy.LOOKBACK_MS, nowMs)
-                    val offer = SessionResumePolicy.offer(latest, nowMs, RecordingServicePolicy.writing(held))
-                    val open = offer?.takeIf { continuable(it, plan?.sessions.orEmpty()) }
-                    // Newest first: the sessions query orders by start, descending.
-                    val lastDone =
-                        plan?.let { p ->
-                            sessions.firstOrNull { it.planName == p.planName && it.planSessionName != null }
-                                ?.planSessionName
-                        }
-                    HeroPart(plan?.planName, HomeHeroPolicy.hero(true, plan?.sessions, open, lastDone))
-                }
+    private fun heroPart() = combine(
+        sessionRepository.sessions,
+        planRepository.activePlan,
+        container.recordingHolds.held,
+    ) { sessions, planEntity, held -> Triple(sessions, planEntity, held) }
+        .mapLatest { (sessions, planEntity, held) ->
+            withContext(Dispatchers.Default) {
+                val plan = planEntity?.let { planRepository.decode(it) }
+                val nowMs = System.currentTimeMillis()
+                val latest = sessionRepository.latestSession(nowMs - SessionResumePolicy.LOOKBACK_MS, nowMs)
+                val offer = SessionResumePolicy.offer(latest, nowMs, RecordingServicePolicy.writing(held))
+                val open = offer?.takeIf { continuable(it, plan?.sessions.orEmpty()) }
+                // Newest first: the sessions query orders by start, descending.
+                val lastDone =
+                    plan?.let { p ->
+                        sessions.firstOrNull { it.planName == p.planName && it.planSessionName != null }
+                            ?.planSessionName
+                    }
+                HeroPart(plan?.planName, HomeHeroPolicy.hero(true, plan?.sessions, open, lastDone))
             }
+        }
 
     /**
      * Whether Record's "Continue it" would adopt [offer] rather than leave it
@@ -879,11 +878,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private suspend fun buildState(
-        sessions: List<SessionEntity>,
-        unit: WeightUnit,
-        bodyWeightKg: Double?,
-    ): HomeState {
+    private suspend fun buildState(sessions: List<SessionEntity>, unit: WeightUnit, bodyWeightKg: Double?): HomeState {
         val weekStartMs = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(DAYS_PER_WEEK)
 
         var weekVolumeKg = 0.0

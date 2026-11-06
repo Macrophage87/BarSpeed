@@ -235,18 +235,18 @@ private fun AppNav(sessionLive: () -> Boolean) {
         composable(
             RECORD_ROUTE,
             arguments =
-                listOf(
-                    navArgument("entry") {
-                        type = NavType.StringType
-                        nullable = true
-                        defaultValue = null
-                    },
-                    navArgument("planSession") {
-                        type = NavType.StringType
-                        nullable = true
-                        defaultValue = null
-                    },
-                ),
+            listOf(
+                navArgument("entry") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+                navArgument("planSession") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+            ),
         ) { backStackEntry ->
             RecordScreen(
                 navController,
