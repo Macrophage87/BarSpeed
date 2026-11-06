@@ -12,6 +12,10 @@ offset, so intervals between files (a set and the rest before it) survive.
 Do not split a session across calls, and do not pass two sessions together
 unless the gap between them is meant to be kept.
 
+--epoch-ms may move the target, but only to a value before 2001-01-01, so
+that --check still recognises the result as shifted. A file with a header
+and no samples is refused.
+
 Only files whose header is exactly `timestamp_ms,hr_bpm,rr_ms` are touched;
 anything else (an IMU capture, a cue track) is refused, and nothing is
 written unless every file passes. A batch whose earliest sample is already
@@ -54,6 +58,8 @@ def read(path):
         if not sep or not head.isdigit():
             sys.exit(f"{path}:{n}: first field {head!r} is not an epoch-ms integer")
         rows.append((int(head), line[len(head):]))
+    if not any(ts is not None for ts, _ in rows):
+        sys.exit(f"{path}: no samples after the header; refusing (nothing to shift)")
     return lines[0], rows
 
 
@@ -69,6 +75,11 @@ def main():
     mode.add_argument("--dry-run", action="store_true")
     mode.add_argument("--check", action="store_true")
     a = p.parse_args()
+    if not 0 <= a.epoch_ms < ALREADY_SHIFTED_BEFORE_MS:
+        sys.exit(
+            f"--epoch-ms {a.epoch_ms} is not in [0, {ALREADY_SHIFTED_BEFORE_MS}) "
+            f"(before {iso(ALREADY_SHIFTED_BEFORE_MS)}); --check would report the result as unshifted"
+        )
 
     parsed = {f: read(f) for f in a.files}
     starts = {f: first_ts(rows) for f, (_, rows) in parsed.items()}
