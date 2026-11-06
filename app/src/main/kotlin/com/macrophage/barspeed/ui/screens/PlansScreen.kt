@@ -47,6 +47,7 @@ import com.macrophage.barspeed.data.PlanImportResult
 import com.macrophage.barspeed.model.BodyWeightPromptPolicy.BarColorRole
 import com.macrophage.barspeed.model.PlanBodyWeightPolicy
 import com.macrophage.barspeed.model.PlanStartDecision
+import com.macrophage.barspeed.model.PlanStartPolicy
 import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.BodyWeightDialog
 
@@ -249,10 +250,21 @@ fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewMo
                         )
                     }
                 },
-                // Kept TextButtons (#201): this dialog's two actions; the dialog's frame already
-                // marks them as its answers.
+                // "APPROVE & START" is the filled primary (UX review 2026-11-06,
+                // plans F2): a plan is usually imported to be lifted now, and
+                // plain Approve left the lifter on this list hunting for the
+                // card's Start. Plain Approve stays, as a TextButton, for a plan
+                // imported on a rest day. A plan with no sets has nothing to
+                // start, so it gets Approve alone. Discard/Cancel are unchanged.
                 confirmButton = {
-                    TextButton(onClick = { viewModel.approve(summary.planId) }) { Text("Approve") }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = { viewModel.approve(summary.planId) }) { Text("Approve") }
+                        if (summary.totalSets > 0) {
+                            Button(onClick = { viewModel.approveAndStart(summary.planId) }) {
+                                Text(PlanStartPolicy.APPROVE_AND_START)
+                            }
+                        }
+                    }
                 },
                 dismissButton = {
                     // Reopened from "Make active" on a stored plan, the gate
