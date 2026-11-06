@@ -259,4 +259,39 @@ class RemoveSetControlTest {
         assertTrue(t.wasUpcoming)
         assertEquals(1, t.removableCount)
     }
+
+    // ---- an off-plan set (record-setup F2) ------------------------------------
+
+    /**
+     * "Different exercise..." puts an added set of ANOTHER lift next: its own
+     * one-set block, so the finished set's block never contains it. A wrong
+     * pick must still come back out, or the lifter has to do it or finish the
+     * session.
+     */
+    private fun squatsThenOffPlanCurl() = listOf(
+        key("squat", 0),
+        key("squat", 1),
+        key("leg_curl", 0, added = true),
+        key("bench", 0),
+    )
+
+    @Test
+    fun `an off-plan set coming next can be taken back out from the rest screen`() {
+        val t = assertNotNull(RemoveSetControl.target(squatsThenOffPlanCurl(), queueIndex = 1, upcomingIndex = 2))
+        assertEquals(2, t.removeAt)
+        assertTrue(t.wasUpcoming)
+        assertEquals(1, t.removableCount)
+    }
+
+    @Test
+    fun `an off-plan set on READY can be taken back out`() {
+        val t = assertNotNull(RemoveSetControl.target(squatsThenOffPlanCurl(), queueIndex = 2, upcomingIndex = 2))
+        assertEquals(2, t.removeAt)
+    }
+
+    @Test
+    fun `a prescribed first set coming next is not an off-plan set`() {
+        val queue = listOf(key("squat", 0), key("squat", 1), key("bench", 0))
+        assertNull(RemoveSetControl.target(queue, queueIndex = 1, upcomingIndex = 2))
+    }
 }
