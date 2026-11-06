@@ -92,6 +92,7 @@ import com.macrophage.barspeed.model.ImplementLoad
 import com.macrophage.barspeed.model.LatestSession
 import com.macrophage.barspeed.model.LeadInPolicy
 import com.macrophage.barspeed.model.LiveCountReadout
+import com.macrophage.barspeed.model.NextSetInputs
 import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.PlanSessionDef
 import com.macrophage.barspeed.model.PlanValueCaption
@@ -124,7 +125,6 @@ import com.macrophage.barspeed.model.SetLimiterPolicy
 import com.macrophage.barspeed.model.SetLimiterScale
 import com.macrophage.barspeed.model.SetLimiterTile
 import com.macrophage.barspeed.model.SetLoadPolicy
-import com.macrophage.barspeed.model.SetRepsPolicy
 import com.macrophage.barspeed.model.SetWriteState
 import com.macrophage.barspeed.model.SideChoicePolicy
 import com.macrophage.barspeed.model.SkipSetControl
@@ -143,6 +143,8 @@ import com.macrophage.barspeed.record.RecordViewModel
 import com.macrophage.barspeed.record.SetFeedback
 import com.macrophage.barspeed.record.SetRating
 import com.macrophage.barspeed.record.cardInstruction
+import com.macrophage.barspeed.record.nextSetSlot
+import com.macrophage.barspeed.record.nextSetStatements
 import com.macrophage.barspeed.record.previewSet
 import com.macrophage.barspeed.record.soleSilenceOver
 import com.macrophage.barspeed.ui.BarColors
@@ -2181,26 +2183,23 @@ private fun loadFieldLabel(slot: PlannedSlot?, unit: WeightUnit): String = Bodyw
  * pinned in :core:model. This resolves the three facts each caption needs and
  * draws whatever comes back, including nothing.
  *
- * The REACH each caption claims is not asserted here -- it is the carry policy's
- * own answer about this slot and the one after it. Asking
- * SetLoadPolicy.standingStatedAddedKg and SetRepsPolicy whether the value on
- * screen would still stand for the set after this one is the same call
- * restingState will make when that set actually arrives, with one argument
- * different -- this passes the parsed box where restingState passes
- * state.statedLoadKg / statedReps / statedDurationS. The two agree wherever a
- * caption is drawn at all, because a caption is drawn only when the box's
- * rendered text differs from the plan's and an untouched box is re-seeded from
- * that same declaration. So the sentence and the behaviour cannot disagree: on
- * the last set of a block, the answer is null for all three boxes. Reps and
- * hold also answer null wherever the plan prescribes a different number next
- * -- SetRepsPolicy stops the carry there. The load does not: since
- * `Carry a load correction across the plan's own steps as a distance`
- * it carries a correction across a stepping plan as a distance rather than
- * stopping, so [SetLoadPolicy.standingStatedAddedKg] stays non-null there
- * too. What withholds the load's reach sentence is not a policy null but
- * [nextDeclaredAddedKg], passed to [PlanValueCaption.load] separately and
- * compared against the planned figure inside it -- the caption says the
- * change is recorded rather than claiming a reach it does not have.
+ * The REACH each caption claims is not asserted here -- it is
+ * [NextSetInputs.of]'s answer about this slot and the one after it, the SAME
+ * call, on the same pair and the same statements, that restingState makes when
+ * this set has run. Only restingState's LastRanSet differs, and that feeds the
+ * boxes, never a standing statement; `NextSetInputsTest` pins the two answers
+ * equal. The statements are the state's stated values, not the parsed boxes:
+ * those are what the rest transition carries, so a box holding a seeded number
+ * nobody stated can no longer be promised a carry it does not get (code-health
+ * review 2026-11-06, F2). On the last set of a block the answer is null for all
+ * three boxes. Reps and hold also answer null wherever the plan prescribes a
+ * different number next -- SetRepsPolicy stops the carry there. The load does
+ * not: it carries a correction across a stepping plan as a distance rather
+ * than stopping, so the load's answer stays non-null there too. What withholds
+ * the load's reach sentence is not a policy null but `nextDeclaredAddedKg`,
+ * passed to [PlanValueCaption.load] separately and compared against the
+ * planned figure inside it -- the caption says the change is recorded rather
+ * than claiming a reach it does not have.
  *
  * The PLANNED side is the FROZEN declaration and the SHOWN side is the box, so
  * the caption names the plan's prescription and the lifter's standing
@@ -2210,13 +2209,15 @@ private fun loadFieldLabel(slot: PlannedSlot?, unit: WeightUnit): String = Bodyw
 @Composable
 private fun PlanValueCaptions(state: RecordState, slot: PlannedSlot) {
     val after = state.slotAfterUpcoming
-    val sameBlock =
-        SetLoadPolicy.sameExerciseBlock(
-            lastExerciseId = slot.exercise.id,
-            nextExerciseId = after?.exercise?.id,
-            nextSetIndexInExercise = after?.setIndexInExercise,
+    // The same call the rest transition after this set makes, on the same pair
+    // and the same statements: what stands for later sets is read off it rather
+    // than decided a second time here.
+    val reach =
+        NextSetInputs.of(
+            last = slot.nextSetSlot(),
+            next = after?.nextSetSlot(),
+            stated = state.nextSetStatements,
         )
-    val shownAddedKg = state.weightUnit.parseToKg(state.loadInput)
     val captions =
         listOfNotNull(
             PlanValueCaption.load(
@@ -2226,17 +2227,8 @@ private fun PlanValueCaptions(state: RecordState, slot: PlannedSlot) {
                 unit = state.weightUnit,
                 plannedAddedKg = slot.plannedLoadKg,
                 nextDeclaredAddedKg = after?.plannedLoadKg,
-                shownAddedKg = shownAddedKg,
-                standsForLaterSets =
-                SetLoadPolicy.standingStatedAddedKg(
-                    statedAddedKg = shownAddedKg,
-                    sameExerciseBlock = sameBlock,
-                    lastDeclaredAddedKg = slot.plannedLoadKg,
-                    nextDeclaredAddedKg = after?.plannedLoadKg,
-                    bodyweight = after?.exercise?.bodyweight ?: false,
-                    finishedWarmup = slot.warmup,
-                    nextWarmup = after?.warmup == true,
-                ) != null,
+                shownAddedKg = state.weightUnit.parseToKg(state.loadInput),
+                standsForLaterSets = reach.statedKg != null,
             ),
             if (slot.isTimed) {
                 PlanValueCaption.hold(
@@ -2245,13 +2237,7 @@ private fun PlanValueCaptions(state: RecordState, slot: PlannedSlot) {
                     plannedDurationS = slot.plannedDurationS,
                     nextDeclaredDurationS = after?.plannedDurationS,
                     shownDurationS = state.durationInput.trim().toIntOrNull(),
-                    standsForLaterSets =
-                    SetRepsPolicy.standingStatedDurationS(
-                        statedDurationS = state.durationInput.trim().toIntOrNull(),
-                        sameExerciseBlock = sameBlock,
-                        lastDeclaredDurationS = slot.plannedDurationS,
-                        nextDeclaredDurationS = after?.plannedDurationS,
-                    ) != null,
+                    standsForLaterSets = reach.statedDurationS != null,
                 )
             } else {
                 PlanValueCaption.reps(
@@ -2260,13 +2246,7 @@ private fun PlanValueCaptions(state: RecordState, slot: PlannedSlot) {
                     plannedReps = slot.plannedReps,
                     nextDeclaredReps = after?.plannedReps,
                     shownReps = state.repsInput.trim().toIntOrNull(),
-                    standsForLaterSets =
-                    SetRepsPolicy.standingStatedReps(
-                        statedReps = state.repsInput.trim().toIntOrNull(),
-                        sameExerciseBlock = sameBlock,
-                        lastDeclaredReps = slot.plannedReps,
-                        nextDeclaredReps = after?.plannedReps,
-                    ) != null,
+                    standsForLaterSets = reach.statedReps != null,
                 )
             },
         )
