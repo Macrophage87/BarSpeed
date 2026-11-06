@@ -174,4 +174,20 @@ class LiveCounterPolicyTest {
             "a straight-reps dynamic set with a sensor arms a live counter",
         )
     }
+
+    /**
+     * An eccentric-first set the sensor counts -- a back squat, a bench press,
+     * a Romanian deadlift -- runs the lockout counter; a concentric-first one
+     * keeps the full-cycle counter the deadlift evidence chose.
+     *
+     * The owner's first v0.2.2 session (2026-11-06): on his back squats the
+     * full-cycle rule called the walk-out as rep 1 and every rep a rep late,
+     * so the last call fell on the rack, and it dropped two of five reps on
+     * the empty bar. `LockoutRepCounter`'s KDoc carries the measurement.
+     */
+    @Test
+    fun `an eccentric-first sensor set runs the lockout counter`() {
+        assertEquals(LiveCounter.LOCKOUT, LiveCounterPolicy.counterFor(RepCounter.SENSOR, StartPhase.ECCENTRIC))
+        assertEquals(LiveCounter.CYCLE, LiveCounterPolicy.counterFor(RepCounter.SENSOR, StartPhase.CONCENTRIC))
+    }
 }
