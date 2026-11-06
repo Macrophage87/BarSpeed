@@ -1662,20 +1662,18 @@ private fun journaledWorkStart(
  * one way the two can differ, and the recovered row then carries the load the
  * set began at -- the only one a kill leaves on the disk.
  *
- * [counter] is the counter [RecordViewModel.beginSet] froze, and [plannedPrepS]
- * and [prepS] the prep seconds it resolved, all three before the journal
- * opens. The tempo, warm-up, added and planned-side facts are read off the
- * slot with the expressions `endSet` writes the row's own with (#100 review
- * round 1), so a recovered set carries what its own write would have.
+ * The counter and the prep seconds are [counterAtStart]'s,
+ * [prepSecondsAtStart]'s and [plannedPrepSecondsAtStart]'s answers, the same
+ * calls [RecordViewModel.beginSet] freezes them with, over the same state at
+ * the same moment. The tempo, warm-up, added and planned-side facts are read
+ * off the slot with the expressions `endSet` writes the row's own with (#100
+ * review round 1), so a recovered set carries what its own write would have.
  */
 private fun journalFactsOf(
     s: RecordState,
     exercise: ExerciseDef,
     prepCase: PrepCase,
     armedSensors: RecordedSensors?,
-    counter: RepCounter,
-    plannedPrepS: Int?,
-    prepS: Int?,
 ): JournalSetFacts {
     val slot = s.currentSlot
     val load =
@@ -1697,20 +1695,42 @@ private fun journalFactsOf(
         timed = s.currentIsTimed,
         prepCase = prepCase,
         armedSensors = armedSensors,
-        counter = counter,
-        tempo =
-        when {
-            s.currentIsTimed -> null
-            s.adHoc -> s.tempoInput.ifBlank { null }
-            else -> slot?.tempo
-        },
+        counter = counterAtStart(s, exercise),
+        tempo = tempoTextAtStart(s).takeIf { !s.currentIsTimed },
         warmup = slot?.warmup == true,
         added = slot?.isAddedSet == true,
         plannedSide = if (s.adHoc) null else slot?.plannedSide,
-        plannedPrepS = plannedPrepS,
-        prepS = prepS,
+        plannedPrepS = plannedPrepSecondsAtStart(s, prepCase),
+        prepS = prepSecondsAtStart(s, prepCase),
     )
 }
+
+/**
+ * The tempo the coming set is performed to, as text: the typed one on an
+ * ad-hoc set, the slot's otherwise. Free functions for [sessionOpeningOf]'s
+ * reason, and ONE statement each, because two readers take them at START --
+ * [RecordViewModel.beginSet], which runs the set by them, and
+ * [journalFactsOf], which journals them for #100's recovery -- and two copies
+ * are how a journaled fact comes to disagree with the set it describes.
+ */
+private fun tempoTextAtStart(s: RecordState): String? =
+    if (s.adHoc) s.tempoInput.ifBlank { null } else s.currentSlot?.tempo
+
+/** Who counts the coming set, `CountingPolicy.counterFor`'s answer; see [tempoTextAtStart]. */
+private fun counterAtStart(s: RecordState, exercise: ExerciseDef): RepCounter = CountingPolicy.counterFor(
+    hasTempo = tempoTextAtStart(s)?.let { Tempo.parseOrNull(it) } != null,
+    isTimed = s.currentIsTimed,
+    kind = exercise.kind,
+    imuConnected = s.imuConnected,
+)
+
+/** The prep the coming set runs, null where it runs none; see [tempoTextAtStart]. */
+private fun prepSecondsAtStart(s: RecordState, prepCase: PrepCase): Int? =
+    s.prepSecondsFor(s.currentSlot).takeIf { prepCase != PrepCase.NONE }
+
+/** The prep the plan prescribed for the coming set, null where it runs none; see [tempoTextAtStart]. */
+private fun plannedPrepSecondsAtStart(s: RecordState, prepCase: PrepCase): Int? =
+    s.plannedPrepSecondsFor(s.currentSlot).takeIf { prepCase != PrepCase.NONE }
 
 /**
  * Open the durable capture for a set that is about to begin.
@@ -1741,9 +1761,6 @@ private fun openJournal(
     startedAtMs: Long,
     roster: SensorRoster,
     prepCase: PrepCase,
-    counter: RepCounter,
-    plannedPrepS: Int?,
-    prepS: Int?,
 ): SetJournal? = store.open(
     SetJournalHeader(
         exerciseId = exercise.id,
@@ -1772,10 +1789,7 @@ private fun openJournal(
         // would have: the declaration the analysis runs under, the load, the
         // prep case and the armed roster -- frozen at the start like the rest
         // of this header, because a kill leaves no end to read them at.
-        facts =
-        journalFactsOf(
-            s, exercise, prepCase, SensorCapturePolicy.recorded(roster), counter, plannedPrepS, prepS,
-        ),
+        facts = journalFactsOf(s, exercise, prepCase, SensorCapturePolicy.recorded(roster)),
     ),
 )
 
@@ -4849,8 +4863,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // itself — the DEFAULT for all tempo work. A missed phase switch in
         // sensor counting corrupts the whole set, so the app's own count wins;
         // the sensor still records for velocity/power metrics.
-        val guidedTempo =
-            (if (s.adHoc) s.tempoInput.ifBlank { null } else s.currentSlot?.tempo)?.let { Tempo.parseOrNull(it) }
+        val guidedTempo = tempoTextAtStart(s)?.let { Tempo.parseOrNull(it) }
         // The same rule the import gate warns an inert prep_s against and the
         // same one the screen offers the prep control on. Stated once, in a
         // module with tests, because three statements of it would be three rules.
@@ -4864,7 +4877,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // !s.imuConnected)`, forced true again below for a guided set, and that
         // one boolean answered four questions. The three the app still asks are
         // read off this counter instead, so they cannot disagree.
-        val counter = CountingPolicy.counterFor(guidedTempo != null, s.currentIsTimed, exercise.kind, s.imuConnected)
+        val counter = counterAtStart(s, exercise)
         setCounter = counter
         // The lifter's or the guide's tally IS the count on these sets, which is
         // the question `manualSet` is asked most often -- and it still gates
@@ -4923,8 +4936,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // lifter adjusted the prep; they are equal both when no adjustment
         // exists and when it happens to equal what the plan prescribed.
         val prepS = s.prepSecondsFor(s.currentSlot)
-        plannedPrepSForSet = s.plannedPrepSecondsFor(s.currentSlot).takeIf { prepCase != PrepCase.NONE }
-        prepSForSet = prepS.takeIf { prepCase != PrepCase.NONE }
+        plannedPrepSForSet = plannedPrepSecondsAtStart(s, prepCase)
+        prepSForSet = prepSecondsAtStart(s, prepCase)
         prepCaseForSet = prepCase
         clockStartedAtMs = null
         workStartedAtMs = null
@@ -4935,11 +4948,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // with nowhere durable to go. A null here is the disk refusing, which
         // is the state this whole mechanism replaces -- it must not also stop
         // the set being recorded in memory as it always was.
-        journal =
-            openJournal(
-                container.setJournals, s, exercise, sessionStartedAtMs, setStartedAtMs, roster, prepCase,
-                counter, plannedPrepSForSet, prepSForSet,
-            )
+        journal = openJournal(container.setJournals, s, exercise, sessionStartedAtMs, setStartedAtMs, roster, prepCase)
         // Every set, not just the first. The catch in
         // RecordingService.onStartCommand ends every refusal
         // ForegroundStartPolicy.classify recognises in stopSelf(startId), so a
