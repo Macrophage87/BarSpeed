@@ -41,7 +41,29 @@ class InferredExerciseTest {
     fun `the display name is the id read as words`() {
         assertEquals("Cable fly", ExerciseDef.inferred("cable_fly").displayName)
         assertEquals("Cable fly", ExerciseDef.inferredDisplayName("cable_fly"))
-        assertEquals("Dumbbell rdl", ExerciseDef.inferredDisplayName("dumbbell_rdl"))
+    }
+
+    /**
+     * core-model review 2026-11-06, F7. Abbreviations plans use in ids read
+     * as the abbreviation, upper case, wherever they sit; every other word
+     * keeps the sentence case the app already writes, so a stored row such as
+     * "Tricep pushdown" or "Cable fly" still matches and is not rewritten.
+     */
+    @Test
+    fun `abbreviations in an id are written in capitals`() {
+        assertEquals("Dumbbell RDL", ExerciseDef.inferredDisplayName("dumbbell_rdl"))
+        assertEquals("RDL", ExerciseDef.inferredDisplayName("rdl"))
+        assertEquals("KB swing", ExerciseDef.inferredDisplayName("kb_swing"))
+        assertEquals("DB row", ExerciseDef.inferredDisplayName("db_row"))
+        assertEquals("Seated DB OHP", ExerciseDef.inferredDisplayName("seated_db_ohp"))
+        assertEquals("DB RFESS", ExerciseDef.inferredDisplayName("db_rfess"))
+        assertEquals("RFE split squat", ExerciseDef.inferredDisplayName("rfe_split_squat"))
+        assertEquals("Single leg RDLs", ExerciseDef.inferredDisplayName("single_leg_rdls"), "a plural keeps its s")
+        assertEquals("EZ bar curl", ExerciseDef.inferredDisplayName("ez_bar_curl"))
+        assertEquals("Rear foot elevated split squat", ExerciseDef.inferredDisplayName("rear_foot_elevated_split_squat"))
+        assertEquals("Tricep pushdown", ExerciseDef.inferredDisplayName("tricep_pushdown"))
+        assertEquals("Kbswing", ExerciseDef.inferredDisplayName("kbswing"), "only a whole word is an abbreviation")
+        assertEquals("Dbsnatch", ExerciseDef.inferredDisplayName("dbsnatch"))
     }
 
     /**
