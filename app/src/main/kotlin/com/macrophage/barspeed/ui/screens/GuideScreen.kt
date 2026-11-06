@@ -143,8 +143,9 @@ private val SECTIONS =
                 "End the set by tapping how hard it felt. Tapping the reps yourself and stopped " +
                 "before the target? It is recorded as short of target automatically, and " +
                 "END SET EARLY ends it with no rating. On a tempo set or a hold, the red button " +
-                "ends it early as a failure; the rating comes once it is done. On a sensor-counted set, " +
-                "END SET ends it unrated and the rest screen asks how it felt. Started by mistake? " +
+                "ends it early as a failure; the rating comes once it is done. On a sensor-counted " +
+                "straight-rep set, END SET ends it unrated and the rest screen asks how it felt. " +
+                "Started by mistake? " +
                 "CANCEL SET, during the get-ready or before the first rep, throws the set away " +
                 "with nothing saved.",
         ),
