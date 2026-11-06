@@ -396,6 +396,13 @@ enum class SetLimiterPagePlacement {
 
     /** Drawn under the reason row. No caller has returned it since #237. */
     CORRECTION,
+
+    /**
+     * Folded to one line, [SetLimiterPolicy.COLLAPSED_ROW], that opens the
+     * page on a tap. Ignoring it costs nothing; the page itself would push
+     * the Up next card and FINISH below the fold on every on-target set.
+     */
+    COLLAPSED,
 }
 
 /**
@@ -545,6 +552,7 @@ object SetLimiterPolicy {
         limiter: SetLimiter?,
         dismissed: Boolean,
         changing: Boolean,
+        expanded: Boolean = false,
     ): SetLimiterPagePlacement = when {
         changing -> SetLimiterPagePlacement.CORRECTION
         prompts(failed, rpe, limiter, dismissed) -> SetLimiterPagePlacement.PROMPT
@@ -581,4 +589,7 @@ object SetLimiterPolicy {
 
     /** The line's wording for a set carrying no reason at all. */
     const val NOT_GIVEN = "Not given"
+
+    /** The one-line row [SetLimiterPagePlacement.COLLAPSED] draws in place of the page. */
+    const val COLLAPSED_ROW = "What limited it? (optional)"
 }
