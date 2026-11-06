@@ -7,9 +7,12 @@ captures/
 .DS_Store
 .kotlin/
 
-# Signing material. app/build.gradle.kts reads app/release.keystore and the
+# Signing material and Play credentials. app/build.gradle.kts reads app/release.keystore and the
 # release workflow writes it there; never commit an upload key.
 *.keystore
 *.jks
 keystore.properties
 app/release.keystore
+*.p12
+*service-account*.json
+play-*.json
