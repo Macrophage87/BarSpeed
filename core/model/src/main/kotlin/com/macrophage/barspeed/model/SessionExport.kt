@@ -4103,7 +4103,7 @@ data class SetExport(
      * the set records — the lifter or the voice guide counted something else —
      * or, from 1.26 (#246) on a `metronome` set whose stored reps carry their
      * drive instants, when the counts agree but the detections do not each sit
-     * in their own cycle of the guide's marks (the last paragraph here).
+     * in their own cycle of the guide's marks (the FROM 1.26 paragraph below).
      *
      * TRUE IS THE TWO COUNTS MATCHING AND NOTHING MORE (1.23, #246). The rule
      * is count equality, so a segmenter that misses reps and finds as many
@@ -4304,7 +4304,10 @@ data class SetSensorsExport(
      * RECORDED, not what the document's `schemaVersion` says: a set armed to
      * analyse a unit that delivered too few frames to analyse is analysed
      * from the unit that delivered enough, and [analysedFellBack] is what
-     * says the app moved. Read that key rather than comparing this one with
+     * says the app moved. From 1.26 (#242, #287) the same holds for an armed
+     * unit that delivered enough but could not stand for the set beside its
+     * partner, for the further causes that key lists. Read that key rather
+     * than comparing this one with
      * [present], which no longer separates the two cases.
      *
      * It can still name a role absent from [present] in three situations, and
@@ -4404,8 +4407,9 @@ data class SetSensorsExport(
      *
      * The ROLE is a key rather than a second list. It was [expected] minus
      * [present] until #209, which a reader could compute; it is now [expected]
-     * minus the roles the analysis could run on, which a reader holding only
-     * this document cannot. A duplicate list of them would still be the
+     * minus the roles the analysis could run on, and minus any refused role
+     * whose link read as delivering as the set ended -- [ArmedSilencePolicy.silent]
+     * drops those -- which a reader holding only this document cannot. A duplicate list of them would still be the
      * duplicate statement [expected]'s own description refuses. The VALUE is
      * what was always new.
      *
@@ -4533,7 +4537,9 @@ data class SetSensorsExport(
      * `fallback`, [AnalysedRoleBasis]'s published spellings (#278).
      *
      * READ WITH [analysedFellBack] AND NOT INSTEAD OF IT. That flag says the
-     * armed unit delivered too few frames; this says which of three rules
+     * armed unit could not stand for the set -- too few frames, or from 1.26
+     * (#242, #287) a short span or a still stream beside a partner that
+     * moved; this says which of three rules
      * produced the answer, and a `stackSignature` set can name a role the set
      * did not arm with no flag beside it -- the analysis moved because the
      * OTHER unit is the one the set's mount declaration describes, not because

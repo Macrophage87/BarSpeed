@@ -457,7 +457,9 @@ object SetAnalyzer {
      *
      * [analysedUnitFellBack] is `RecordedSensors.analysedFellBack`: true when
      * [samples] came from a unit the set did not arm, because the armed one
-     * delivered too few frames to run on. It exists because [direction] is the
+     * could not stand for the set: too few frames to run on, or since #242
+     * and #287 a short span or a still stream beside a partner that moved
+     * (`SensorCapturePolicy.analysable`). It exists because [direction] is the
      * EXERCISE's declaration and, on a cable machine, describes where the
      * ARMED unit was mounted -- see [LiftDirection.mountSpecific]. Issue #247.
      *

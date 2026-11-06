@@ -90,8 +90,10 @@ data class RecordedSensors(
     val analysed: SensorRole? = null,
     /**
      * True when [analysed] is NOT the role the set was armed to analyse, and
-     * the app moved onto it because the armed one delivered too few frames to
-     * analyse.
+     * the app moved onto it because the armed one could not stand for the
+     * set: it delivered too few frames to analyse, or since #242 and #287 it
+     * spanned less of the set than its partner or never moved while its
+     * partner did -- [SensorCapturePolicy.analysable] states all three.
      *
      * IT IS NO LONGER THE ONLY WAY [analysed] CAN DIFFER FROM THE ARMED ROLE,
      * and the sentence above is narrowed rather than reworded: since #278 a set
@@ -194,10 +196,11 @@ data class RecordedSensors(
      * The role here is a KEY, not a second statement of which units were
      * missing. It was [expected] minus the roles that streamed until #209,
      * which a reader could compute; it is now [expected] minus the roles
-     * [SensorCapturePolicy.analysable] keeps, which a reader holding only the export
-     * cannot, because the export publishes no frame counts. What was always
-     * new is the WORD, and the word is the thing
-     * field-37 had no way to record. Thirteen sets published `present: ["a"]`
+     * [SensorCapturePolicy.analysable] keeps, and minus any refused role whose
+     * link read as delivering as the set ended -- [ArmedSilencePolicy.silent]
+     * drops those -- which a reader holding only the export cannot, because
+     * the export publishes no frame counts. What was always new is the WORD,
+     * and the word is the thing field-37 had no way to record. Thirteen sets published `present: ["a"]`
      * and nothing about whether `b` was switched off, out of range, answering
      * with the wrong GATT profile, or connected and silent -- and those have
      * three different remedies, of which the lifter was offered none.
@@ -958,6 +961,16 @@ object SensorCapturePolicy {
      *   partner did (#287). Its figures would describe a unit lying still.
      *   Never when every unit is still: there is then nothing better to point
      *   the analysis at, and the empty-handed answer stays the one it was.
+     *   "Covering" is deliberate: a partner that moved but was itself refused
+     *   on its span does not count as moving, so an armed unit that moved and
+     *   stopped half way, beside a covering partner that never moved, hands
+     *   the analysis to the still partner, flagged as a fallback -- not the
+     *   other way round, which would keep figures describing half the set
+     *   with nothing saying so. Where that still unit's roll is read as
+     *   riding a load, the fallback is then refused in `SetAnalyzer` under
+     *   either kind of declaration (#247, #279); what the analysis resolves
+     *   from such a stream otherwise is not pinned. `ShortOrStillUnitTest`
+     *   pins the choice.
      *
      * WHAT THE SPAN RULE CANNOT SEE is a gap. A unit whose link dropped
      * mid-set and came back before the end -- four frames, a dropout, four

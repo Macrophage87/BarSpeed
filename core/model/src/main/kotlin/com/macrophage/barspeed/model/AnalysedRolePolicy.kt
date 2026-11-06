@@ -74,15 +74,17 @@ enum class AnalysedRoleBasis(val published: String) {
      * it is the armed unit this word is a CONFIRMATION and the analysed role
      * is unchanged; where it is not, the analysis moved -- and
      * [RecordedSensors.analysedFellBack] stays FALSE, because that flag means
-     * "the armed unit delivered too few frames" and is what issue #247's
-     * refusal keys off.
+     * "the armed unit could not stand for the set" -- too few frames, or
+     * since #242 and #287 a short span or a still stream beside a partner
+     * that moved -- and is what issue #247's refusal keys off.
      */
     STACK_SIGNATURE("stackSignature"),
 
     /**
-     * The armed unit delivered too few frames to analyse and another unit
-     * delivered enough, so the figures come from the one that did (#207,
-     * widened by #209).
+     * The armed unit could not stand for the set and another could, so the
+     * figures come from the one that could: it delivered too few frames to
+     * analyse and another delivered enough (#207, widened by #209), or since
+     * #242 and #287 one of the two further causes below.
      *
      * The frame count decides before any signature does, and the reason is not
      * a preference: a buffer below [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES]
@@ -164,10 +166,14 @@ data class AnalysedRoleChoice(
  * ## What it deliberately does not do
  *
  * IT DOES NOT SET [AnalysedStream.fellBack]. That flag means the armed unit
- * delivered too few frames, `SetAnalyzer` refuses a fallback under a
- * mount-specific declaration on it (#247), and the refusal must go on firing
- * for exactly the population it fired on before. A signature flip is a
- * different fact and is said in [AnalysedRoleChoice.basis].
+ * could not stand for the set, `SetAnalyzer` refuses a fallback under a
+ * mount-specific declaration on it (#247), and the refusal must fire on
+ * that flag's population and no other. That population is no longer the
+ * one it fired on before: since #242 and #287 it includes an armed unit
+ * refused for a short span or for never moving, deliberately, and since
+ * #279 a mount-free fallback onto a unit read as riding a load is refused
+ * on the same flag. A signature flip is a different fact and is said in
+ * [AnalysedRoleChoice.basis].
  *
  * IT DOES NOT SWAP THE GEOMETRY. The declaration is unchanged; what changes is
  * which stream it is applied to. That is the repair #278 asks for: a stack
