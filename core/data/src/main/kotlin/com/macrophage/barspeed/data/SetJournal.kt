@@ -190,9 +190,13 @@ data class OrphanedSet(
      * #211. The header is written and closed before the first sample line, so
      * it can only name the unit the set armed; on a capture whose armed unit
      * went silent, the rows are in the other file. This is derived on read by
-     * [SensorCapturePolicy.analysedFrom] -- the same single writer the
-     * recording path decides with -- so a recovered capture and a stored set
-     * cannot disagree about which stream the analysis belongs to.
+     * [SensorCapturePolicy.analysedFrom] -- the same function the recording
+     * path decides with -- from FRAME COUNTS ALONE. Since #242 and #287 the
+     * recording path also passes each stream's span and stillness, and this
+     * reader passes neither (it counts newlines and decodes nothing), so a
+     * recovered capture whose armed unit stopped early or never moved names
+     * the armed role where the stored set would have named its partner. The
+     * two agree wherever the frame counts decide.
      *
      * NOTHING IS ANALYSED HERE. A recovered orphan is offered back as a zip or
      * discarded; this is a statement about the capture, published so that the
@@ -636,8 +640,10 @@ class SetJournalStore(
         // silent it named a file with no rows in it. The counts come from the
         // scans above -- newline counts, not decodes -- so nothing here can
         // judge one stream and publish another, and the rule is
-        // `SensorCapturePolicy.analysedFrom`, the single writer the recording
-        // path decides with, rather than a second reading of it here.
+        // `SensorCapturePolicy.analysedFrom`, the function the recording path
+        // decides with, rather than a second reading of it here -- called with
+        // counts alone, so the #242 span and #287 stillness tests the
+        // recording path adds are not made on a recovered orphan.
         val analysed =
             SensorCapturePolicy.analysedFrom(
                 armed = header.armedRole,

@@ -111,7 +111,8 @@ data class RecordedSensors(
      * which unit the analysis moved off. This flag does.
      *
      * AND TWO MORE CAUSES SINCE #242 AND #287: an armed unit that delivered
-     * enough frames but stopped early beside its partner, or never moved while
+     * enough frames but whose stream spanned less of the set than its
+     * partner's -- it started late or stopped early -- or never moved while
      * its partner did -- [SensorCapturePolicy.analysable] states both. "Went
      * quiet" above now covers those: in each the armed unit cannot stand for
      * the set, and `SetAnalyzer`'s refusal under a mount-specific declaration
@@ -173,7 +174,9 @@ data class RecordedSensors(
     /**
      * Which ARMED roles delivered too few frames to analyse across this whole
      * set, and what the app could see of each one's link when the set ended
-     * (#213, #209).
+     * (#213, #209) -- and since #242 and #287 also an armed role
+     * [SensorCapturePolicy.analysable] refused for a short span or for never
+     * moving, named only when its link was not delivering as the set ended.
      *
      * TOO FEW RATHER THAN NONE since #209, and it is the same boundary the
      * analysis uses: a role under [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES]
@@ -190,8 +193,8 @@ data class RecordedSensors(
      *
      * The role here is a KEY, not a second statement of which units were
      * missing. It was [expected] minus the roles that streamed until #209,
-     * which a reader could compute; it is now [expected] minus the roles that
-     * delivered enough to analyse, which a reader holding only the export
+     * which a reader could compute; it is now [expected] minus the roles
+     * [SensorCapturePolicy.analysable] keeps, which a reader holding only the export
      * cannot, because the export publishes no frame counts. What was always
      * new is the WORD, and the word is the thing
      * field-37 had no way to record. Thirteen sets published `present: ["a"]`
@@ -449,8 +452,10 @@ object SensorCapturePolicy {
     const val MIN_ANALYSABLE_FRAMES = 8
 
     /**
-     * One second: the least a unit's stream may end short of its partner's
-     * before [analysable] judges that it stopped early (#242).
+     * One second: the most a unit's span -- first arrival to last -- may fall
+     * short of its partner's before [analysable] judges that it did not cover
+     * the set: it started late or stopped early, and the span cannot say which
+     * (#242).
      *
      * ARGUED FROM THE COMMITTED CORPUS, which `UnitMotionFieldTest` measures:
      * every committed two-unit capture's two spans agree within 94 ms, field-42
@@ -464,8 +469,11 @@ object SensorCapturePolicy {
     /**
      * A tenth: on a set longer than ten seconds the shortfall [analysable]
      * allows grows with the set, so a unit that dropped during the last few
-     * seconds of a long set -- the re-rack, by the time it is that late --
-     * keeps an analysis that already covers the work. A unit that delivered
+     * seconds of a long set keeps its analysis. That those seconds hold no
+     * work is a reading of the corpus, not of the set in hand: on session
+     * 32's eleven sets the stream ran 4.3 to 13.7 s past the terminal cue
+     * (`RecordViewModel`'s note), so the tail of a capture is usually the
+     * re-rack, and nothing here checks that it was. A unit that delivered
      * half the set does not. Where between those two a unit stops covering
      * the work is a judgement about where the reps fall, which no count here
      * can see; the bound is set to move the analysis only when a large share
@@ -897,9 +905,12 @@ object SensorCapturePolicy {
      * TWO MORE REFUSALS SINCE #242 AND #287, both judged against the PARTNER,
      * because neither is a property of one stream alone:
      *
-     * - A unit that delivered enough frames but whose stream ENDED short of
-     *   the longest delivered span by more than [allowedShortfallMs] stopped
-     *   early (#242). Eight frames is a stream the estimator accepts, and the
+     * - A unit that delivered enough frames but whose SPAN -- first arrival
+     *   to last, [UnitMotion.spanMs] -- fell short of the longest delivered
+     *   span by more than [allowedShortfallMs] did not cover the set (#242).
+     *   The span is a duration, never an end instant: a unit that started
+     *   late and ran to the end reads exactly as one that stopped early, and
+     *   both are moved off. Eight frames is a stream the estimator accepts, and the
      *   figures computed from it described 70 ms of a set that ran for tens of
      *   seconds. Spans and not frame counts, because a slower unit over the
      *   same seconds sends fewer frames: field-42's role a sent 0.44 of its
@@ -908,6 +919,13 @@ object SensorCapturePolicy {
      *   partner did (#287). Its figures would describe a unit lying still.
      *   Never when every unit is still: there is then nothing better to point
      *   the analysis at, and the empty-handed answer stays the one it was.
+     *
+     * WHAT THE SPAN RULE CANNOT SEE is a gap. A unit whose link dropped
+     * mid-set and came back before the end -- four frames, a dropout, four
+     * more -- spans the set and keeps the analysis, and its figures are
+     * computed across the hole as though it were not there. No inter-arrival
+     * test is made, and no committed capture holds such a stream, so none
+     * could be fitted; the export's `analysedFellBack` description says so.
      *
      * A role with no entry in [spanMsByRole] or [stillByRole] is UNJUDGED on
      * that question and stays, so every caller that passes counts alone --
@@ -934,8 +952,8 @@ object SensorCapturePolicy {
     }
 
     /**
-     * How far short of the longest delivered span a unit's own may end and
-     * still be judged to have covered the set (#242): [SPAN_MARGIN_MS], or
+     * How far short of the longest delivered span a unit's own span may fall
+     * and still be judged to have covered the set (#242): [SPAN_MARGIN_MS], or
      * [SPAN_SHORTFALL_SHARE] of the longest span where that is more.
      */
     fun allowedShortfallMs(longestSpanMs: Long): Long =

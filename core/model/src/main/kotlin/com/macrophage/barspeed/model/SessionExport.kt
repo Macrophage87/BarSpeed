@@ -2850,9 +2850,11 @@ data class SessionExport(
          * 1.26 FURTHER ENTRY (#242, #287, a unit that cannot stand for the set
          * beside its partner): THE ANALYSED ROLE MAY MOVE ON TWO MORE SETS.
          * `SensorCapturePolicy.analysable` now also refuses an armed unit
-         * whose stream ENDED short of its partner's by more than
+         * whose SPAN -- first arrival to last, never an end instant -- fell
+         * short of its partner's by more than
          * `SensorCapturePolicy.SPAN_MARGIN_MS` or a tenth of the partner's
-         * span, whichever is longer (#242), and one that NEVER MOVED --
+         * span, whichever is longer, which is a late start or an early stop
+         * alike (#242; a mid-set gap with frames at both ends is not caught), and one that NEVER MOVED --
          * [UnitMotion.still] -- while its partner did (#287), so the analysis
          * moves by the fallback that already existed: `analysedFellBack`
          * true, `analysedRoleBasis` `fallback`, refused under a mount-specific
@@ -3916,17 +3918,19 @@ data class SetExport(
     val repMarks: List<Long>? = null,
     /**
      * False when the sensor segmenter resolved a different number of reps than
-     * the set records — the lifter or the voice guide counted something else.
+     * the set records — the lifter or the voice guide counted something else —
+     * or, from 1.26 (#246) on a `metronome` set whose stored reps carry their
+     * drive instants, when the counts agree but the detections do not each sit
+     * in their own cycle of the guide's marks (the last paragraph here).
      *
      * TRUE IS THE TWO COUNTS MATCHING AND NOTHING MORE (1.23, #246). The rule
      * is count equality, so a segmenter that misses reps and finds as many
      * movements that are not reps publishes true; true is not evidence that
-     * the per-rep array, or anything drawn from it, is the lifter's reps. No
-     * stronger test is published. None is computed: the stored per-rep rows
-     * carry durations and no clock, and [liveReps] is one integer, so matching
-     * detections to counted reps in time would need the segmenter re-run over
-     * the stored raw stream, which the export does not do. The name is
-     * historical.
+     * the per-rep array, or anything drawn from it, is the lifter's reps.
+     * Under 1.23 no stronger test was published, because the stored per-rep
+     * rows carried durations and no clock and [liveReps] is one integer; that
+     * still holds of every set but the one the 1.26 paragraph below names,
+     * and is superseded there. The name is historical.
      *
      * Stated without reference to [repMetrics], deliberately. Everything drawn
      * from the segmented reps carries this caveat — [velocityLossPct],
@@ -4099,7 +4103,9 @@ data class SetSensorsExport(
     /**
      * True when [analysedRole] is not the role the set armed for analysis,
      * because that unit delivered too few frames to analyse and another one
-     * delivered enough (#207, widened by #209).
+     * delivered enough (#207, widened by #209) -- or, from 1.26 (#242, #287),
+     * because its span fell short of its partner's or it never moved while its
+     * partner did; [SensorCapturePolicy.analysable] states both.
      *
      * TOO FEW, not none. A unit that put one to seven frames in its buffer
      * still put a file in the raw archive, so a set carrying this key can name
@@ -4162,7 +4168,9 @@ data class SetSensorsExport(
     /**
      * Which ARMED roles delivered too few frames to analyse across the whole
      * set, keyed by role, with what the app could see of each one's link when
-     * the set ended (#213, widened by #209).
+     * the set ended (#213, widened by #209) -- and from 1.26 (#242, #287) a
+     * role the analysis moved off for a short span or for never moving, named
+     * only when its link was not delivering as the set ended.
      *
      * The boundary is [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES], the point
      * below which the estimator refuses a stream outright, so a role named
@@ -4177,8 +4185,8 @@ data class SetSensorsExport(
      *
      * The ROLE is a key rather than a second list. It was [expected] minus
      * [present] until #209, which a reader could compute; it is now [expected]
-     * minus the roles that delivered enough to analyse, which a reader holding
-     * only this document cannot. A duplicate list of them would still be the
+     * minus the roles the analysis could run on, which a reader holding only
+     * this document cannot. A duplicate list of them would still be the
      * duplicate statement [expected]'s own description refuses. The VALUE is
      * what was always new.
      *
