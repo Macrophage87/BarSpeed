@@ -918,10 +918,20 @@ abstract class AppDatabase : RoomDatabase() {
          * mode) leaves things exactly as they were before this existed, and a
          * failure here must not stop the database opening. Whether a phone
          * ever reports busy at this point was not observed.
+         *
+         * The cursor must be STEPPED: the framework's cursor runs its statement
+         * lazily, on the first move, so a query closed unread never ran the
+         * pragma at all. The first version of this function did exactly that
+         * (review of dcd1e9d). Column 0 of the one row is SQLite's busy flag;
+         * 1 means the checkpoint could not complete and is logged.
          */
         private fun checkpoint(db: SupportSQLiteDatabase) {
             try {
-                db.query("PRAGMA wal_checkpoint(TRUNCATE)").close()
+                db.query("PRAGMA wal_checkpoint(TRUNCATE)").use { cursor ->
+                    if (cursor.moveToFirst() && cursor.getInt(0) == 1) {
+                        Log.w(TAG, "WAL checkpoint at open was busy; the main file may lag the log")
+                    }
+                }
             } catch (e: Exception) {
                 Log.w(TAG, "WAL checkpoint at open failed; the main file may lag the log", e)
             }
