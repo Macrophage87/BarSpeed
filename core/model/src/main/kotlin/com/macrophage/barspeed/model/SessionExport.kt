@@ -4388,11 +4388,12 @@ data class SetSensorsExport(
      */
     val shortfall: String? = null,
     /**
-     * Which ARMED roles delivered too few frames to analyse across the whole
-     * set, keyed by role, with what the app could see of each one's link when
-     * the set ended (#213, widened by #209) -- and from 1.26 (#242, #287) a
-     * role the analysis moved off for a short span or for never moving, named
-     * only when its link was not delivering as the set ended.
+     * Which ARMED roles the analysis refused -- for too few frames to analyse
+     * across the whole set (#213, widened by #209), or from 1.26 (#242, #287)
+     * for a short span or for never moving -- keyed by role, with what the app
+     * could see of each one's link when the set ended. Whatever the cause, a
+     * role is named only when its link was not delivering as the set ended
+     * ([ArmedSilencePolicy.silent] drops a DELIVERING role).
      *
      * The boundary is [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES], the point
      * below which the estimator refuses a stream outright, so a role named
@@ -4427,10 +4428,10 @@ data class SetSensorsExport(
      * [analysedFellBack] follows and deliberately not the one [expected] and
      * [present] follow: there is no informative empty here, and absence also
      * covers every set recorded by a build that could not observe delivery at
-     * all, which is every set before this version. One further meaning this
-     * version cannot remove: a set shorter than three seconds where an armed
-     * unit's last frame arrived during the preceding rest reads as delivering
-     * and is left out.
+     * all, which is every set before this version. A refused role whose last
+     * frame landed inside the three seconds before the set ended reads as
+     * delivering and is left out, on a set of any length; on a set shorter
+     * than three seconds that frame can be one from the preceding rest.
      *
      * A set armed with one bar sensor arms no ROLE at all, so this map is
      * absent there and [soleSilent] carries the same word without one (#224).
@@ -4440,7 +4441,8 @@ data class SetSensorsExport(
     /**
      * What the app could see of the ONE armed link on a set whose stream
      * carries no role, or absent when that link delivered a stream the
-     * analysis could run on (1.17, #224; the bar moved from "any frames at
+     * analysis could run on or was still delivering as the set ended (1.17,
+     * #224; the bar moved from "any frames at
      * all" to "enough frames to analyse" by #209).
      *
      * [silent]'s answer for the set that has no key to hang it off. A role
@@ -4472,14 +4474,17 @@ data class SetSensorsExport(
      *
      * ABSENT MEANS THE SET CAPTURED A STREAM THE ANALYSIS COULD RUN ON from
      * that one link -- at least [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES] of
-     * it, since #209 -- or, on a set shorter than
-     * [ArmedSilencePolicy.SILENT_AFTER_MS], that its last frame arrived during
-     * the preceding rest and read as delivering -- or that the document was
-     * written by a build that could not observe an unroled link at all. A
+     * it, since #209 -- or that the link sent fewer but was still delivering as
+     * the set ended: its last frame landed inside the
+     * [ArmedSilencePolicy.SILENT_AFTER_MS] ending at the set's end, on a set of
+     * any length, and on a shorter set that frame can be one from the
+     * preceding rest -- or that the document was written by a build that
+     * could not observe an unroled link at all. A
      * link that fed enough of a set to analyse and then went silent publishes
      * nothing here either: the word is refused wherever the set's buffer
      * holds a capture the analysis could run on. One that sent fewer than
-     * [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES] and stopped is named here.
+     * [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES] is named here only when its
+     * link was not delivering as the set ended.
      * Absent rather than empty on the ordinary set, [analysedFellBack]'s
      * rule.
      */
