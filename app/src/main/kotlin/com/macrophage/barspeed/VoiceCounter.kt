@@ -1,9 +1,12 @@
 package com.macrophage.barspeed
 
 import android.content.Context
+import android.content.Intent
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
+import android.os.Handler
+import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.text.SpannableString
@@ -14,6 +17,11 @@ import com.macrophage.barspeed.model.VoiceFocusChange
 import com.macrophage.barspeed.model.VoiceFocusPolicy
 import com.macrophage.barspeed.model.VoiceFocusState
 import com.macrophage.barspeed.model.VoiceFocusStep
+import com.macrophage.barspeed.model.VoiceHealth
+import com.macrophage.barspeed.model.VoiceStatus
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import java.util.Locale
 
 /**
  * Thin wrapper around the platform TTS engine for tempo counting. Counts are
@@ -35,10 +43,32 @@ import com.macrophage.barspeed.model.VoiceFocusStep
  *
  * The engine reports each utterance on a thread of its own, so the focus
  * state is read and written under [lock].
+ *
+ * **Health** (UX review 2026-11-06, voice F1 and F3). [status] says whether
+ * the engine can speak, as [VoiceHealth.afterInit] decides it: the phone's
+ * language is set, falling back to US English, and an engine that fails to
+ * start or dies mid-session is started again once. [mediaVolumeZero] is read
+ * here at construction and at every [setStarted]. Both feed the Record
+ * screen's one-line warning; neither changes what is spoken or recorded.
+ * Engine binding and its threads are as untestable here as the rest of this
+ * class; only the decisions are pinned, in `VoiceHealthTest`.
  */
 class VoiceCounter(context: Context) {
-    private var ready = false
-    private val audio = context.applicationContext.getSystemService(AudioManager::class.java)
+    @Volatile private var ready = false
+
+    @Volatile private var shutDown = false
+    private var retriesUsed = 0
+    private val appContext = context.applicationContext
+    private val main = Handler(Looper.getMainLooper())
+    private val statusFlow = MutableStateFlow(VoiceStatus.STARTING)
+    private val volumeZeroFlow = MutableStateFlow(false)
+
+    /** Whether the engine can speak; see [VoiceHealth]. */
+    val status: StateFlow<VoiceStatus> = statusFlow
+
+    /** Whether the media stream, which the voice plays on, was at 0 when last read. */
+    val mediaVolumeZero: StateFlow<Boolean> = volumeZeroFlow
+    private val audio = appContext.getSystemService(AudioManager::class.java)
     private val attributes = AudioAttributes.Builder()
         .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
@@ -70,16 +100,19 @@ class VoiceCounter(context: Context) {
         @Deprecated("Deprecated in Java")
         override fun onError(utteranceId: String?) = finished(utteranceId)
 
+        override fun onError(utteranceId: String?, errorCode: Int) {
+            finished(utteranceId)
+            if (VoiceHealth.engineDied(errorCode)) main.post { engineFailed() }
+        }
+
         override fun onStop(utteranceId: String?, interrupted: Boolean) = finished(utteranceId)
     }
 
-    private val tts =
-        TextToSpeech(context.applicationContext) { status ->
-            ready = status == TextToSpeech.SUCCESS
-        }.apply {
-            setAudioAttributes(attributes)
-            setOnUtteranceProgressListener(progress)
-        }
+    @Volatile private var tts: TextToSpeech = newEngine()
+
+    init {
+        checkMediaVolume()
+    }
 
     fun speak(text: String) {
         if (!ready) return
@@ -87,11 +120,17 @@ class VoiceCounter(context: Context) {
             utterances += 1
             "barspeed-count-$utterances".also { move(VoiceFocusPolicy.spoke(focus, it)) }
         }
-        if (tts.speak(marked(text), TextToSpeech.QUEUE_FLUSH, null, id) != TextToSpeech.SUCCESS) finished(id)
+        if (tts.speak(marked(text), TextToSpeech.QUEUE_FLUSH, null, id) != TextToSpeech.SUCCESS) {
+            finished(id)
+            main.post { engineFailed() }
+        }
     }
 
-    /** A set has begun; see [VoiceFocusPolicy] for what that changes. */
-    fun setStarted() = synchronized(lock) { move(VoiceFocusPolicy.setStarted(focus)) }
+    /** A set has begun; see [VoiceFocusPolicy] for what that changes. Also re-reads the media volume. */
+    fun setStarted() {
+        checkMediaVolume()
+        synchronized(lock) { move(VoiceFocusPolicy.setStarted(focus)) }
+    }
 
     /** The set is over; focus goes once the word playing now has finished. */
     fun setEnded() = synchronized(lock) { move(VoiceFocusPolicy.setEnded(focus)) }
@@ -105,10 +144,69 @@ class VoiceCounter(context: Context) {
         synchronized(lock) { move(VoiceFocusPolicy.cuesSwitchedOff(focus, cadenceSpeaks)) }
 
     fun shutdown() {
+        shutDown = true
         ready = false
+        main.removeCallbacksAndMessages(null)
         synchronized(lock) { move(VoiceFocusState()) }
         tts.shutdown()
     }
+
+    private fun checkMediaVolume() {
+        volumeZeroFlow.value = audio.getStreamVolume(AudioManager.STREAM_MUSIC) == 0
+    }
+
+    /**
+     * A new engine. Its init answer is posted to Main, so [initialised] runs
+     * after this returns and [tts] holds it -- the platform can answer a
+     * failed bind synchronously, from inside the constructor.
+     */
+    private fun newEngine(): TextToSpeech {
+        val made = arrayOfNulls<TextToSpeech>(1)
+        val engine = TextToSpeech(appContext) { code -> main.post { initialised(made[0], code) } }
+        made[0] = engine
+        engine.setAudioAttributes(attributes)
+        engine.setOnUtteranceProgressListener(progress)
+        return engine
+    }
+
+    /** Main thread. An answer from an engine already replaced or shut down is ignored. */
+    private fun initialised(engine: TextToSpeech?, code: Int) {
+        if (shutDown || engine == null || engine !== tts) return
+        val next = VoiceHealth.afterInit(code == TextToSpeech.SUCCESS, hasEngine(), Locale.getDefault()) {
+            engine.setLanguage(it)
+        }
+        if (VoiceHealth.mayRetry(next, retriesUsed)) {
+            restart()
+        } else {
+            ready = next == VoiceStatus.READY
+            statusFlow.value = next
+        }
+    }
+
+    /** Main thread. A speak refused or an engine error that means the service went: one restart, then FAILED. */
+    private fun engineFailed() {
+        if (shutDown || !ready) return
+        ready = false
+        if (VoiceHealth.mayRetry(VoiceStatus.FAILED, retriesUsed)) restart() else statusFlow.value = VoiceStatus.FAILED
+    }
+
+    private fun restart() {
+        retriesUsed += 1
+        statusFlow.value = VoiceStatus.STARTING
+        val old = tts
+        tts = newEngine()
+        old.shutdown()
+    }
+
+    /**
+     * Whether any speech engine is installed. Only consulted after a failed
+     * init, to tell NO_ENGINE from FAILED; the manifest's `<queries>` entry
+     * is what lets this see engines from API 30.
+     */
+    private fun hasEngine(): Boolean =
+        appContext.packageManager
+            .queryIntentServices(Intent(TextToSpeech.Engine.INTENT_ACTION_TTS_SERVICE), 0)
+            .isNotEmpty()
 
     private fun finished(id: String?) = synchronized(lock) { move(VoiceFocusPolicy.finished(focus, id)) }
 

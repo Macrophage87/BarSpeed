@@ -162,6 +162,7 @@ import com.macrophage.barspeed.ui.components.SensorDot
 import com.macrophage.barspeed.ui.components.SideArrow
 import com.macrophage.barspeed.ui.components.TargetLineBars
 import com.macrophage.barspeed.ui.components.VerdictChip
+import com.macrophage.barspeed.ui.components.VoiceWarningBanner
 import com.macrophage.barspeed.ui.components.rememberArmedDelivery
 import com.macrophage.barspeed.ui.components.velocityLossColor
 import kotlinx.coroutines.delay
@@ -323,6 +324,7 @@ fun RecordScreen(
             // beginSet, so the set it leaves unprotected is IN_SET by the
             // time the service reports, and the rest after it is no safer.
             state.foregroundFailure?.let { ForegroundRefusalBanner(it) }
+            VoiceWarningBanner(state.voiceStatus, state.mediaVolumeZero, state.audioCues || state.guidedSet)
             when (state.stage) {
                 Stage.SETUP -> SetupStage(state, viewModel, hideResumeDialog)
                 Stage.PREVIEW -> PreviewStage(state, viewModel)

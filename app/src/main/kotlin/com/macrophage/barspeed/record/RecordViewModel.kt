@@ -126,6 +126,7 @@ import com.macrophage.barspeed.model.UnwrittenClose
 import com.macrophage.barspeed.model.VelocityLossRegime
 import com.macrophage.barspeed.model.VoiceCue
 import com.macrophage.barspeed.model.VoiceMilestonePolicy
+import com.macrophage.barspeed.model.VoiceStatus
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.model.armedCaptureOf
 import kotlinx.coroutines.CancellationException
@@ -3965,6 +3966,15 @@ data class RecordState(
      */
     val foregroundFailure: ForegroundStartFailure? = null,
     /**
+     * Whether the speech engine can speak, and whether the media volume it
+     * plays on was 0 at the last session or set start. Mirrored from
+     * `VoiceCounter` by `mirrorVoiceHealth`; `VoiceHealth.warning` turns them
+     * into the Record screen's one-line warning (UX review 2026-11-06, voice
+     * F1 and F3).
+     */
+    val voiceStatus: VoiceStatus = VoiceStatus.STARTING,
+    val mediaVolumeZero: Boolean = false,
+    /**
      * The [roster] the set in progress was armed with, frozen by `inSetState`
      * when it began, or null before the session's first set.
      *
@@ -4813,6 +4823,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         }
         viewModelScope.mirrorBodyWeight(container.settings, stateFlow)
         viewModelScope.mirrorPrepOverrides(container.settings, stateFlow)
+        viewModelScope.mirrorVoiceHealth(voice, stateFlow)
         viewModelScope.mirrorSensorSettings(container.settings, container.deviceRegistry, stateFlow) { address ->
             autoConnect.setSecondaryImuAddress(address)
         }

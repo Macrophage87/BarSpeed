@@ -17,6 +17,17 @@
 
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
 
+    <!--
+        Package visibility for the speech engine (API 30+). VoiceCounter asks
+        whether any engine is installed after a failed init, to tell "no
+        speech engine" from "engine failed"; without this the query sees none.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+
     <application
         android:name=".LiftingApp"
         android:allowBackup="true"
