@@ -2720,6 +2720,28 @@ private fun InSetStage(state: RecordState, viewModel: RecordViewModel) {
 }
 
 /**
+ * The only (or both) bar sensor has stopped delivering, so the count has
+ * frozen: said once out loud and drawn large enough to read from the bench
+ * (UX review 2026-11-06, BLE F1). Nothing while the sensor delivers. Both
+ * sensor-counted stages draw it, since the voice says it on both;
+ * [SensorLossPolicy] is the rule.
+ */
+@Composable
+private fun SensorLostBanner(state: RecordState) {
+    if (!state.sensorLoss.lost) return
+    Spacer(Modifier.height(10.dp))
+    Card(Modifier.fillMaxWidth()) {
+        Text(
+            SensorLossPolicy.BANNER,
+            Modifier.padding(12.dp),
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = BarColors.Amber,
+        )
+    }
+}
+
+/**
  * In-set display for a set the SENSOR is counting: the count the voice is
  * saying, the live velocity, one button for the rep the detector missed, the
  * end controls, and the per-rep bars.
@@ -2738,21 +2760,7 @@ private fun SensorCountedSetStage(state: RecordState, viewModel: RecordViewModel
     var lastRepTapAtMs by remember { mutableStateOf<Long?>(null) }
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         InSetHeader(state, slot)
-        // The only (or both) bar sensor has stopped delivering, so the count
-        // below has frozen; said once out loud and drawn large enough to read
-        // from the bench (UX review 2026-11-06, BLE F1). SensorLossPolicy.
-        if (state.sensorLoss.lost) {
-            Spacer(Modifier.height(10.dp))
-            Card(Modifier.fillMaxWidth()) {
-                Text(
-                    SensorLossPolicy.BANNER,
-                    Modifier.padding(12.dp),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = BarColors.Amber,
-                )
-            }
-        }
+        SensorLostBanner(state)
         Spacer(Modifier.height(10.dp))
         // The count. The SAME field the voice was handed, so the number on
         // screen is the number that was spoken (#252).
@@ -3049,6 +3057,7 @@ private fun ExplosiveSetStage(state: RecordState, viewModel: RecordViewModel, sl
     val plannedReps = if (state.adHoc) state.repsInput.toIntOrNull() else slot?.reps
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         InSetHeader(state, slot)
+        SensorLostBanner(state)
         Spacer(Modifier.height(10.dp))
         // The SPOKEN count, not `live.repCount` (#286). The tracker's own count
         // is a second statement of the pairing rule and the voice no longer says
@@ -3116,6 +3125,19 @@ private fun ExplosiveSetStage(state: RecordState, viewModel: RecordViewModel, sl
             )
         }
         Spacer(Modifier.height(24.dp))
+        // The banner above tells the lifter to count by hand, and this stage
+        // has no correction button otherwise, so it is offered while the
+        // sensor is lost: the same `+1 REP` correction, through the same
+        // `addManualRep`, as the straight-reps stage (BLE F1).
+        if (state.sensorLoss.lost && state.setWrite == SetWriteState.NONE) {
+            OutlinedButton(
+                onClick = viewModel::addManualRep,
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+            ) {
+                Text("+1 REP THE SENSOR MISSED", style = MaterialTheme.typography.titleMedium)
+            }
+            Spacer(Modifier.height(10.dp))
+        }
         EndSetControl(state, viewModel)
     }
 }
