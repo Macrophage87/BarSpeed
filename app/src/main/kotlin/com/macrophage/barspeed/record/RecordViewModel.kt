@@ -1612,8 +1612,9 @@ private fun CoroutineScope.mirroredGuidedRunner(
  * then; the next tick after waking shows the true remainder instead of
  * resuming where it stopped. Each sleep runs to the next whole second of the
  * period, `RestClockPolicy.msToNextTick`. A state carrying no start instant
- * (none should reach here) is given one that reproduces its remainder, so it
- * counts on as before rather than reading zero.
+ * -- the rest a CANCEL SET puts back, see [cancelledSetState] -- is given one
+ * that reproduces its seeded remainder at the moment the loop starts, so it
+ * counts on from that seed rather than from the original rest's start.
  *
  * THE CUE USES THE SAME CLOCK: `RestClockPolicy.cueOnTick` says the digit or
  * "Rest over" for the remainder this tick computed, once, as it is crossed.
@@ -3534,6 +3535,11 @@ internal fun cancelledSetState(now: RecordState): RecordState? {
         explosiveUpStroke = back.explosiveUpStroke,
         explosiveDownStroke = back.explosiveDownStroke,
         restRemainingS = (back.restRemainingS - now.setElapsedS).coerceAtLeast(0),
+        // Dropped so the countdown rebuilds a start that matches the seed above
+        // (rest is a minimum: the cancelled set's seconds are not rest). Kept,
+        // the original start would pull the first tick down by the lead-in and
+        // could say a digit or "Rest over" a second after the cancel.
+        restStartedAtMs = null,
         cancelTo = null,
     )
 }
@@ -3900,7 +3906,9 @@ data class RecordState(
     val restTotalS: Int = 0,
     /**
      * When the rest on screen started, the instant [restRemainingS] is counted
-     * from (UX review 2026-11-06, rest F10); null outside a rest's lifetime.
+     * from (UX review 2026-11-06, rest F10). Null before the first rest, and
+     * after a CANCEL SET, whose rest is re-seeded from the remainder instead
+     * (see [cancelledSetState]); the countdown then rebuilds a matching start.
      */
     val restStartedAtMs: Long? = null,
     /** RPE the lifter picked for the just-finished set (rest screen), if any. */
