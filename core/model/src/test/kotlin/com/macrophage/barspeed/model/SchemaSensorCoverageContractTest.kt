@@ -76,7 +76,7 @@ class SchemaSensorCoverageContractTest {
         assertFalse("so `silent` does not name it" in fellBack, "the false absolute about silent is still stated")
         assertTrue("named in `silent` only when its link was not delivering" in fellBack, "fellBack: when named")
         val silent = sensorDescription("silent")
-        assertTrue("or, FROM 1.26 (#242, #287), were moved off" in silent.substringBefore(" keyed by role"))
+        assertTrue("or, FROM 1.26 (#242, #287), for a short span" in silent.substringBefore(" keyed by role"))
         assertTrue("Until 1.26 the row was written only where" in silent, "silent: written-only-where unqualified")
         assertTrue("or one that never moved while its partner did" in silent, "silent: the still unit")
     }
@@ -176,9 +176,60 @@ class SchemaSensorCoverageContractTest {
         )
         assertTrue("could not stand for the set while another could" in shippedPrompt)
         assertTrue(
-            "one the analysis moved off for a short span or for never moving, but only when its link was not" in
-                shippedPrompt,
+            "or, from export 1.26, it was moved off for a short span or for never moving -- but only when its " +
+                "link was not delivering as the set ended" in shippedPrompt,
             "the prompt's silent definition still says too few frames alone",
+        )
+    }
+
+    /**
+     * Review round 3 (lens A BLK-1 and N2, lens B B2 and N2): the delivering
+     * exception was stated for the 1.26 causes only. `ArmedSilencePolicy`
+     * drops a role reading DELIVERING whatever it was refused for, so a unit
+     * refused for too few frames whose last frame landed inside the three
+     * seconds before the set ended is not named either, on a set of any
+     * length -- `ArmedCaptureTest` pins that through the stored reading. The
+     * exception is now stated once for every cause, in `silent`, in
+     * `soleSilent` and in the prompt.
+     */
+    @Test
+    fun `silent and soleSilent qualify every refusal cause by delivery`() {
+        val silent = sensorDescription("silent")
+        assertFalse(
+            "no armed unit was refused for too few frames to analyse --" in silent,
+            "silent's ABSENT sentence still exempts the too-few cause from the delivering drop",
+        )
+        assertFalse("as the last paragraph here says" in silent, "silent still counts to a paragraph")
+        val opener = silent.substringBefore(" keyed by role")
+        assertTrue("the analysis refused" in opener, "silent's opener: $opener")
+        assertTrue("NOT delivering as the set ended" in opener, "silent's opener: $opener")
+        val absent = silent.substringAfter("ABSENT means").substringBefore(" Absence has")
+        assertTrue("for too few frames to analyse, or from 1.26" in absent, "silent's ABSENT sentence: $absent")
+        assertTrue("on a set of any length" in absent, "silent's ABSENT sentence: $absent")
+        assertTrue(
+            "Whatever the cause, a role is named only when its link was not delivering as the set ended" in silent,
+            "silent's 1.26 sentence still qualifies the new causes alone",
+        )
+
+        val sole = sensorDescription("soleSilent")
+        assertFalse(
+            "one that sent one to seven frames and stopped IS named here" in sole,
+            "soleSilent still says a handful of frames is always named",
+        )
+        val soleAbsent = sole.substringAfter("ABSENT means").substringBefore(" It is the same FUNCTION")
+        assertTrue("on a set of any length" in soleAbsent, "soleSilent's ABSENT sentence: $soleAbsent")
+        assertTrue(
+            "named here only when its link was not delivering as the set ended" in soleAbsent,
+            "soleSilent's ABSENT sentence: $soleAbsent",
+        )
+
+        assertTrue(
+            "whose link was not delivering as the set ended -- that third shape" in shippedPrompt,
+            "the prompt says a one-sensor set with too few frames always publishes the block",
+        )
+        assertTrue(
+            "publishes this block too, unless its link was still delivering as the set ended" in shippedPrompt,
+            "the prompt's absent-sensors sentence still says too few frames always publishes the block",
         )
     }
 }
