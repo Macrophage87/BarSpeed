@@ -327,11 +327,14 @@ that replay at that commit.
 
 **Ruling.** On 2026-11-06 the owner was offered three options: a separately flagged depth estimate,
 keep withholding, or look for another signal first. He chose **keep withholding**. Loosening
-the caps would publish depths that could be off by about 0.3 m, and no reference depth exists to
-check an estimate against. The schema's `summary.meanRom_m` description now tells a consumer to
+the caps would leave drift that nothing limits: at 0.05-0.10 m/s2 over a 4 s interval,
+`0.5 * b * dt^2` is 0.4-0.8 m. No reference depth exists to check an estimate against either. The schema's `summary.meanRom_m` description now tells a consumer to
 expect the figure absent on bar-mounted back squats.
 
 **Adjacent and not changed here:** about half of every squat stream's frames repeat the frame
 before them exactly, so the unique rate is about 50 Hz at a nominal 99 Hz. The `romSpread_pct`
 description's statement that no seated leg curl rep is bounded is contradicted by this export's
-leg curl sets. That statement was measured on the committed leg-curl fixtures, not on these sets.
+leg curl sets. That statement was measured on the committed leg-curl fixtures, not on these sets. The
+`meanRom_m` description's "on a real working set the bar never goes quiet enough" was narrowed
+to the captures it was measured on for the same reason, since this export bounds working leg curl
+sets.
