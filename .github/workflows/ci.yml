@@ -5,6 +5,9 @@ on:
     branches: ["main", "claude/**"]
   pull_request:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -22,7 +25,7 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
 
       - name: ktlint + detekt
         run: ./gradlew ktlintCheck detekt --stacktrace
@@ -41,11 +44,11 @@ jobs:
 
       - name: Validate JSON schemas and examples
         run: |
-          npx --yes -p ajv-cli@5 -p ajv-formats@2 ajv validate -c ajv-formats --spec=draft2020 \
+          npx --yes -p ajv-cli@5.0.0 -p ajv-formats@2.1.1 ajv validate -c ajv-formats --spec=draft2020 \
             -s docs/schemas/plan.schema.json -d docs/schemas/examples/plan.example.json
-          npx --yes -p ajv-cli@5 -p ajv-formats@2 ajv validate -c ajv-formats --spec=draft2020 \
+          npx --yes -p ajv-cli@5.0.0 -p ajv-formats@2.1.1 ajv validate -c ajv-formats --spec=draft2020 \
             -s docs/schemas/session-export.schema.json -d docs/schemas/examples/session-export.example.json
-          npx --yes -p ajv-cli@5 -p ajv-formats@2 ajv validate -c ajv-formats --spec=draft2020 \
+          npx --yes -p ajv-cli@5.0.0 -p ajv-formats@2.1.1 ajv validate -c ajv-formats --spec=draft2020 \
             -s docs/schemas/raw-meta.schema.json -d docs/schemas/examples/raw-meta.example.json
 
       - name: Upload debug APK
