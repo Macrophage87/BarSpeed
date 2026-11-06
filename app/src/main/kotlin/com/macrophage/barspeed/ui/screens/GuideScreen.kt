@@ -139,13 +139,18 @@ private val SECTIONS =
                 "reps, or you, tapping +1 REP, when no sensor is connected. " +
                 "If the sensor misses a rep, tap +1 REP THE SENSOR MISSED and it keeps counting. " +
                 "Holds and carries run on a clock instead. " +
-                "End the set by tapping how hard it felt. Stopped before the target? " +
-                "It is recorded as short of target automatically. " +
-                "END SET EARLY ends it with no rating.",
+                "End the set by tapping how hard it felt. Tapping the reps yourself and stopped " +
+                "before the target? It is recorded as short of target automatically, and " +
+                "END SET EARLY ends it with no rating. On a tempo set or a hold, the red button " +
+                "ends it early as a failure; the rating comes once it is done. On a sensor-counted set, " +
+                "END SET ends it unrated and the rest screen asks how it felt. Started by mistake? " +
+                "CANCEL SET, during the get-ready or before the first rep, throws the set away " +
+                "with nothing saved.",
         ),
         GuideSection(
             "Rest",
-            "Fix the last set's reps, load or rating here, or mark it a warm-up. " +
+            "Fix count (Fix time on a hold) corrects the last set's reps, load or rating, or " +
+                "marks it a warm-up. " +
                 "CHANGE NEXT SET edits what comes next, and the Prep buttons set the get-ready " +
                 "time. Equipment busy? SWITCH EXERCISE. After the last planned set: ADD SET, or " +
                 "FINISH SESSION, which asks how the whole session felt.",
