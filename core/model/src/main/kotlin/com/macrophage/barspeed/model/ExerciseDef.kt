@@ -521,12 +521,54 @@ data class ExerciseDef(
          * `"start"` overrides it per exercise.
          */
         fun inferStartPhase(id: String): StartPhase {
+            START_PHASE_BY_ID[id.lowercase()]?.let { return it }
             val tokens = tokens(id)
-            return if (CONCENTRIC_START_HINTS.any { tokens.name(it) }) {
-                StartPhase.CONCENTRIC
-            } else {
-                StartPhase.ECCENTRIC
+            return when {
+                LOWERING_FIRST_VETO.any { tokens.name(it) } -> StartPhase.ECCENTRIC
+                CONCENTRIC_START_HINTS.any { tokens.name(it) } -> StartPhase.CONCENTRIC
+                else -> StartPhase.ECCENTRIC
             }
         }
+
+        /**
+         * Exact ids whose start the hints get backwards, checked against where
+         * each lift begins rather than against a word in its id. Wins over
+         * every hint, the way [STACK_MOUNTED_IDS] states one fact per id
+         * (core-model review 2026-11-06, F1).
+         *
+         * CONCENTRIC: the lifter starts with the load at rest and the first
+         * movement is the drive -- the leg extension's stack is down with the
+         * knees bent, a step-up starts on the floor, a glute bridge and a
+         * sit-up start lying down, the pec deck and hip abduction start open,
+         * a kickback starts with the elbow bent, and a seated dumbbell or
+         * Arnold press starts with the bells at the shoulders, as
+         * `shoulder_press` already does through its hint.
+         *
+         * ECCENTRIC: the load starts overhead or the body starts upright, and
+         * the first movement lowers it -- "overhead" is a hint for the press
+         * and "curl" for the arm curl, and neither describes these.
+         *
+         * Every value here reaches stored rows through [CustomExerciseRepair],
+         * which compares a row against this function.
+         */
+        private val START_PHASE_BY_ID: Map<String, StartPhase> =
+            listOf(
+                "leg_extension", "step_up", "glute_bridge", "sit_up", "hip_abduction", "pec_deck",
+                "tricep_kickback", "triceps_kickback", "seated_dumbbell_press", "arnold_press",
+            ).associateWith { StartPhase.CONCENTRIC } +
+                listOf(
+                    "overhead_squat", "overhead_tricep_extension", "overhead_triceps_extension",
+                    "nordic_curl", "jefferson_curl",
+                ).associateWith { StartPhase.ECCENTRIC }
+
+        /**
+         * Words that make any id an RDL-style lift, which starts standing and
+         * lowers first whatever else the id says -- the seed's
+         * `romanian_deadlift` is ECCENTRIC, and without this "deadlift" and
+         * "snatch" made `dumbbell_romanian_deadlift` and `snatch_grip_rdl`
+         * CONCENTRIC. `stiff_leg` rather than `stiff`, so a straight-arm
+         * `stiff_arm_pulldown` keeps its drive-first answer.
+         */
+        private val LOWERING_FIRST_VETO = listOf("romanian", "rdl", "stiff_leg", "stiff_legged")
     }
 }
