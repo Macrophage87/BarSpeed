@@ -22,6 +22,7 @@ jobs:
     env:
       # secrets are not usable in step-level `if`; surface via env instead.
       KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
     steps:
       - uses: actions/checkout@v7
 
@@ -84,3 +85,22 @@ jobs:
             release-artifacts/BarSpeed-*.aab
             release-artifacts/BarSpeed-*-mapping.txt
           generate_release_notes: true
+
+      # Continuous delivery to the Play internal testing track, the owner's
+      # only tester list. Skipped, not failed, until the PLAY_SERVICE_ACCOUNT_JSON
+      # secret exists, so a release still publishes to GitHub before Play is
+      # set up. Play's API cannot create an app: the first bundle for
+      # com.macrophage.barspeed must be uploaded by hand in Play Console, and
+      # every later release uploads here. Pinned by SHA (v1.1.5) because the
+      # step holds the service account key.
+      - name: Upload bundle to Play internal testing
+        if: ${{ env.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.macrophage.barspeed
+          releaseFiles: release-artifacts/BarSpeed-*.aab
+          mappingFile: app/build/outputs/mapping/release/mapping.txt
+          track: internal
+          status: completed
+          releaseName: ${{ github.event.inputs.tag || github.ref_name }}
