@@ -128,19 +128,19 @@ blend of two mountings.
   returns. A set ended by tap has none -- `endSet` cancels the sample
   collectors before it reads the clock, so its last sample is never later
   than the tap -- and that covers a tap-ended guided set (`Stopped`). An
-  unguided rep set carries no word that bounds it: with the voice on it records
-  the `Rep N` / `Last rep` milestones (no planned count, as on every
-  sensor-counted set, or a lifter who stops short of it), and on a
-  sensor-counted set also the tempo digits where a tempo was prescribed
-  with no cadence to play it, and `No count` where the live count was
-  withheld (#280); none of these bounds the set. With the voice off it
-  records nothing; or, at a reached planned count, `Done` as the rep-count
-  milestone (#285), which is not a call to stop lifting and opens no
-  closing window, though the lifter's extra reps past it are samples past
-  a cue `calledOver` counts as terminal. A clock-ended timed set (`Time`)
-  has none either: the tick that speaks `Time` calls `endSet`, which
-  cancels the collectors first -- read from source; no clock-ended set has
-  been measured.
+  unguided rep set carries no word that bounds it. With the voice on it
+  records the `Rep N` / `Last rep` milestones (no planned count, as on
+  every sensor-counted set, or a lifter who stops short of it), or, at a
+  reached planned count, `Done` as the rep-count milestone (#285), which
+  is not a call to stop lifting and opens no closing window, though the
+  lifter's extra reps past it are samples past a cue `calledOver` counts
+  as terminal; on a sensor-counted set it also records the tempo digits
+  where a tempo was prescribed with no cadence to play it, and `No count`
+  where the live count was withheld (#280). None of these bounds the set.
+  With the voice off it records nothing.
+  A clock-ended timed set (`Time`) has none either: the tick that speaks
+  `Time` calls `endSet`, which cancels the collectors first -- read from
+  source; no clock-ended set has been measured.
   Field-41 set 21, a hang ended by tap at 5 s of 30, is the tap case: its
   last sample is 33 ms before its write. Each of those has no closing
   window, so the default below refuses it. Session 32's five failed sets were
