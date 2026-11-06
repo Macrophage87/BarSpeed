@@ -1,5 +1,6 @@
 package com.macrophage.barspeed.ui.screens
 
+import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -79,6 +80,7 @@ import com.macrophage.barspeed.model.CountingPolicy
 import com.macrophage.barspeed.model.DualSensorSetup
 import com.macrophage.barspeed.model.EffortAsk
 import com.macrophage.barspeed.model.EffortClaim
+import com.macrophage.barspeed.model.EffortGridSlipGuard
 import com.macrophage.barspeed.model.EffortScale
 import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.ExitAction
@@ -2536,6 +2538,8 @@ private fun InSetStage(state: RecordState, viewModel: RecordViewModel) {
 @Composable
 private fun SensorCountedSetStage(state: RecordState, viewModel: RecordViewModel, slot: PlannedSlot?) {
     val plannedReps = if (state.adHoc) state.repsInput.toIntOrNull() else slot?.reps
+    // When +1 was last tapped, for the grid's slip guard (EffortGridSlipGuard).
+    var lastRepTapAtMs by remember { mutableStateOf<Long?>(null) }
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         InSetHeader(state, slot)
         Spacer(Modifier.height(10.dp))
@@ -2583,14 +2587,19 @@ private fun SensorCountedSetStage(state: RecordState, viewModel: RecordViewModel
         // from that moment, so a live-looking 72dp target would do nothing.
         if (state.setWrite == SetWriteState.NONE) {
             OutlinedButton(
-                onClick = confirmTap(viewModel::addManualRep),
+                onClick = confirmTap {
+                    lastRepTapAtMs = SystemClock.uptimeMillis()
+                    viewModel.addManualRep()
+                },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
             ) {
                 Text("+1 REP THE SENSOR MISSED", style = MaterialTheme.typography.titleMedium)
             }
-            Spacer(Modifier.height(10.dp))
+            // Clear space between the counting button and the grid whose
+            // every tile ends the set (record-live F2); ManualSetStage's too.
+            Spacer(Modifier.height(24.dp))
         }
-        EndSetControl(state, viewModel)
+        EndSetControl(state, viewModel, lastRepTapAtMs)
         Spacer(Modifier.height(16.dp))
         LiveRepBars(state, slot)
     }
@@ -2764,6 +2773,8 @@ private fun startCueFor(state: RecordState, slot: PlannedSlot?): StartCue {
 @Composable
 private fun ManualSetStage(state: RecordState, viewModel: RecordViewModel, slot: PlannedSlot?) {
     val plannedReps = if (state.adHoc) state.repsInput.toIntOrNull() else slot?.reps
+    // When +1 was last tapped, for the grid's slip guard (EffortGridSlipGuard).
+    var lastRepTapAtMs by remember { mutableStateOf<Long?>(null) }
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         InSetHeader(state, slot)
         Spacer(Modifier.height(10.dp))
@@ -2798,12 +2809,18 @@ private fun ManualSetStage(state: RecordState, viewModel: RecordViewModel, slot:
         // moment, so leaving the button drawn would be a 72dp target that
         // silently does nothing, right where the lifter's thumb already is.
         if (state.setWrite == SetWriteState.NONE) {
-            Button(onClick = confirmTap(viewModel::addManualRep), modifier = Modifier.fillMaxWidth().height(72.dp)) {
+            Button(
+                onClick = confirmTap {
+                    lastRepTapAtMs = SystemClock.uptimeMillis()
+                    viewModel.addManualRep()
+                },
+                modifier = Modifier.fillMaxWidth().height(72.dp),
+            ) {
                 Text("+1 REP", style = MaterialTheme.typography.titleLarge)
             }
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(24.dp))
         }
-        EndSetControl(state, viewModel)
+        EndSetControl(state, viewModel, lastRepTapAtMs)
     }
 }
 
@@ -3124,7 +3141,7 @@ private fun velocityColor(phase: Phase): Color = when (phase) {
  * of them.
  */
 @Composable
-private fun EndSetControl(state: RecordState, viewModel: RecordViewModel) {
+private fun EndSetControl(state: RecordState, viewModel: RecordViewModel, lastRepTapAtMs: Long? = null) {
     when (state.setWrite) {
         SetWriteState.IN_FLIGHT -> SavingSetNotice()
         SetWriteState.FAILED -> UnsavedSetNotice(viewModel)
@@ -3143,7 +3160,12 @@ private fun EndSetControl(state: RecordState, viewModel: RecordViewModel) {
             SetEndControlPolicy.drawOrder(controls).forEach { control ->
                 when (control) {
                     SetEndControl.EFFORT_GRID ->
-                        EndSetRpeGrid(state, viewModel, failedTile = SetEndControl.FAILED_TILE in controls)
+                        EndSetRpeGrid(
+                            state,
+                            viewModel,
+                            failedTile = SetEndControl.FAILED_TILE in controls,
+                            lastRepTapAtMs = lastRepTapAtMs,
+                        )
                     SetEndControl.END_FAILED ->
                         FailSetButton(state, viewModel, gridBelow = SetEndControl.EFFORT_GRID in controls)
                     SetEndControl.END_UNRATED ->
@@ -3364,7 +3386,12 @@ private fun EndSetUnratedButton(viewModel: RecordViewModel) {
  * on the path a miscounted rep total arrives on.
  */
 @Composable
-private fun EndSetRpeGrid(state: RecordState, viewModel: RecordViewModel, failedTile: Boolean) {
+private fun EndSetRpeGrid(
+    state: RecordState,
+    viewModel: RecordViewModel,
+    failedTile: Boolean,
+    lastRepTapAtMs: Long?,
+) {
     val options =
         rpeOptions(
             state.currentIsTimed,
@@ -3386,12 +3413,13 @@ private fun EndSetRpeGrid(state: RecordState, viewModel: RecordViewModel, failed
             modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
         ) {
             row.forEach { option ->
-                RpeTile(
-                    option,
-                    selected = false,
-                    modifier = Modifier.weight(1f),
-                    onClick = confirmTap { viewModel.endSet(SetRating(option.rpe, failed = option.failed)) },
-                )
+                // Built here, run only once the slip guard accepts the tap: a
+                // thumb that slips off +1 REP lands on this grid, and that tap
+                // must neither end the set nor buzz as if it had (record-live F2).
+                val endWithBuzz = confirmTap { viewModel.endSet(SetRating(option.rpe, failed = option.failed)) }
+                RpeTile(option, selected = false, modifier = Modifier.weight(1f)) {
+                    if (EffortGridSlipGuard.accepts(SystemClock.uptimeMillis(), lastRepTapAtMs)) endWithBuzz()
+                }
             }
             if (row.size == 1) Spacer(Modifier.weight(1f))
         }
