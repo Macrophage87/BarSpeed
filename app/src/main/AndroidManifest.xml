@@ -36,6 +36,28 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!--
+                A plan handed over from another app: "Open with" on a .json
+                file, or the share sheet with the file or with its text. Both
+                land in the Plans import gate (IncomingPlan); nothing is
+                approved without the lifter's tap there. text/plain is here
+                because many file managers and chat apps label a .json that
+                way; a path-pattern filter on *.json is not used, since
+                content:// uris rarely carry the file name.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:mimeType="application/json" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/json" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
         </activity>
 
         <!--

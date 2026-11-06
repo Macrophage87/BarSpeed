@@ -7,12 +7,16 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavType
@@ -51,6 +55,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         gate.refresh(hasBlePermissions(), shouldShowBleRationale())
         ensureAsked()
+        // A recreated Activity is handed the intent it was launched with
+        // again; that plan was already taken into the gate the first time.
+        if (savedInstanceState == null) receivePlan(intent)
+        // launchMode singleTop: a share while the app is open arrives here.
+        addOnNewIntentListener { receivePlan(it) }
         setContent {
             LiftingTheme {
                 CompositionLocalProvider(
@@ -77,6 +86,15 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         gate.refresh(hasBlePermissions(), shouldShowBleRationale())
+    }
+
+    /**
+     * "Open with BarSpeed" or a share (UX review 2026-11-06, plans F1). Only
+     * the hand-off is recorded here; reading, staging and the approval gate
+     * are the Plans screen's, the same as for a picked file.
+     */
+    private fun receivePlan(intent: Intent?) {
+        IncomingPlan.from(intent)?.let(IncomingPlanInbox::offer)
     }
 
     /** The first ask of the process. Silent once anything has been asked. */
@@ -145,6 +163,25 @@ private fun AppNav() {
     LaunchedEffect(navController) {
         navController.currentBackStackEntryFlow.collect { entry ->
             CurrentScreen.route = entry.destination.route
+        }
+    }
+    // A plan handed in from outside goes to Plans, where its ViewModel takes it
+    // into the import gate. Not while Record is on the stack: navigating over
+    // a session in progress would strand it, so the plan waits in the inbox
+    // and is staged when Plans next opens.
+    val incomingPlan by IncomingPlanInbox.pending.collectAsState()
+    val context = LocalContext.current
+    LaunchedEffect(incomingPlan) {
+        if (incomingPlan == null) return@LaunchedEffect
+        val recording = runCatching { navController.getBackStackEntry("record") }.isSuccess
+        if (recording) {
+            Toast.makeText(context, "Plan received. Open Plans after this session to review it.", Toast.LENGTH_LONG)
+                .show()
+        } else {
+            navController.navigate("plans") {
+                popUpTo("home")
+                launchSingleTop = true
+            }
         }
     }
     NavHost(navController = navController, startDestination = "home") {

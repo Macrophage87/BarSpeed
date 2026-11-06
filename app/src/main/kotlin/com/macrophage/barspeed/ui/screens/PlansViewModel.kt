@@ -5,6 +5,8 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.macrophage.barspeed.IncomingPlan
+import com.macrophage.barspeed.IncomingPlanInbox
 import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.data.PlanEntity
 import com.macrophage.barspeed.data.PlanImportResult
@@ -12,6 +14,7 @@ import com.macrophage.barspeed.model.BodyWeightPromptPolicy
 import com.macrophage.barspeed.model.PlanLifecycle
 import com.macrophage.barspeed.model.PlanStartDecision
 import com.macrophage.barspeed.model.PlanStartPolicy
+import com.macrophage.barspeed.model.PlanTextIntake
 import com.macrophage.barspeed.model.WeightUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -20,6 +23,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -188,20 +192,33 @@ class PlansViewModel(app: Application) : AndroidViewModel(app) {
 
     /** File-based import: read the picked document's text, then validate as usual. */
     fun importFromUri(context: Context, uri: Uri) {
-        viewModelScope.launch {
-            val text =
-                withContext(Dispatchers.IO) {
-                    runCatching {
-                        context.contentResolver.openInputStream(uri)?.use {
-                            it.bufferedReader().readText()
-                        }
-                    }.getOrNull()
+        viewModelScope.launch { stageDocument(context, uri) }
+    }
+
+    /**
+     * Read a document under [PlanTextIntake]'s size cap and stage it, or show
+     * why it was not read. Shared by the picker and "Open with"/share, so a
+     * plan reaching the gate by any route is read the same way.
+     */
+    private suspend fun stageDocument(context: Context, uri: Uri) {
+        val outcome =
+            withContext(Dispatchers.IO) {
+                try {
+                    PlanTextIntake.read(context.contentResolver.openInputStream(uri))
+                } catch (e: Exception) {
+                    // A revoked grant, a provider that is gone, a uri that
+                    // names nothing: all of them are "could not read", and none
+                    // of them may take the app down from a share.
+                    PlanTextIntake.Outcome.Refused(PlanTextIntake.UNREADABLE)
                 }
-            if (text.isNullOrBlank()) {
-                importResult.value = PlanImportResult.Invalid(listOf("Could not read the selected file."))
-            } else {
-                stage(text)
             }
+        stageOutcome(outcome)
+    }
+
+    private suspend fun stageOutcome(outcome: PlanTextIntake.Outcome) {
+        when (outcome) {
+            is PlanTextIntake.Outcome.Text -> stage(outcome.text)
+            is PlanTextIntake.Outcome.Refused -> importResult.value = PlanImportResult.Invalid(listOf(outcome.message))
         }
     }
 
@@ -271,5 +288,29 @@ class PlansViewModel(app: Application) : AndroidViewModel(app) {
 
     fun delete(planId: Long) {
         viewModelScope.launch { repository.delete(planId) }
+    }
+
+    /**
+     * A plan handed over by "Open with" or the share sheet (UX review
+     * 2026-11-06, plans F1) goes through [stage] exactly as a picked file
+     * does, so it lands in the same approval gate with the same warnings.
+     * Nothing here approves it.
+     *
+     * Collected for the life of this ViewModel, so a plan that arrives while
+     * the Plans screen is already open is staged too, not only one that
+     * arrived before it opened. Last in the class on purpose: viewModelScope
+     * dispatches immediately, so this can run during construction, and every
+     * property it reaches must already be initialised.
+     */
+    init {
+        viewModelScope.launch {
+            IncomingPlanInbox.pending.filterNotNull().collect {
+                when (val incoming = IncomingPlanInbox.take()) {
+                    is IncomingPlan.Text -> stageOutcome(PlanTextIntake.ofText(incoming.text))
+                    is IncomingPlan.Document -> stageDocument(getApplication<Application>(), incoming.uri)
+                    null -> {}
+                }
+            }
+        }
     }
 }
