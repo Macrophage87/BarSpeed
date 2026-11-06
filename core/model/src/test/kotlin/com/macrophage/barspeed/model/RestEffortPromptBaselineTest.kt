@@ -30,6 +30,7 @@ class RestEffortPromptBaselineTest {
                     assertNull(
                         RestEffortPromptPolicy.prompt(
                             timed = false,
+                            sensorCounted = false,
                             rpe = rpe,
                             tappedFailed = tapped,
                             derivedFailed = derived,
@@ -52,6 +53,7 @@ class RestEffortPromptBaselineTest {
                     assertNull(
                         RestEffortPromptPolicy.prompt(
                             timed = timed,
+                            sensorCounted = false,
                             rpe = rpe,
                             tappedFailed = tapped,
                             derivedFailed = false,

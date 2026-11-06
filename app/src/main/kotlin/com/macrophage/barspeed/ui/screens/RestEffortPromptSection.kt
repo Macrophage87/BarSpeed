@@ -22,7 +22,9 @@ import com.macrophage.barspeed.ui.components.SectionCaption
 
 /**
  * "How hard was that set?", asked on the rest screen about a hold that ran its
- * clock and was never asked (#283).
+ * clock and was never asked (#283) -- and, since the UX review of 2026-11-06
+ * (record-live F6), about a sensor-counted rep set ended with END SET, which
+ * skipped the in-set grid on purpose. Same tiles and taps; the rep ladder.
  *
  * ## Nothing here decides anything
  *
@@ -141,6 +143,9 @@ internal fun RestEffortPromptSection(state: RecordState, viewModel: RecordViewMo
     val timed = feedback.actualDurationS != null
     RestEffortPromptPolicy.prompt(
         timed = timed,
+        // A sensor-counted set reaches here unrated only by END SET, which
+        // left this question for the rest (UX review 2026-11-06, record-live F6).
+        sensorCounted = feedback.sensorCounted,
         rpe = state.lastSetRpe,
         tappedFailed = state.lastSetTappedFailed,
         // The shortfall the app worked out for itself: the effective verdict

@@ -40,6 +40,7 @@ class RestEffortPromptDifferentialTest {
         assertNull(
             RestEffortPromptPolicy.prompt(
                 timed = true,
+                sensorCounted = false,
                 rpe = null,
                 tappedFailed = true,
                 derivedFailed = false,
@@ -57,6 +58,7 @@ class RestEffortPromptDifferentialTest {
         assertNull(
             RestEffortPromptPolicy.prompt(
                 timed = true,
+                sensorCounted = false,
                 rpe = null,
                 tappedFailed = true,
                 derivedFailed = true,
@@ -75,6 +77,7 @@ class RestEffortPromptDifferentialTest {
         assertNull(
             RestEffortPromptPolicy.prompt(
                 timed = true,
+                sensorCounted = false,
                 rpe = null,
                 tappedFailed = false,
                 derivedFailed = true,
@@ -92,6 +95,7 @@ class RestEffortPromptDifferentialTest {
         assertNotNull(
             RestEffortPromptPolicy.prompt(
                 timed = true,
+                sensorCounted = false,
                 rpe = null,
                 tappedFailed = false,
                 derivedFailed = false,
@@ -101,29 +105,51 @@ class RestEffortPromptDifferentialTest {
     }
 
     @Test
-    fun `only an unrated timed set with no failure standing is asked`() {
+    fun `only an unrated timed or sensor-counted set with no failure standing is asked`() {
         // The contract over the whole cross product the policy takes, so that
-        // widening it in any of the four inputs is a visible failure here and
+        // widening it in any of the five inputs is a visible failure here and
         // not a case nobody enumerated.
         for (timed in listOf(false, true)) {
-            for (rpe in listOf(null, 1, 6, 10)) {
-                for (tapped in listOf(false, true)) {
-                    for (derived in listOf(false, true)) {
-                        val asked =
-                            RestEffortPromptPolicy.prompt(
-                                timed = timed,
-                                rpe = rpe,
-                                tappedFailed = tapped,
-                                derivedFailed = derived,
-                            ) != null
-                        assertEquals(
-                            timed && rpe == null && !tapped && !derived,
-                            asked,
-                            "wrong ask: timed=$timed rpe=$rpe tapped=$tapped derived=$derived",
-                        )
+            for (sensorCounted in listOf(false, true)) {
+                for (rpe in listOf(null, 1, 6, 10)) {
+                    for (tapped in listOf(false, true)) {
+                        for (derived in listOf(false, true)) {
+                            val asked =
+                                RestEffortPromptPolicy.prompt(
+                                    timed = timed,
+                                    sensorCounted = sensorCounted,
+                                    rpe = rpe,
+                                    tappedFailed = tapped,
+                                    derivedFailed = derived,
+                                ) != null
+                            assertEquals(
+                                (timed || sensorCounted) && rpe == null && !tapped && !derived,
+                                asked,
+                                "wrong ask: timed=$timed sensor=$sensorCounted rpe=$rpe " +
+                                    "tapped=$tapped derived=$derived",
+                            )
+                        }
                     }
                 }
             }
         }
+    }
+
+    @Test
+    fun `a sensor-counted set ended with END SET is asked how hard it was`() {
+        // UX review 2026-11-06, record-live F6: END SET ends a sensor-counted
+        // set with no rating so the lifter can walk away from the bar; the
+        // question it skipped is asked here instead. The only other unrated
+        // way such a set reaches rest is none: the grid rates it and the
+        // failure tile stands as tappedFailed.
+        assertNotNull(
+            RestEffortPromptPolicy.prompt(
+                timed = false,
+                sensorCounted = true,
+                rpe = null,
+                tappedFailed = false,
+                derivedFailed = false,
+            ),
+        )
     }
 }

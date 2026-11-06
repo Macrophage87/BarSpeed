@@ -3323,8 +3323,8 @@ internal const val END_SET_EARLY_CAPTION =
  *
  * Not END SET EARLY, because on this set nothing is early: no shortfall is
  * derived from a sensor count, and the lifter may simply be done and not want
- * to rate at the bar. The rating is then given on the rest screen, where the
- * effort row reads Not rated and CORRECT opens the same grid.
+ * to rate at the bar. The rest screen then asks "How hard was that set?"
+ * (`RestEffortPromptPolicy`, keyed on `SetFeedback.sensorCounted`).
  */
 @Composable
 private fun EndSetUnratedButton(viewModel: RecordViewModel) {
@@ -3335,7 +3335,7 @@ private fun EndSetUnratedButton(viewModel: RecordViewModel) {
         Text("END SET", style = MaterialTheme.typography.titleLarge)
     }
     Spacer(Modifier.height(6.dp))
-    SectionCaption("Ends the set without a rating · rate it with CORRECT while you rest")
+    SectionCaption("Ends the set without a rating · you're asked how it felt while you rest")
 }
 
 /**

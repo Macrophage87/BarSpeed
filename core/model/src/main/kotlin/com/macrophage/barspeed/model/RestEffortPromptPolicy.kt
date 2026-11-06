@@ -91,9 +91,18 @@ data object RestEffortPrompt
  *    write. That set is not asked either. Read from source; no test here can
  *    execute either caller.
  *
+ * ## The one rep set that IS asked
+ *
+ * A SENSOR-COUNTED rep set with no rating and no failure (UX review
+ * 2026-11-06, record-live F6). Its in-set controls include END SET, which ends
+ * it with no rating so the lifter can leave the bar unasked; this is where
+ * the question it skipped is put. The grid rates such a set and its failure
+ * tile stands as `tappedFailed`, so END SET is the only way one arrives here
+ * unrated.
+ *
  * ## What is deliberately NOT widened
  *
- * A REP set owes nothing here whatever it carries, and after the owner's rule
+ * Any other REP set owes nothing here whatever it carries, and after the owner's rule
  * the two reasons have merged into one shape. A rep set that WAS rated was
  * rated at the moment it ended, because there the grid is the end-set control.
  * A rep set that reached rest unrated did so by leaving -- END SET EARLY, or a
@@ -115,6 +124,8 @@ object RestEffortPromptPolicy {
      * owes none.
      *
      * @param timed the set was measured on the clock -- a hold or a carry.
+     * @param sensorCounted the set's reps were counted by the sensor
+     *   (`SetEndKind.SENSOR_COUNTED`); unrated, it was ended with END SET.
      * @param rpe the rating standing on the row, null where none does.
      * @param tappedFailed the lifter's own failure verdict, already stored.
      * @param derivedFailed the app judged the set short of its target and the
@@ -124,7 +135,13 @@ object RestEffortPromptPolicy {
      *   cross-product pin unable to tell which of them a later change stopped
      *   reading.
      */
-    fun prompt(timed: Boolean, rpe: Int?, tappedFailed: Boolean, derivedFailed: Boolean): RestEffortPrompt? = when {
+    fun prompt(
+        timed: Boolean,
+        sensorCounted: Boolean,
+        rpe: Int?,
+        tappedFailed: Boolean,
+        derivedFailed: Boolean,
+    ): RestEffortPrompt? = when {
         // A set already carrying a rating has answered this question. First,
         // so that a timed set which DID reach the in-set grid is not asked
         // twice, and so that the prompt closes itself the moment the tap
@@ -141,10 +158,14 @@ object RestEffortPromptPolicy {
         // to deliver, nothing asked how it felt while it was ending, so the
         // question is asked afterwards or not at all.
         timed -> RestEffortPrompt
-        // A rep set was rated at the moment it ended, because there the grid
-        // IS the end-set control. Written out rather than folded into the line
-        // above, so that widening this to an unrated rep set is a visible
-        // change to this branch.
+        // A sensor-counted rep set that reached rest unrated was ended with
+        // END SET, which exists so the lifter can leave the bar without rating
+        // and be asked here instead (UX review 2026-11-06, record-live F6).
+        sensorCounted -> RestEffortPrompt
+        // Any other rep set was rated at the moment it ended, because there
+        // the grid IS the end-set control. Written out rather than folded into
+        // the line above, so that widening this to an unrated rep set is a
+        // visible change to this branch.
         else -> null
     }
 }

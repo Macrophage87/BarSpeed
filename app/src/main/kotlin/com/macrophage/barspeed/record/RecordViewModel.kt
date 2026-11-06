@@ -495,6 +495,12 @@ data class SetFeedback(
     /** Olympic-lift style set: peak velocity is the headline metric. */
     val explosive: Boolean = false,
     /**
+     * The SENSOR counted this set's reps (`SetEndKind.SENSOR_COUNTED`). Read by
+     * the rest screen's effort question, which asks such a set when it arrives
+     * unrated -- it was ended with END SET (UX review 2026-11-06, record-live F6).
+     */
+    val sensorCounted: Boolean = false,
+    /**
      * Which question this set's velocity loss answers, and therefore which
      * figure the rest screen leads with (#250).
      *
@@ -2809,6 +2815,9 @@ private fun restingState(
             plannedDurationS = p.targetDurationS,
             side = p.side,
             explosive = p.exercise.kind == ExerciseKind.EXPLOSIVE,
+            // Off the in-set state, which still describes the set being
+            // written: the stage stays IN_SET until this state replaces it.
+            sensorCounted = s.setEndKind == SetEndKind.SENSOR_COUNTED,
             // Off the FROZEN geometry, which is what the row stores and what
             // the exporter re-derives the published word from -- so the chip
             // the lifter reads between sets and the word the coach reads in
