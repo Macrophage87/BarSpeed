@@ -60,9 +60,27 @@ object VoiceMilestonePolicy {
         /** `"Last rep"` one before the planned count and `"Done"` at it. */
         CALLS_SET_OVER,
 
-        /** The sensor's: every rep is named, and nothing calls the set over. */
+        /**
+         * The sensor's: every rep is named, `"Rep 4, last rep"` one before the
+         * planned count, `"Rep 5, target"` at it, and nothing calls the set
+         * over (owner's ruling 2026-11-06).
+         *
+         * "Last rep" means what it means on every other set: the rep about to
+         * be done is the final planned one. The tap counter says it as rep
+         * N-1 completes and the guide says it opening rep N, so both say it
+         * BEFORE the final rep is lifted; this says it at the same moment as
+         * the tap counter. The number stays in front because the sensor's
+         * count is the one that can be wrong, and the lifter hears which
+         * count it has reached.
+         */
         MARKS_TARGET,
     }
+
+    /** What follows `"Rep N"` at the planned count on a sensor-counted set. */
+    const val TARGET_SUFFIX = ", target"
+
+    /** What follows `"Rep N"` one before the planned count on a sensor-counted set. */
+    const val LAST_REP_SUFFIX = ", last rep"
 
     /**
      * What is said as rep [repCount] completes, or null where nothing is said
@@ -81,7 +99,13 @@ object VoiceMilestonePolicy {
         milestones: Milestones = Milestones.CALLS_SET_OVER,
     ): String? {
         if (repCount == announcedRep || repCount == 0) return null
-        if (milestones == Milestones.MARKS_TARGET) return "Rep $repCount"
+        if (milestones == Milestones.MARKS_TARGET) {
+            return when {
+                plannedReps != null && repCount == plannedReps -> "Rep $repCount$TARGET_SUFFIX"
+                plannedReps != null && repCount == plannedReps - 1 -> "Rep $repCount$LAST_REP_SUFFIX"
+                else -> "Rep $repCount"
+            }
+        }
         return when {
             plannedReps != null && repCount == plannedReps -> "Done"
             plannedReps != null && repCount == plannedReps - 1 && plannedReps > 1 -> "Last rep"
