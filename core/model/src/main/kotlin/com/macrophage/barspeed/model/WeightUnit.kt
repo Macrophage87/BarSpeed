@@ -28,8 +28,13 @@ enum class WeightUnit(val suffix: String) {
         return "$text $suffix"
     }
 
-    /** Parse user input given in this unit, returning kilograms. */
-    fun parseToKg(text: String): Double? = text.trim().toDoubleOrNull()?.let { toKg(it) }
+    /**
+     * Parse user input given in this unit, returning kilograms, or null when
+     * the text is not a finite number. A comma is read as the decimal point,
+     * because a comma-decimal phone's number pad types "52,5".
+     */
+    fun parseToKg(text: String): Double? =
+        text.trim().replace(',', '.').toDoubleOrNull()?.takeIf { it.isFinite() }?.let { toKg(it) }
 
     /** Numeric value for pre-filling input fields, rounded to 0.1. */
     fun inputValue(kg: Double): String {
