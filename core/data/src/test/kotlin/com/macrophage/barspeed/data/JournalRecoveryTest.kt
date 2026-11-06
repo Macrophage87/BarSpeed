@@ -641,6 +641,21 @@ class JournalRecoveryTest {
         assertFalse(orphan.directory.exists(), "the capture of a stored set was kept")
     }
 
+    /**
+     * The stored check runs before the re-analysis (#100 review round 3,
+     * Lens A N2), but not before the wait: while a recording write is
+     * outstanding nothing is decided, and the capture of a stored set stays.
+     */
+    @Test
+    fun `a stored set's capture is kept while a recording write is outstanding`() = runTest {
+        val dao = ownSession(endedAtMs = null)
+        dao.sets += row(3, 7, 2, startedAtMs, startedAtMs + 50_000L)
+        val orphan = journaled()
+        assertEquals(RecoveryOutcome.Waiting, recovery(dao).recover(orphan, writeOutstanding = true))
+        assertEquals(3, dao.sets.size)
+        assertTrue(orphan.directory.exists(), "the capture went while a write was outstanding")
+    }
+
     /** The journal is removed only after the row write lands; a write that fails leaves the only copy. */
     @Test
     fun `a write that fails keeps the capture`() = runTest {
