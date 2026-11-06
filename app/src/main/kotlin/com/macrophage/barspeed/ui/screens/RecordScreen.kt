@@ -52,6 +52,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -94,6 +95,7 @@ import com.macrophage.barspeed.model.GuidedRepCaption
 import com.macrophage.barspeed.model.HistoryTarget
 import com.macrophage.barspeed.model.Implement
 import com.macrophage.barspeed.model.ImplementLoad
+import com.macrophage.barspeed.model.LastSetRecordPolicy
 import com.macrophage.barspeed.model.LatestSession
 import com.macrophage.barspeed.model.LeadInPolicy
 import com.macrophage.barspeed.model.LiveCountReadout
@@ -3643,18 +3645,18 @@ private fun EndSetRpeGrid(state: RecordState, viewModel: RecordViewModel, failed
  * by when it happened.
  *
  * The rest countdown and START NEXT SET are the two things this screen exists
- * for (#153), and [RestHeader] now puts them in the same row: [StartNextSetButton]
- * sits beside the ring rather than at the foot of [NextSetBlock], because they
- * are the only two facts a lifter needs before the phone comes off the floor.
- * After the last planned set, [StartNextSetButton] draws nothing in this row
- * and [SessionCloseControls] becomes the filled, primary control below instead
- * (#195); adding a set through [AddSetSection] brings START back to this row,
- * since there is a slot to run again.
+ * for (#153), and [RestHeader] draws them together: the ring, then
+ * [RestPrimarySlot] full width directly under it (UX review 2026-11-06, rest
+ * F11), because they are the only two facts a lifter needs before the phone
+ * comes off the floor. After the last planned set START is withheld (#195) and
+ * FINISH SESSION takes its slot (rest F6) rather than sitting below the fold;
+ * adding a set through [AddSetSection] brings START back, since there is a
+ * slot to run again.
  * Everything about the set that had just finished -- what it was, and every
  * correction to it -- sits below the next-set block, in [LastSetDetail]. Since
- * #237 that is a BOX stating the record in one line, a Correct button, and a
+ * #237 that is a BOX stating the record in one line and a
  * rep-quality card carrying a 64dp chart; the six inline correction rows that
- * stood there are inside the popup the button opens. THREE things are still drawn
+ * stood there are inside the popup the Fix count button in [RestHeader] opens. THREE things are still drawn
  * above it, and all three for the same reason. The first is
  * [RestEffortPromptSection] (#283), the effort question a set nothing asked at
  * its end is asked here instead -- which is a hold that RAN ITS CLOCK, because
@@ -3687,13 +3689,16 @@ private fun EndSetRpeGrid(state: RecordState, viewModel: RecordViewModel, failed
  * fit above the fold on a phone. What is below the fold is the detail rather
  * than the control.
  *
- * [SessionCloseControls] does NOT follow [StartNextSetButton] to the top. It
- * stays after [NextSetBlock], where it has sat since the next-set block was
- * consolidated (#152), because in `SessionCloseState.FAILED` it draws THIS
- * SESSION DID NOT FINISH and the retry, and putting a session-ending control
- * directly beside a repeatedly-tapped START would recreate the stacked-target
- * hazard #137 removed elsewhere on this screen. Keeping it separated by the
- * whole next-set block, rather than adjacent to START, is the point.
+ * [SessionCloseControls] does NOT follow START to the top while START is
+ * drawn. It stays after [NextSetBlock], where it has sat since the next-set
+ * block was consolidated (#152), because in `SessionCloseState.FAILED` it
+ * draws THIS SESSION DID NOT FINISH and the retry, and putting a
+ * session-ending control directly beside a repeatedly-tapped START would
+ * recreate the stacked-target hazard #137 removed elsewhere on this screen.
+ * Only once START is withheld is there nothing to stack against, and then the
+ * finish (and the rating it asks for) moves into START's slot; the failed-close
+ * notice and its retry stay where they were. [RestControlPolicy.startSlot]
+ * decides which.
  */
 @Composable
 internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
@@ -3709,6 +3714,13 @@ internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     // Keyed like `dismissed`, so a row opened in one rest is folded again in
     // the next.
     var expanded by remember(state.setsCompleted) { mutableStateOf(false) }
+    // The correction popup's open flag, hoisted out of LastSetDetail so the
+    // button that opens it can sit in the header's Last set column, above the
+    // fold (UX review 2026-11-06, rest F5). Keyed on setsCompleted for the
+    // reason it was keyed there: a popup left open when the next set ends must
+    // close rather than carry a stale set's draft into the following rest.
+    var correcting by remember(state.setsCompleted) { mutableStateOf(false) }
+    val startSlot = RestControlPolicy.startSlot(restControls(state))
     val timed = state.lastFeedback?.actualDurationS != null
     // `changing` is passed FALSE and no longer exists as state (#237). It was
     // the lifter's own tap on the reason ROW, and the row is gone: every
@@ -3737,7 +3749,12 @@ internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
         } else {
             SetLimiterPagePlacement.NONE
         }
-    RestHeader(state, viewModel)
+    RestHeader(
+        state,
+        viewModel,
+        startSlot = startSlot,
+        onFixCount = if (state.lastFeedback != null) ({ correcting = true }) else null,
+    )
     Spacer(Modifier.height(6.dp))
     // FIRST of the three things drawn above the fold, and above the limiter
     // page deliberately (#283). A hold that runs its clock out is never asked
@@ -3833,7 +3850,7 @@ internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     // Decides nothing itself; see [NextSetNudgeSection].
     NextSetNudgeSection(state, viewModel)
     NextSetBlock(state, viewModel)
-    SessionCloseControls(state, viewModel)
+    SessionCloseControls(state, viewModel, inStartSlot = startSlot)
     Spacer(Modifier.height(16.dp))
     // `onReasonRetracted` is the second half of what [LimiterPage]'s CLEAR
     // foot does -- it runs `limitLastSet(null)` AND `onSkip()`. Without it a
@@ -3843,6 +3860,8 @@ internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
         state = state,
         viewModel = viewModel,
         timed = timed,
+        correcting = correcting,
+        onCloseCorrection = { correcting = false },
         onReasonRetracted = { dismissed = true },
     )
 }
@@ -3920,11 +3939,16 @@ private fun restControls(state: RecordState): RestControls = RestControlPolicy.r
 )
 
 /**
- * Begin the next set, when beginning one is a thing that may be done.
+ * The rest screen's primary slot, full width under the ring: START NEXT SET
+ * while there is a set to start, and after the last planned set whatever
+ * replaces it -- FINISH SESSION, then the session rating it asks for (UX
+ * review 2026-11-06, rest F6). Which one is [RestControlPolicy.startSlot]'s
+ * answer, and [SessionCloseControls] skips that same answer, so the two cannot
+ * both draw one control.
  *
- * Both rest layouts route through this rather than drawing the button twice,
- * which is what makes the gate a gate: a second copy is a second place for it to
- * be missing from.
+ * Both rest layouts route START through here rather than drawing the button
+ * twice, which is what makes the gate a gate: a second copy is a second place
+ * for it to be missing from.
  *
  * `startNextSet` writes READY and calls `beginSet` in the same frame — the
  * foreground service starts, the collectors attach, the stage becomes IN_SET. A
@@ -3932,21 +3956,46 @@ private fun restControls(state: RecordState): RestControls = RestControlPolicy.r
  * service while the lifter is under a loaded bar with the buffers filling, on a
  * screen that has no way to end a set.
  *
- * `heightIn(min = ...)`, not a fixed `height`, since #153 (issue #153): the
- * button now sits in the narrow column beside the 110dp ring rather than the
- * full screen width, so "START NEXT SET" wraps to two lines at font scale 2.
- * A fixed 52dp height clipped the second line; a minimum lets the button grow
- * to fit its own text while keeping the 52dp floor as the tap target.
+ * FULL WIDTH AND AT LEAST 64dp (rest F11), the size of the in-set controls: it
+ * is the most-tapped control between sets and was a 52dp half-width button
+ * beside the ring. `heightIn`, not `height`, for #153's reason: a raised font
+ * scale wraps the label and a fixed height clips it.
+ *
+ * THE EMPHASIS MOVES WITH THE CLOCK. While the rest runs START is tonal (dark
+ * green, accent text); at REST OVER it fills with the accent. Rest is a
+ * minimum, so the louder state is the one where starting is what is due. The
+ * label does not change. FINISH SESSION here is filled: with no set left,
+ * finishing is what is due. Whether any of this fits above the fold on a
+ * phone is a [Field] question; nothing here has been rendered on a device.
  */
 @Composable
-private fun StartNextSetButton(state: RecordState, viewModel: RecordViewModel) {
-    if (RestControl.START_NEXT_SET !in restControls(state).controls) return
-    Button(
-        onClick = confirmTap(viewModel::startNextSet),
-        // An ad-hoc rest draws AdHocForm, whose load box says why (record-setup F4).
-        enabled = !state.adHocLoadRefused(),
-        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-    ) { Text("START NEXT SET", textAlign = TextAlign.Center) }
+private fun RestPrimarySlot(state: RecordState, viewModel: RecordViewModel, slot: RestControl?) {
+    val big = Modifier.fillMaxWidth().heightIn(min = 64.dp)
+    when (slot) {
+        RestControl.START_NEXT_SET -> {
+            val colors =
+                if (state.restRemainingS == 0) {
+                    ButtonDefaults.buttonColors()
+                } else {
+                    ButtonDefaults.buttonColors(containerColor = BarColors.HeroGreen, contentColor = BarColors.Volt)
+                }
+            Button(
+                onClick = confirmTap(viewModel::startNextSet),
+                // An ad-hoc rest draws AdHocForm, whose load box says why (record-setup F4).
+                enabled = !state.adHocLoadRefused(),
+                modifier = big,
+                colors = colors,
+            ) {
+                Text("START NEXT SET", style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+            }
+        }
+        RestControl.FINISH_SESSION ->
+            Button(onClick = confirmTap(viewModel::askSessionRpe), modifier = big) {
+                Text("FINISH SESSION", style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+            }
+        RestControl.RATE_SESSION -> SessionRpePanel(viewModel)
+        else -> Unit
+    }
 }
 
 /**
@@ -3959,7 +4008,14 @@ private fun StartNextSetButton(state: RecordState, viewModel: RecordViewModel) {
  * layer in — guarding the way out while leaving these live is not a guard.
  */
 @Composable
-private fun SessionCloseControls(state: RecordState, viewModel: RecordViewModel) {
+private fun SessionCloseControls(
+    state: RecordState,
+    viewModel: RecordViewModel,
+    // The control the rest screen's primary slot already draws, if any (UX
+    // review 2026-11-06, rest F6). Skipped here so it is drawn once. READY
+    // passes nothing and draws everything, as before.
+    inStartSlot: RestControl? = null,
+) {
     // Both blocks now ask [restControls], which carries askedToFinish for
     // everything: the rating panel still takes the finish control's place, and
     // the START membership it returns is the same the one-argument form gave
@@ -3967,7 +4023,7 @@ private fun SessionCloseControls(state: RecordState, viewModel: RecordViewModel)
     // that equality in :core:model, which is what made the move safe.
     val screen = restControls(state)
     val controls = screen.controls
-    if (RestControl.FINISH_SESSION in controls) {
+    if (RestControl.FINISH_SESSION in controls && inStartSlot != RestControl.FINISH_SESSION) {
         if (screen.primary == RestControl.FINISH_SESSION) {
             // Filled, because there is no next set to start and finishing is
             // what is left to do. Drawn from the same answer that withheld
@@ -3984,7 +4040,7 @@ private fun SessionCloseControls(state: RecordState, viewModel: RecordViewModel)
             }
         }
     }
-    if (RestControl.RATE_SESSION in controls) {
+    if (RestControl.RATE_SESSION in controls && inStartSlot != RestControl.RATE_SESSION) {
         SessionRpePanel(viewModel)
     }
     if (RestControl.RETRY_FINISH in controls) {
@@ -4012,7 +4068,7 @@ private fun SessionCloseControls(state: RecordState, viewModel: RecordViewModel)
  * Two rows of five rather than one row of ten. At 360dp with font scale 2 a
  * ten-across row gives each number about 32dp of width before padding, which is
  * under the 48dp tap-target floor; five across is roughly 64dp. `heightIn(min =
- * 52.dp)` rather than a fixed height for the reason [StartNextSetButton] uses
+ * 52.dp)` rather than a fixed height for the reason [RestPrimarySlot] uses
  * one: a fixed height clips at large font scales instead of growing.
  *
  * SKIPPABLE WITHOUT FRICTION, which is the owner's rule and is why the skip is
@@ -4358,14 +4414,34 @@ internal fun RpeTile(option: RpeOption, selected: Boolean, modifier: Modifier = 
     }
 }
 
+/** The rest ring at font scale 1; see [RestHeader] for why it grows. */
+private val REST_RING_DIAMETER = 156.dp
+
+/** The font scale past which the rest ring stops growing. */
+private const val REST_RING_MAX_FONT_SCALE = 1.3f
+
 @Composable
-internal fun RestHeader(state: RecordState, viewModel: RecordViewModel) {
+internal fun RestHeader(
+    state: RecordState,
+    viewModel: RecordViewModel,
+    startSlot: RestControl?,
+    onFixCount: (() -> Unit)?,
+) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         val total = state.restTotalS.takeIf { it > 0 } ?: 1
+        // The countdown is the number read from the bench, so it is drawn at
+        // 48sp (UX review 2026-11-06, accessibility F6; it was 26sp in a 110dp
+        // ring). The ring grows with the font scale up to 1.3x so "12:34" at
+        // that scale still sits inside the stroke: 48sp x 1.3 is about 62dp
+        // tall and five tabular glyphs about 156dp wide, whose half-diagonal
+        // is about 84dp against the 92dp inner radius of a 204dp ring. That is
+        // arithmetic on typical glyph widths, not a measurement; above 1.3x
+        // the ring stops growing so the Last set column keeps some width.
+        val fontScale = LocalDensity.current.fontScale.coerceIn(1f, REST_RING_MAX_FONT_SCALE)
         ProgressRing(
             progress = state.restRemainingS / total.toFloat(),
-            diameter = 110.dp,
-            strokeWidth = 9.dp,
+            diameter = REST_RING_DIAMETER * fontScale,
+            strokeWidth = 10.dp,
         ) {
             // Words at zero, digits above it. Since #172 a rest can already be
             // over when this screen first draws -- the period runs from the
@@ -4377,21 +4453,18 @@ internal fun RestHeader(state: RecordState, viewModel: RecordViewModel) {
             // before: the voice cue for the end of the rest is the countdown
             // loop's, and a period seeded at zero never enters that loop.
             if (state.restRemainingS == 0) {
-                Text("REST OVER", style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                Text("REST OVER", style = MaterialTheme.typography.titleLarge, maxLines = 1, color = BarColors.Volt)
             } else {
-                Text(formatMmSs(state.restRemainingS), style = MaterialTheme.typography.headlineMedium)
+                Text(
+                    formatMmSs(state.restRemainingS),
+                    style = MaterialTheme.typography.displayMedium.copy(fontSize = 48.sp, lineHeight = 52.sp),
+                    maxLines = 1,
+                    softWrap = false,
+                )
             }
         }
         Spacer(Modifier.padding(horizontal = 8.dp))
         Column(Modifier.weight(1f)) {
-            // The two things a resting lifter acts on -- how long is left, and
-            // go -- are the first things on screen. StartNextSetButton is
-            // unconditional here rather than gated on lastFeedback below: the
-            // button's own visibility already comes from RestControlPolicy, so
-            // nothing extra is needed to keep it hidden in SessionClose states
-            // where starting is not allowed.
-            StartNextSetButton(state, viewModel)
-            Spacer(Modifier.height(6.dp))
             SectionCaption("Last set")
             state.lastFeedback?.let { feedback ->
                 // effectiveLoadKg / effectiveAddedKg, not loadKg / addedKg:
@@ -4444,9 +4517,26 @@ internal fun RestHeader(state: RecordState, viewModel: RecordViewModel) {
                         style = MaterialTheme.typography.titleMedium,
                     )
                 }
+                // The way into the correction popup, beside the figure it
+                // corrects and above the fold (UX review 2026-11-06, rest F5).
+                // It sat at the foot of the screen labelled CORRECT, which
+                // reads as a verdict on the set rather than an action; a
+                // sensor miscount is the commonest fix, so the label names it.
+                if (onFixCount != null) {
+                    OutlinedButton(onClick = onFixCount, contentPadding = ButtonDefaults.TextButtonContentPadding) {
+                        Text(LastSetRecordPolicy.fixLabel(timed = feedback.actualDurationS != null))
+                    }
+                }
             }
         }
     }
+    // The two things a resting lifter acts on -- how long is left, and go --
+    // are the first things on screen. The slot is unconditional here rather
+    // than gated on lastFeedback: what it draws comes from RestControlPolicy,
+    // so nothing extra is needed to keep START hidden in SessionClose states
+    // where starting is not allowed.
+    Spacer(Modifier.height(8.dp))
+    RestPrimarySlot(state, viewModel, startSlot)
     // Moved out of the column beside the ring so the pills get the whole
     // screen width rather than what is left after the ring and the button's
     // column -- see FeedbackChips' own KDoc for the arithmetic this changes.

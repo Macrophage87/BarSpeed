@@ -7,7 +7,8 @@
 // one tap away at all times, which made the set just finished read as a FORM;
 // what was lifted, for how many and how it went was spread across the rows
 // instead of stated once. It is now a BOX in the shape of the "Up next" card
-// stating the record in one line, one Correct button, and a popup holding the
+// stating the record in one line, one Correct button (since UX review
+// 2026-11-06 "Fix count", in RestHeader), and a popup holding the
 // six corrections. What a correction DOES is unchanged: the popup's confirm
 // calls the same RecordViewModel methods the rows called, and
 // LastSetCorrections.kt is untouched.
@@ -116,16 +117,17 @@ internal fun LastSetDetail(
     state: RecordState,
     viewModel: RecordViewModel,
     timed: Boolean,
+    correcting: Boolean,
+    onCloseCorrection: () -> Unit,
     onReasonRetracted: () -> Unit,
 ) {
     val feedback = state.lastFeedback ?: return
-    var correcting by remember(state.setsCompleted) { mutableStateOf(false) }
+    // The button that opens the popup is in RestHeader's Last set column,
+    // above the fold, labelled "Fix count" (UX review 2026-11-06, rest F5);
+    // its open flag is RestingStage's, keyed on setsCompleted as it was here.
     LastSetCard(state, feedback)
-    OutlinedButton(onClick = { correcting = true }, modifier = Modifier.fillMaxWidth()) {
-        Text("CORRECT", color = BarColors.Sub)
-    }
     if (correcting) {
-        CorrectionDialog(state, feedback, viewModel, timed, onReasonRetracted) { correcting = false }
+        CorrectionDialog(state, feedback, viewModel, timed, onReasonRetracted, onCloseCorrection)
     }
     Spacer(Modifier.height(6.dp))
     RepQualityCard(feedback)
