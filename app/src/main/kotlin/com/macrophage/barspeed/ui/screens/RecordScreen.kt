@@ -38,6 +38,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -50,6 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -100,6 +102,7 @@ import com.macrophage.barspeed.model.RepCallNotePolicy
 import com.macrophage.barspeed.model.RestControl
 import com.macrophage.barspeed.model.RestControlPolicy
 import com.macrophage.barspeed.model.RestControls
+import com.macrophage.barspeed.model.ScreenOnPolicy
 import com.macrophage.barspeed.model.SensorAdvice
 import com.macrophage.barspeed.model.SensorAdvicePolicy
 import com.macrophage.barspeed.model.SensorCapturePolicy
@@ -194,6 +197,18 @@ fun RecordScreen(
     // CONTINUE from Home answers the dialog itself; drawing it meanwhile
     // would flash a question the lifter has already answered.
     val hideResumeDialog = !entryDone && entry == RecordEntry.CONTINUE
+
+    // The phone sits on a bench through the set and the rest; the system
+    // display timeout would blank the readout and the rest clock mid-glance
+    // (UX review 2026-11-06, record-live F1). Which stages hold it is
+    // ScreenOnPolicy's. The flag is on this screen's View, so leaving Record
+    // releases it with the dispose; no wake lock is taken.
+    val view = LocalView.current
+    val keepOn = ScreenOnPolicy.keepsScreenOn(state.stage)
+    DisposableEffect(view, keepOn) {
+        view.keepScreenOn = keepOn
+        onDispose { view.keepScreenOn = false }
+    }
 
     // Back has two routes out of this screen — the top bar's button and the
     // system gesture — and the lifter uses whichever is nearer the thumb, so a
