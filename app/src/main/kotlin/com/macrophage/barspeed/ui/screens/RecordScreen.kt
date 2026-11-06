@@ -411,7 +411,12 @@ private fun exitTitle(prompt: ExitPrompt, unwritten: UnwrittenClose?): String = 
     -> SessionNotClosedCopy.title(unwritten ?: UNKNOWN_UNWRITTEN)
 }
 
-private fun exitBody(prompt: ExitPrompt, unwritten: UnwrittenClose?): String = when (prompt) {
+/**
+ * The exit prompt's body for [prompt]. `internal` rather than private so
+ * `ShortOfTargetCopyTest` in `app/src/test` can read the words without a
+ * composable; nothing else here changes.
+ */
+internal fun exitBody(prompt: ExitPrompt, unwritten: UnwrittenClose?): String = when (prompt) {
     ExitPrompt.NONE -> ""
     // Names the save-and-end control that is already on this screen, below the
     // fold: without it the choice reads as "lose the set or stay", which is a
@@ -3295,8 +3300,11 @@ internal fun EndSetEarlyButton(viewModel: RecordViewModel) {
         Text("END SET EARLY", style = MaterialTheme.typography.titleLarge, color = BarColors.Red)
     }
     Spacer(Modifier.height(6.dp))
-    SectionCaption("Ends the set with no rating · a set that came up short logs as failed")
+    SectionCaption(END_SET_EARLY_CAPTION)
 }
+
+/** What END SET EARLY's caption says, a constant so `ShortOfTargetCopyTest` can read it. */
+internal const val END_SET_EARLY_CAPTION = "Ends the set with no rating · a set that came up short logs as failed"
 
 /**
  * The effort grid IS the end-set control. Tapping how the set felt ends the set
