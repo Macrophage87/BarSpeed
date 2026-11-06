@@ -70,6 +70,7 @@ import com.macrophage.barspeed.model.LiveFallback
 import com.macrophage.barspeed.model.LiveFallbackPolicy
 import com.macrophage.barspeed.model.LiveFeed
 import com.macrophage.barspeed.model.LiveFeedPolicy
+import com.macrophage.barspeed.model.NextSetCall
 import com.macrophage.barspeed.model.NextSetInputs
 import com.macrophage.barspeed.model.NextSetSlot
 import com.macrophage.barspeed.model.NextSetStatements
@@ -1592,7 +1593,7 @@ private fun CoroutineScope.restCountdown(stateFlow: MutableStateFlow<RecordState
                     if (remaining == RecordViewModel.REST_COUNTDOWN_FROM_S) voice()?.spanStarted()
                     when (remaining) {
                         in 1..RecordViewModel.REST_COUNTDOWN_FROM_S -> voice()?.speak(remaining.toString())
-                        0 -> voice()?.speak("Rest over")
+                        0 -> voice()?.speak(NextSetCall.restOver(stateFlow.value.nextSetPhrase()))
                     }
                 }
             }
@@ -1600,6 +1601,30 @@ private fun CoroutineScope.restCountdown(stateFlow: MutableStateFlow<RecordState
             voice()?.spanEnded()
         }
     }
+
+/**
+ * What the voice says about the next set when the rest runs out, or null when
+ * there is none (UX review 2026-11-06, voice F4).
+ *
+ * The same figures `RecordScreen`'s "Up next" card draws -- the slot under the
+ * lifter's standing statements of side, load, reps and seconds -- read at the
+ * instant the rest ends, so a change made during the rest is the one said.
+ * Null on an ad-hoc session and after the last planned set, where the card
+ * shows no next set either. The wording is [NextSetCall.phrase]'s.
+ */
+private fun RecordState.nextSetPhrase(): String? {
+    val next = nextSlot?.takeIf { !adHoc } ?: return null
+    return NextSetCall.phrase(
+        exerciseName = next.exercise.displayName,
+        bodyweight = next.exercise.bodyweight,
+        timed = next.isTimed,
+        unit = weightUnit,
+        loadKg = statedLoadKg ?: next.loadKg,
+        reps = statedReps ?: next.reps,
+        durationS = statedDurationS ?: next.durationS,
+        side = SideChoicePolicy.carriedIntoNextSet(declaredSide = next.side, statedSide = statedSide),
+    )
+}
 
 /**
  * The four instants [mirrorLinkStates] mirrors in one write (#213).
