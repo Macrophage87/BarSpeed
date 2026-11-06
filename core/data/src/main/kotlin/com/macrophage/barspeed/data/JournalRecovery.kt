@@ -14,7 +14,9 @@ import com.macrophage.barspeed.model.JournalRecoveryPolicy
 import com.macrophage.barspeed.model.PrepCase
 import com.macrophage.barspeed.model.PrepWindowPolicy
 import com.macrophage.barspeed.model.RecoveryRefusal
+import com.macrophage.barspeed.model.RecoveryTarget
 import com.macrophage.barspeed.model.SensorCapturePolicy
+import com.macrophage.barspeed.model.SessionResumePolicy
 import com.macrophage.barspeed.model.SetGeometryPolicy
 import com.macrophage.barspeed.model.VoiceCue
 import com.macrophage.barspeed.model.armedCaptureOf
@@ -74,7 +76,6 @@ internal sealed interface PreparedRecovery {
  * returns it as a sample with a wrong yaw. Everything after the last newline is
  * therefore dropped before decoding. The zip still carries those bytes.
  */
-@Suppress("UnusedPrivateProperty") // the seam's: the write lands on the next commits
 class JournalRecovery(
     private val repository: SessionRepository,
     private val store: SetJournalStore,
@@ -104,15 +105,67 @@ class JournalRecovery(
      *
      * [writeOutstanding] is whether any recording hold is held; while one is,
      * nothing is decided (`JournalRecoveryPolicy.target`).
+     *
+     * WHERE IT GOES is `JournalRecoveryPolicy.target`'s answer, asked with the
+     * newest session over `SessionResumePolicy.LOOKBACK_MS` -- the read the
+     * resume prompt makes -- and with whether a row of this exercise begun at
+     * this instant already exists in any session that could hold it. A closed
+     * session is never re-opened or rewritten: the set goes into a session of
+     * its own, begun when the set began and closed when it ended, because
+     * `endSession` writes a session's summary once and a set attached after
+     * would sit outside the numbers drawn over its own session.
+     *
+     * THE CAPTURE GOES ONLY AFTER THE ROW HAS LANDED. Every write below
+     * completes before `SetJournalStore.discard`, so a write that throws
+     * leaves the journal on disk -- the only copy of the set -- and the
+     * failure reaches the caller. A process killed between the row and the
+     * discard leaves a capture whose set is stored, which the next attempt
+     * answers AlreadyStored and removes without writing it twice.
      */
-    @Suppress("UnusedParameter")
-    suspend fun recover(orphan: OrphanedSet, writeOutstanding: Boolean): RecoveryOutcome =
-        when (val prepared = prepare(orphan)) {
-            is PreparedRecovery.Refused -> RecoveryOutcome.Refused(prepared.refusal)
-            // SEAM: nothing is written yet. The target and the write land
-            // with their differentials on the next commits.
-            is PreparedRecovery.Ready -> RecoveryOutcome.Waiting
+    suspend fun recover(orphan: OrphanedSet, writeOutstanding: Boolean): RecoveryOutcome {
+        val set =
+            when (val prepared = prepare(orphan)) {
+                is PreparedRecovery.Refused -> return RecoveryOutcome.Refused(prepared.refusal)
+                is PreparedRecovery.Ready -> prepared.set
+            }
+        val header = orphan.header
+        val now = nowMs()
+        // Every session that could hold this set: begun before it, and no
+        // earlier than the header's own session or the resume look-back,
+        // whichever reaches further. Wider than the header's session alone,
+        // because a session opened for an earlier recovery of this same
+        // capture begins at the set's own start.
+        val from = minOf(header.sessionStartedAtMs, set.startedAtMs - SessionResumePolicy.LOOKBACK_MS)
+        val stored =
+            JournalRecoveryPolicy.alreadyStored(
+                set.exerciseId,
+                set.startedAtMs,
+                repository.setsBegunInSessionsBetween(from, set.startedAtMs),
+            )
+        val latest = repository.latestSession(now - SessionResumePolicy.LOOKBACK_MS, now)
+        val target = JournalRecoveryPolicy.target(header.sessionId, latest, now, writeOutstanding, stored)
+        return when (target) {
+            RecoveryTarget.Wait -> RecoveryOutcome.Waiting
+            RecoveryTarget.AlreadyStored -> {
+                store.discard(orphan)
+                RecoveryOutcome.AlreadyStored
+            }
+            is RecoveryTarget.Attach -> {
+                repository.ensureExerciseExists(set.exerciseId)
+                val setId = repository.recordSet(target.sessionId, target.orderIdx, set)
+                store.discard(orphan)
+                RecoveryOutcome.Stored(target.sessionId, setId, newSession = false)
+            }
+            RecoveryTarget.NewSession -> {
+                repository.ensureExerciseExists(set.exerciseId)
+                val opening = SessionOpening(header.planName, header.planSessionName, set.startedAtMs, timeZone = null)
+                val written = repository.recordFirstSet(opening, JournalRecoveryPolicy.NEW_SESSION_ORDER_IDX, set)
+                repository.endSession(written.sessionId, set.endedAtMs)
+                store.discard(orphan)
+                RecoveryOutcome.Stored(written.sessionId, written.setId, newSession = true)
+            }
         }
+    }
 
     /** [orphan]'s streams read back and re-analysed into the row it would become. */
     internal fun prepare(orphan: OrphanedSet): PreparedRecovery {
