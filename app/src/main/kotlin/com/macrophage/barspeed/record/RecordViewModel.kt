@@ -4924,9 +4924,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     // are written together here and nowhere else, so a re-seed of the text
     // cannot manufacture one. An unparseable box states nothing rather than
     // stating zero -- a lifter mid-retype has not asked for a zero-rep set.
-    fun updateRepsInput(text: String) {
-        stateFlow.value = stateFlow.value.copy(repsInput = text, statedReps = text.trim().toIntOrNull())
-    }
+    fun updateRepsInput(text: String) =
+        stateFlow.value.copy(repsInput = text, statedReps = text.trim().toIntOrNull()).let { stateFlow.value = it }
 
     fun updateDurationInput(text: String) {
         stateFlow.value = stateFlow.value.copy(durationInput = text, statedDurationS = text.trim().toIntOrNull())
@@ -4945,18 +4944,13 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * Stored raw and judged by [SideChoicePolicy] at every reader, rather than
      * validated here: one rule, in the module a test runs in.
      */
-    fun stateNextSetSide(side: String?) {
-        stateFlow.value = stateFlow.value.copy(statedSide = side)
-    }
+    fun stateNextSetSide(side: String?) = stateFlow.value.copy(statedSide = side).let { stateFlow.value = it }
 
-    fun updateTempoInput(text: String) {
-        stateFlow.value = stateFlow.value.copy(tempoInput = text)
-    }
+    fun updateTempoInput(text: String) = stateFlow.value.copy(tempoInput = text).let { stateFlow.value = it }
 
     /** One tap of a tempo digit's stepper between sets; every decision is [tempoAdjustedState]'s. */
-    fun adjustTempoDigit(position: Int, value: String) {
-        stateFlow.value = tempoAdjustedState(stateFlow.value, position, value)
-    }
+    fun adjustTempoDigit(position: Int, value: String) =
+        tempoAdjustedState(stateFlow.value, position, value).let { stateFlow.value = it }
 
     /**
      * Begin recording the current set.
