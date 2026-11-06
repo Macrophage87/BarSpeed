@@ -1,0 +1,41 @@
+name: Bug report
+description: Something in the app went wrong.
+labels: ["bug"]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: Shown on the Guide screen.
+      placeholder: "0.2.1"
+    validations:
+      required: true
+  - type: input
+    id: phone
+    attributes:
+      label: Phone and Android version
+      placeholder: "Pixel 8, Android 16"
+    validations:
+      required: true
+  - type: textarea
+    id: did
+    attributes:
+      label: What you did
+      description: The screen, the exercise and set number, and the taps just before it went wrong.
+    validations:
+      required: true
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened
+      description: What you saw or heard, and what you expected instead.
+    validations:
+      required: true
+  - type: checkboxes
+    id: attached
+    attributes:
+      label: Files
+      description: If Home shows a CRASH REPORT card, tap SEND IT TO ME and attach the file. A session's raw zip (Session detail, Raw zip) helps too. Drag files into the box above.
+      options:
+        - label: Crash file attached
+        - label: Session raw zip attached
