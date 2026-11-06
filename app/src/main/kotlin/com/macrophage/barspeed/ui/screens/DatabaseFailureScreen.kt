@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.macrophage.barspeed.data.DATABASE_NAME
+import com.macrophage.barspeed.data.DatabaseRescue
 import com.macrophage.barspeed.ui.ShareUtil
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -42,7 +43,8 @@ import java.util.zip.ZipOutputStream
  * REPORT card on Home could never be tapped because Home died as it drew.
  *
  * ONE BUTTON, AND IT NEVER OPENS THE DATABASE: it zips the files at the
- * database's path, byte for byte, and hands them to the share sheet.
+ * database's path and everything in `files/rescued/`, byte for byte, and
+ * hands them to the share sheet.
  *
  * Compile- and lint-gated only; nothing here is test-gated.
  */
@@ -86,19 +88,36 @@ fun DatabaseFailureScreen(error: String) {
 }
 
 /**
- * The database's main file and whichever of its sidecars exist, zipped into
+ * The database's main file and whichever of its sidecars exist, plus
+ * everything under `files/rescued/` under a `rescued/` prefix, zipped into
  * [destination] as they lie. A partial archive is deleted rather than left
  * looking whole, as `RescuedDatabaseStore.zipTo` does for the same reason.
+ *
+ * WHY THE RESCUE DIRECTORY TOO: the launch-time route here is a rescue cut
+ * off or a restore stuck partway, and in both the history can be SPLIT --
+ * a `-wal` in a `db-<ms>` folder, the main file at the path, the journal
+ * saying which is which. Sending only the path would send half of it.
+ * Review of 14a1713.
  */
 private fun zipDatabaseFiles(context: Context, destination: File) {
     val main = context.getDatabasePath(DATABASE_NAME)
     val files = listOf("", "-wal", "-shm", "-journal").map { File(main.path + it) }.filter { it.isFile }
-    if (files.isEmpty()) throw IOException("no database file at ${main.path}")
+    val rescueRoot = File(context.filesDir, DatabaseRescue.RESCUE_DIR)
+    val rescued = rescueRoot.walkTopDown().filter { it.isFile }.sortedBy { it.path }.toList()
+    if (files.isEmpty() && rescued.isEmpty()) {
+        throw IOException("no database file at ${main.path} and nothing in ${rescueRoot.path}")
+    }
     var complete = false
     try {
         ZipOutputStream(FileOutputStream(destination)).use { zip ->
             for (file in files) {
                 zip.putNextEntry(ZipEntry(file.name))
+                file.inputStream().use { it.copyTo(zip) }
+                zip.closeEntry()
+            }
+            for (file in rescued) {
+                val name = file.relativeTo(rescueRoot).invariantSeparatorsPath
+                zip.putNextEntry(ZipEntry("${DatabaseRescue.RESCUE_DIR}/$name"))
                 file.inputStream().use { it.copyTo(zip) }
                 zip.closeEntry()
             }
