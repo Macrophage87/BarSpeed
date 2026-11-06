@@ -60,6 +60,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.macrophage.barspeed.dsp.AccelArtefact
@@ -734,10 +735,12 @@ private fun PreviewStage(state: RecordState, viewModel: RecordViewModel) {
  * "Continue this session?" (#48), raised on entry when [SessionResumePolicy]
  * found a session an earlier visit left open.
  *
- * Both answers are buttons, and neither is a dismissal in disguise. An outside
- * tap or a back press is "Start a new one", which writes nothing: the earlier
- * row stays exactly as it was, so the cheap answer is the one that cannot
- * change history. The words come from the policy, where a test reaches them;
+ * Both answers are buttons, and only the buttons answer. An outside tap or a
+ * back press does nothing and the dialog stays up (UX review 2026-11-06,
+ * home-nav F7, reliability F3): it used to count as "Start a new one", so a
+ * stray tap on the scrim while the phone was being put down split one workout
+ * across two rows, and the offer is made on entry only, so it never came back.
+ * The words come from the policy, where a test reaches them;
  * the start time is rendered here, in the phone's zone, because that is where
  * the lifter is reading it.
  */
@@ -748,7 +751,10 @@ private fun ResumeSessionDialog(offer: LatestSession, viewModel: RecordViewModel
             .atZone(ZoneId.systemDefault())
             .format(DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault()))
     AlertDialog(
-        onDismissRequest = viewModel::declineResume,
+        // Deliberately empty, with both dismissals switched off below: only
+        // the two buttons decide.
+        onDismissRequest = {},
+        properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
         title = { Text(SessionResumePolicy.TITLE) },
         text = {
             Text(
