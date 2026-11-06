@@ -3207,7 +3207,7 @@ private fun EndSetControl(state: RecordState, viewModel: RecordViewModel) {
 @Composable
 private fun CancelSetButton(viewModel: RecordViewModel) {
     Spacer(Modifier.height(6.dp))
-    TextButton(onClick = viewModel::cancelSet, modifier = Modifier.fillMaxWidth()) {
+    TextButton(onClick = confirmTap(viewModel::cancelSet), modifier = Modifier.fillMaxWidth()) {
         Text("CANCEL SET", style = MaterialTheme.typography.titleMedium, color = BarColors.Sub)
     }
     SectionCaption("Nothing is saved · the same set is next")
@@ -3383,9 +3383,12 @@ private fun EndSetRpeGrid(state: RecordState, viewModel: RecordViewModel, failed
             modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
         ) {
             row.forEach { option ->
-                RpeTile(option, selected = false, modifier = Modifier.weight(1f)) {
-                    viewModel.endSet(SetRating(option.rpe, failed = option.failed))
-                }
+                RpeTile(
+                    option,
+                    selected = false,
+                    modifier = Modifier.weight(1f),
+                    onClick = confirmTap { viewModel.endSet(SetRating(option.rpe, failed = option.failed)) },
+                )
             }
             if (row.size == 1) Spacer(Modifier.weight(1f))
         }
