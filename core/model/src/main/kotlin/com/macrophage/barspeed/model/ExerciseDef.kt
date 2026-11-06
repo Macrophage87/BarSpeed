@@ -560,8 +560,8 @@ data class ExerciseDef(
          * `"start"` overrides it per exercise.
          */
         fun inferStartPhase(id: String): StartPhase {
-            START_PHASE_BY_ID[id.lowercase()]?.let { return it }
             val tokens = tokens(id)
+            tableStart(tokens)?.let { return it }
             return when {
                 LOWERING_FIRST_VETO.any { tokens.name(it) } -> StartPhase.ECCENTRIC
                 CONCENTRIC_START_HINTS.any { tokens.name(it) } -> StartPhase.CONCENTRIC
@@ -578,8 +578,9 @@ data class ExerciseDef(
          * CONCENTRIC: the lifter starts with the load at rest and the first
          * movement is the drive -- the leg extension's stack is down with the
          * knees bent, a step-up starts on the floor, a glute bridge and a
-         * sit-up start lying down, the pec deck and hip abduction start open,
-         * a kickback starts with the elbow bent, and a seated dumbbell or
+         * sit-up start lying down, the pec deck starts with the arms open and
+         * hip abduction with the legs closed, a kickback starts bent (the
+         * elbow, or the hip on a glute kickback), and a seated dumbbell or
          * Arnold press starts with the bells at the shoulders, as
          * `shoulder_press` already does through its hint.
          *
@@ -587,18 +588,50 @@ data class ExerciseDef(
          * the first movement lowers it -- "overhead" is a hint for the press
          * and "curl" for the arm curl, and neither describes these.
          *
+         * An id that is a table id behind only [START_MODIFIERS] words takes
+         * the table's answer too -- `dumbbell_step_up`, `seated_leg_extension`,
+         * `machine_hip_abduction`, `cable_kickback` -- see [tableStart].
+         *
          * Every value here reaches stored rows through [CustomExerciseRepair],
          * which compares a row against this function.
          */
         private val START_PHASE_BY_ID: Map<String, StartPhase> =
             listOf(
                 "leg_extension", "step_up", "glute_bridge", "sit_up", "hip_abduction", "pec_deck",
-                "tricep_kickback", "triceps_kickback", "seated_dumbbell_press", "arnold_press",
+                "tricep_kickback", "triceps_kickback", "kickback", "glute_kickback",
+                "seated_dumbbell_press", "arnold_press",
             ).associateWith { StartPhase.CONCENTRIC } +
                 listOf(
                     "overhead_squat", "overhead_tricep_extension", "overhead_triceps_extension",
                     "nordic_curl", "jefferson_curl",
                 ).associateWith { StartPhase.ECCENTRIC }
+
+        /**
+         * Equipment and position words that do not change where a lift
+         * starts. Deliberately short, and every word on it is a modifier IN
+         * FRONT of the movement: "lateral", "jump" or "deficit" are not here,
+         * because each can change the movement, so `lateral_step_up` keeps
+         * the hint answer and should declare its start.
+         */
+        private val START_MODIFIERS =
+            setOf(
+                "dumbbell", "db", "barbell", "kettlebell", "kb", "cable", "machine", "band", "banded",
+                "seated", "weighted", "single", "leg", "arm", "smith",
+            )
+
+        /**
+         * [START_PHASE_BY_ID]'s answer for these tokens: the whole id, or a
+         * table id preceded only by [START_MODIFIERS] words. Matching is on
+         * whole tokens at the END of the id, so a table id with words after
+         * it (`step_up_jump`) is not matched.
+         */
+        private fun tableStart(tokens: List<String>): StartPhase? {
+            for (k in tokens.indices) {
+                if (tokens.take(k).any { it !in START_MODIFIERS }) return null
+                START_PHASE_BY_ID[tokens.drop(k).joinToString("_")]?.let { return it }
+            }
+            return null
+        }
 
         /**
          * Words that make any id an RDL-style lift, which starts standing and
@@ -608,6 +641,6 @@ data class ExerciseDef(
          * CONCENTRIC. `stiff_leg` rather than `stiff`, so a straight-arm
          * `stiff_arm_pulldown` keeps its drive-first answer.
          */
-        private val LOWERING_FIRST_VETO = listOf("romanian", "rdl", "stiff_leg", "stiff_legged")
+        private val LOWERING_FIRST_VETO = listOf("romanian", "rdl", "sldl", "stiff_leg", "stiff_legged")
     }
 }

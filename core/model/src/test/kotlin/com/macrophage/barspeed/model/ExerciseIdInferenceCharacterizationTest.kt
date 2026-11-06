@@ -310,6 +310,35 @@ class ExerciseIdInferenceCharacterizationTest {
             Row("deficit_deadlift", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
             Row("sumo_deadlift", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
             Row("hamstring_curl", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+
+            // --- the same lifts under common equipment or position words in
+            // front: a table id behind only words from the modifier list
+            // (dumbbell, seated, machine, cable, single_leg, ...) takes the
+            // table's answer. "kickback" is a table id of its own, because a
+            // cable or glute kickback starts bent and kicks out too. sldl joins
+            // the RDL veto. All MOVE. ---
+            Row("dumbbell_step_up", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("weighted_step_up", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("seated_leg_extension", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("single_leg_extension", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("machine_hip_abduction", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("single_leg_glute_bridge", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("cable_kickback", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("dumbbell_kickback", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("glute_kickback", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("dumbbell_overhead_triceps_extension", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("sldl", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("dumbbell_sldl", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+
+            // --- the modifier rule's neighbours, which must NOT move: a word
+            // outside the modifier list in front (a step-up jump is not a
+            // step-up; "lateral" is not on the list, so a lateral step-up keeps
+            // the ECCENTRIC default and should declare its start), and a table
+            // id with words AFTER it. ---
+            Row("lateral_step_up", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("step_up_jump", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("dumbbell_bench_press", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("cable_fly", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
         )
 
     @Test
