@@ -3169,6 +3169,25 @@ data class SessionExport(
          * PINNED. `SchemaSensorTargetCueContractTest` asserts this entry's
          * marker in the published log, the voiceCues sentence, the tip
          * literal and the example's version.
+         *
+         * FURTHER 1.27 ENTRY (tempo notation): `tempoCompliance.prescribed`
+         * is written so it parses back (core-model review 2026-11-06, F5).
+         * `Tempo.notation()` is its sole producer (`Exporters.kt`). A tempo
+         * with any component that is not a whole 0-9 -- a fraction such as
+         * 1.5, or 10 or more -- is now written in the dash form,
+         * `3-0-1.5-0` and `10-0-1-0`, where earlier builds wrote `301.50`
+         * and `10.0010`, which `Tempo.parse` refuses. A tempo whose every
+         * component is a whole 0-9 or X is written in the compact form
+         * exactly as before (`3010`, `30X1`). RETROACTIVE, unlike the entry
+         * above: `prescribed` is rebuilt from the stored tempo at every
+         * export, so a set recorded earlier with a fractional or two-digit
+         * tempo exports the dash form when re-exported by a build writing
+         * it; the same set exported by an earlier build carried the
+         * unparseable form. A FURTHER entry and not a mint: 1.27 is
+         * unreleased. No key is added, removed, renamed or retyped
+         * (`prescribed` stays a string, and gains a description saying
+         * this), `DATABASE_VERSION` does NOT move, and the plan schema is
+         * untouched. PINNED by `SchemaTempoNotationContractTest`.
          */
         const val SCHEMA_VERSION = "1.27"
 
