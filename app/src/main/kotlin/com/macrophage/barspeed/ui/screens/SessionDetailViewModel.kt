@@ -14,6 +14,7 @@ import com.macrophage.barspeed.data.SetRecordEntity
 import com.macrophage.barspeed.data.guideCalls
 import com.macrophage.barspeed.data.repsSourceOf
 import com.macrophage.barspeed.model.ExerciseKind
+import com.macrophage.barspeed.model.ExportNaming
 import com.macrophage.barspeed.model.RepsCountChip
 import com.macrophage.barspeed.model.RepsSource
 import com.macrophage.barspeed.model.SaveKind
@@ -188,11 +189,24 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
      * does through [container]'s exportJson/buildZip -- the caller bails
      * out via `?: return@launch`, exactly as it already does when the
      * payload itself comes back null.
+     *
+     * The JSON exports only. The raw zip is named by [rawZipName], which
+     * drops the version (history-export F4); [ExportNaming] says why each
+     * keeps or drops it.
      */
     private suspend fun exportName(suffix: String): String? {
         val row = repository.session(sessionId) ?: return null
         val timestamp = sessionTimestamp(row.startedAtMs, row.zoneId, row.utcOffsetMinutes)
-        return "BarSpeed-v${BuildConfig.VERSION_NAME}-$timestamp-$suffix"
+        return ExportNaming.versionedName(BuildConfig.VERSION_NAME, timestamp, suffix)
+    }
+
+    /** The raw zip's name: [ExportNaming.rawZipName], looked up fresh like [exportName]. */
+    private suspend fun rawZipName(): String? {
+        val row = repository.session(sessionId) ?: return null
+        return ExportNaming.rawZipName(
+            sessionTimestamp(row.startedAtMs, row.zoneId, row.utcOffsetMinutes),
+            row.planSessionName,
+        )
     }
 
     private suspend fun jsonName(includeDetail: Boolean) =
@@ -216,7 +230,7 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
             _exporting.value = true
             try {
                 val zip = container.rawExporter.buildZip(sessionId) ?: return@launch
-                val name = exportName("raw.zip") ?: return@launch
+                val name = rawZipName() ?: return@launch
                 ShareUtil.shareFile(getApplication(), name, zip, "application/zip")
             } finally {
                 _exporting.value = false
@@ -254,7 +268,7 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
             _exporting.value = true
             try {
                 val zip = container.rawExporter.buildZip(sessionId) ?: return@launch
-                val name = exportName("raw.zip") ?: return@launch
+                val name = rawZipName() ?: return@launch
                 pendingSave = SaveKind.RAW_ZIP to zip
                 onReady(name)
             } finally {
