@@ -25,6 +25,8 @@ import java.nio.file.Files
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -353,5 +355,65 @@ class JournalRecoveryTest {
         assertEquals(RecoveryOutcome.Waiting, recovery(dao).recover(orphan, writeOutstanding = true))
         assertEquals(2, dao.sets.size)
         assertTrue(orphan.directory.exists(), "the capture went with nothing written")
+    }
+
+    /**
+     * THE ISSUE'S RULE. Session 7 is closed: its heart-rate summary was written
+     * over the sets it held, and it is not re-opened or rewritten. The set gets
+     * a session of its own, begun when the set began and closed when it ended.
+     */
+    @Test
+    fun `a capture whose session is closed goes into a session of its own, closed at its end`() = runTest {
+        val dao = ownSession(endedAtMs = startedAtMs - 30_000L)
+        val orphan = journaled()
+        val outcome = assertIs<RecoveryOutcome.Stored>(recovery(dao).recover(orphan, writeOutstanding = false))
+        assertTrue(outcome.newSession)
+        val written = dao.sets.single { it.recovered }
+        assertEquals(outcome.sessionId, written.sessionId)
+        assertEquals(0, written.orderIdx)
+        val opened = dao.sessions.single { it.id == outcome.sessionId }
+        assertEquals(startedAtMs, opened.startedAtMs)
+        assertEquals(written.endedAtMs, opened.endedAtMs)
+        assertEquals(emptyList(), dao.updated.filter { it.id == 7L }, "the closed session was rewritten")
+        assertFalse(orphan.directory.exists(), "the capture outlived its row")
+    }
+
+    /** Session 7 is open and is the one Record would offer to continue: the set is one of its sets. */
+    @Test
+    fun `a capture whose session is open and current rejoins it at the next free position`() = runTest {
+        val dao = ownSession(endedAtMs = null)
+        val orphan = journaled()
+        val outcome = assertIs<RecoveryOutcome.Stored>(recovery(dao).recover(orphan, writeOutstanding = false))
+        assertEquals(RecoveryOutcome.Stored(7L, outcome.setId, newSession = false), outcome)
+        val written = dao.sets.single { it.recovered }
+        assertEquals(7L, written.sessionId)
+        assertEquals(2, written.orderIdx)
+        assertEquals(1, dao.sessions.size, "a second session was opened for one workout")
+        assertEquals(emptyList(), dao.updated, "the open session was rewritten")
+        assertFalse(orphan.directory.exists(), "the capture outlived its row")
+    }
+
+    /** The row landed and the process died before the journal went: the set is not written twice. */
+    @Test
+    fun `a capture whose set is already stored is not written again, and goes`() = runTest {
+        val dao = ownSession(endedAtMs = null)
+        dao.sets += row(3, 7, 2, startedAtMs, startedAtMs + 50_000L)
+        val orphan = journaled()
+        assertEquals(RecoveryOutcome.AlreadyStored, recovery(dao).recover(orphan, writeOutstanding = false))
+        assertEquals(3, dao.sets.size)
+        assertFalse(orphan.directory.exists(), "the capture of a stored set was kept")
+    }
+
+    /** The journal is removed only after the row write lands; a write that fails leaves the only copy. */
+    @Test
+    fun `a write that fails keeps the capture`() = runTest {
+        val dao =
+            FakeSessionDao(
+                sessions = mutableListOf(SessionEntity(id = 7, startedAtMs = startedAtMs - 600_000L, endedAtMs = 1L)),
+                failInsert = true,
+            )
+        val orphan = journaled()
+        assertFailsWith<IllegalStateException> { recovery(dao).recover(orphan, writeOutstanding = false) }
+        assertTrue(orphan.directory.exists(), "the only copy of the set went with the write that failed")
     }
 }
