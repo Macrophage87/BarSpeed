@@ -3211,7 +3211,64 @@ data class SessionExport(
          * names all three sensor-status words; `SchemaSensorLossCueContractTest`
          * pins the log entry and that sentence.
          *
-         * FURTHER 1.27 ENTRY (tempo notation): `tempoCompliance.prescribed`
+         * FURTHER 1.27 ENTRY (exercise inference) NO KEY CHANGES, but the
+         * figures of a population move (core-model review 2026-11-06, F1 and
+         * F4; whole-release review). [ExerciseDef.inferStartPhase] and
+         * [ExerciseDef.inferKind] answer differently for some ids the app
+         * ships no entry for, and a plan exercise with such an id and no
+         * declared `start` (or `kind`) publishes the new answer in `geometry`
+         * -- robocoach's real lower-body plan carries `leg_extension` with no
+         * `start`. Seeded ids and declared keys do not move.
+         *
+         * `geometry.startsWith` moves from `eccentric` to `concentric` for
+         * `leg_extension`, `step_up`, `glute_bridge`, `sit_up`,
+         * `hip_abduction`, `pec_deck`, `tricep_kickback`,
+         * `triceps_kickback`, `kickback`, `glute_kickback`,
+         * `seated_dumbbell_press` and `arnold_press`, and for any of them
+         * behind only equipment or position words (`dumbbell`, `db`,
+         * `barbell`, `kettlebell`, `kb`, `cable`, `machine`, `band`,
+         * `banded`, `seated`, `weighted`, `single`, `leg`, `arm`, `smith`:
+         * `dumbbell_step_up`, `seated_leg_extension`, `cable_kickback`). It
+         * moves from `concentric` to `eccentric` for `overhead_squat`,
+         * `overhead_tricep_extension`, `overhead_triceps_extension`,
+         * `nordic_curl` and `jefferson_curl`, for those behind only
+         * free-weight words (the list above without `cable`, `machine`,
+         * `band`, `banded` and `leg`), and for an id naming `romanian`,
+         * `rdl`, `sldl`, `stiff_leg` or `stiff_legged` beside a drive-first
+         * word (`dumbbell_romanian_deadlift`, `snatch_grip_rdl`,
+         * `stiff_leg_deadlift`); `rdl` alone was already `eccentric`. Where
+         * it moves, which phase each rep pairs as eccentric and which as
+         * concentric flips, so `ecc_s`, `con_s`, the velocities, power and
+         * the tempo grade of every rep move with it.
+         *
+         * `geometry.kind` moves from `hold` to `dynamic` for an id naming
+         * `plank` beside `row` or `dip` (`plank_row`, `side_plank_hip_dip`),
+         * and from `carry` to `dynamic` for one naming `sled` beside `press`
+         * or `squat` (`leg_press_sled`, `hack_squat_sled`). Such a set now
+         * publishes `startsWith` and `concentric` and their sources, which a
+         * hold or carry omits, and a rep set of a sled id publishes its
+         * reps' velocities, range and power, which a carry publishes none
+         * of.
+         *
+         * NOT RETROACTIVE for a recorded set: each set freezes its resolved
+         * geometry onto its row at set end and the export reads that, so a set
+         * recorded before the upgrade keeps the answer it was recorded with,
+         * under any schemaVersion. Every set recorded after the upgrade, the
+         * first included, takes the new answer: the kind is recomputed from
+         * the id on every read, and a start an earlier build stored for the
+         * id in its custom-exercise row is read through
+         * [CustomExerciseRepair] as today's inference when the plan queue is
+         * built, and the row (its start and inferred display name, neither an
+         * export key) is rewritten at the end of that id's next set. The
+         * geometry's `source.startsWith` or `source.kind` reading `inferred`
+         * marks the sets that can have moved; a plan should declare `start`
+         * (and `kind`) for any lift it cares about. Under 1.27 and not a
+         * mint: 1.27 is unreleased. No key is added, removed, renamed or
+         * retyped, `DATABASE_VERSION` does NOT move, and the plan schema is
+         * untouched. `SchemaExerciseInferenceContractTest` pins this entry;
+         * `ExerciseIdInferenceCharacterizationTest` pins the answers.
+         *
+         * FURTHER 1.27 ENTRY (tempo notation):`tempoCompliance.prescribed`
          * is written so it parses back (core-model review 2026-11-06, F5).
          * `Tempo.notation()` is its sole producer (`Exporters.kt`). A tempo
          * with any component that is not a whole 0-9 -- a fraction such as
