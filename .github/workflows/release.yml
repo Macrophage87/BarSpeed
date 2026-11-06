@@ -27,7 +27,11 @@ jobs:
     # env. The decoded keystore file is deleted right after the signed build,
     # before any third-party action runs, and again at job end whatever failed.
     steps:
+      # Nothing in this job pushes, so the checkout token is not left in the
+      # repository's local config for every later step and action to read.
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Check the release tag
         run: |
