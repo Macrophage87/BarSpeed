@@ -280,8 +280,9 @@ mutation killed, and that mapping is the whole content of a mutation table.
   so a change that compiles debug can still fail release. It does **not** run R8: unit-test tasks
   do not depend on `minifyReleaseWithR8` (check with `./gradlew test --dry-run | grep -i r8`), so
   CI never exercises `isMinifyEnabled = true` with `proguard-rules.pro`. `release.yml` runs
-  `./gradlew test :app:assembleRelease` unsigned before it decodes the keystore, so a missing
-  keep rule fails the release before anything is signed or uploaded.
+  `./gradlew test :app:assembleRelease` unsigned before it decodes the keystore, so a build or
+  R8 error stops the release there, before anything is signed or uploaded; a missing
+  serialization keep rule can still build and fail at runtime.
 - **`:core:data` has a real test source set** — count it with
   `find core/data/src/test -name '*.kt' | wc -l` — run twice per push
   (`testDebugUnitTest` and `testReleaseUnitTest`). But its `SessionRepository*` classes take a

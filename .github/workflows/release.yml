@@ -74,8 +74,9 @@ jobs:
 
       # Runs before the keystore exists, so this is an unsigned build: the unit
       # tests, plus the minified (R8) release build that CI never exercises. A
-      # missing keep rule or a red test stops the release here, before anything
-      # is signed or uploaded to Play.
+      # red test, a build error or an R8 error stops the release here, before
+      # anything is signed or uploaded to Play. A missing serialization keep
+      # rule can still build and fail only at runtime.
       - name: Unit tests and minified release build
         run: ./gradlew test :app:assembleRelease --stacktrace
 
