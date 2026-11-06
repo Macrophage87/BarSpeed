@@ -62,6 +62,30 @@ class WeightUnitTest {
     }
 
     /**
+     * A phone set to a comma-decimal locale offers "," on its number pad, and
+     * "52,5" was read as no number at all -- on an ad-hoc set, recorded as 0
+     * (UX review 2026-11-06, record-setup F4, settings-onboarding F5).
+     */
+    @Test
+    fun `parseToKg reads a comma as the decimal point`() {
+        assertEquals(52.5, WeightUnit.KG.parseToKg("52,5"))
+        assertEquals(52.5, WeightUnit.KG.parseToKg(" 52,5 "))
+        assertEquals(WeightUnit.LB.parseToKg("115.5"), WeightUnit.LB.parseToKg("115,5"))
+        assertNull(WeightUnit.KG.parseToKg("1,2,3"))
+    }
+
+    /**
+     * `toDoubleOrNull` reads these as numbers, and none of them is a load a
+     * lifter can mean. NaN would reach the record as a load.
+     */
+    @Test
+    fun `parseToKg refuses non-finite and suffixed text`() {
+        assertNull(WeightUnit.KG.parseToKg("NaN"))
+        assertNull(WeightUnit.KG.parseToKg("Infinity"))
+        assertNull(WeightUnit.KG.parseToKg("60kg"))
+    }
+
+    /**
      * The round trip a load makes when it passes through a load field:
      * inputValue to seed the text, parseToKg to read the text back. It is the
      * identity for some loads and not for others, and which is which is a
