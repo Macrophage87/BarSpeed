@@ -546,6 +546,32 @@ class JournalRecoveryTest {
         assertTrue(orphan.directory.exists(), "the capture went with nothing written")
     }
 
+    /**
+     * A capture refused at recover whose set is already a row answers
+     * AlreadyStored and goes (#100 review round 3, Lens A N2). The live
+     * sensor-counted set's analysis withheld, its row landed with the live
+     * count, and the process died before the journal went. Re-analysed here
+     * it finds no rep, but the set is in History: answering NOTHING_TO_COUNT,
+     * "No count of its reps survived", would be false and would keep the
+     * capture on the card for good.
+     */
+    @Test
+    fun `a capture refused at recover whose set is already stored goes, not refused`() = runTest {
+        val pulley = squat.copy(travelRatio = 2.0)
+        val sensorFacts =
+            facts.copy(
+                exercise = pulley,
+                geometry = SetGeometryPolicy.describe(pulley, null),
+                counter = RepCounter.SENSOR,
+            )
+        val dao = ownSession(endedAtMs = null)
+        dao.sets += row(3, 7, 2, startedAtMs, startedAtMs + 50_000L)
+        val orphan = journaled(header = header(facts = sensorFacts), marks = emptyList())
+        assertEquals(RecoveryOutcome.AlreadyStored, recovery(dao).recover(orphan, writeOutstanding = false))
+        assertEquals(3, dao.sets.size, "a stored set was written again")
+        assertFalse(orphan.directory.exists(), "the capture of a stored set was kept")
+    }
+
     /** Counted whole by the listing scan and still not a stream: refused at the decode, not guessed around. */
     @Test
     fun `a stream that will not parse is refused`() = runTest {
