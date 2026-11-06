@@ -107,4 +107,19 @@ class SpokenRepCallTest {
             assertEquals(emptyList(), SpokenRepCall.spansOf(text), text)
         }
     }
+
+    /**
+     * What the engine is handed keeps every character where the cue had it,
+     * so each span [SpokenRepCall.spansOf] finds on the cue covers the same
+     * word or number of the handed text.
+     */
+    @Test
+    fun `the handed text keeps every span where the cue had it`() {
+        val cues = listOf("Rep 1", "Rep 12", "Rep 4, last rep", "Rep 5, target", "Last rep", "Done", "Down")
+        for (cue in cues) {
+            val handed = SpokenRepCall.utterance(cue)
+            assertEquals(cue.length, handed.length, cue)
+            assertEquals(SpokenRepCall.spansOf(cue), SpokenRepCall.spansOf(handed), cue)
+        }
+    }
 }
