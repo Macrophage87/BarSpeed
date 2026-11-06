@@ -1,8 +1,11 @@
 package com.macrophage.barspeed.dsp
 
+import com.macrophage.barspeed.model.CountingPolicy
 import com.macrophage.barspeed.model.RepCallNotePolicy
+import com.macrophage.barspeed.model.RepCounter
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.Tempo
+import com.macrophage.barspeed.model.VoiceMilestonePolicy
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -250,6 +253,31 @@ class GuideVoiceCopyContractTest {
      * `LockoutRepCallTest`'s `the geometry whose drive ends the rep still says
      * nothing, and why`.
      */
+
+    /**
+     * The guide's sensor-counted example is what the sensor's voice says
+     * (UX review 2026-11-06, voice F5/F6).
+     *
+     * Read off [VoiceMilestonePolicy.repMilestone] under the milestones
+     * [CountingPolicy.milestones] gives the sensor, at reps 4 and 5 of a
+     * five-rep target, so a reworded call cannot leave the guide quoting
+     * words no set says. The second check holds the guide's promise that the
+     * sensor never calls the set over against the same sweep.
+     */
+    @Test
+    fun `the guide's sensor-counted example is what the sensor says at its target`() {
+        val milestones = CountingPolicy.milestones(RepCounter.SENSOR)
+        val lastRep = VoiceMilestonePolicy.repMilestone(4, 3, 5, milestones)
+        val target = VoiceMilestonePolicy.repMilestone(5, 4, 5, milestones)
+        assertTrue(
+            rendered.contains("'$lastRep', '$target'"),
+            "the guide's Voice section does not contain \"'$lastRep', '$target'\", which is what " +
+                "VoiceMilestonePolicy says at reps 4 and 5 of a five-rep sensor-counted set",
+        )
+        assertTrue(rendered.contains("It never says 'done'"), "the guide no longer says the sensor never says done")
+        val said = (1..12).mapNotNull { VoiceMilestonePolicy.repMilestone(it, it - 1, 5, milestones) }
+        assertTrue("Done" !in said, "the sensor's voice says Done, which the guide says it never does")
+    }
 
     /**
      * The guide says how often a hold names the time left (#312), and it says

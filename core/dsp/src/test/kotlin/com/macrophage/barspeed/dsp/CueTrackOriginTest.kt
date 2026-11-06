@@ -59,7 +59,8 @@ import kotlin.test.assertTrue
  * [CadenceVoice.beatCall] writes a stroke word on every rep of a guided set, and
  * `VoiceMilestonePolicy` -- the UNGUIDED counter, which speaks as a rep
  * completes rather than on a schedule -- writes no word at all beyond digits,
- * `Rep N`, `Last rep` and `Done`.
+ * `Rep N`, `Last rep` and `Done`, and on a sensor-counted set `Rep N, last rep`
+ * and `Rep N, target` in place of the last two.
  *
  * The GUIDED half is weaker from #293 than it was, and weaker again from #266;
  * the weakening is pinned below rather than described here. A guided rep used to
@@ -241,7 +242,9 @@ class CueTrackOriginTest {
      * Swept rather than asserted case by case, because the claim the schema
      * publishes is about the whole vocabulary and not about three strings.
      * `phaseCount` emits bare digits and `repMilestone` emits `Rep N`,
-     * `Last rep` and `Done`; nothing else can come out of either.
+     * `Last rep` and `Done`, and on a sensor-counted set `Rep N, last rep`
+     * and `Rep N, target`; nothing else can come out of either. The check is
+     * per word, so a stroke word inside a longer call would red it too.
      */
     @Test
     fun `the unguided counter never speaks a stroke word`() {
@@ -257,17 +260,21 @@ class CueTrackOriginTest {
         }
         (0..15).forEach { count ->
             listOf(null, 1, 5, 12).forEach { planned ->
-                VoiceMilestonePolicy.repMilestone(count, announcedRep = 0, plannedReps = planned)
-                    ?.let { spoken += it }
+                VoiceMilestonePolicy.Milestones.entries.forEach { milestones ->
+                    VoiceMilestonePolicy.repMilestone(count, announcedRep = 0, plannedReps = planned, milestones)
+                        ?.let { spoken += it }
+                }
             }
         }
         assertTrue(spoken.isNotEmpty(), "the sweep said nothing at all, so it pins nothing")
+        val words = spoken.flatMap { it.split(' ', ',') }.toSet()
         assertEquals(
             emptySet(),
-            spoken intersect strokeWords,
+            words intersect strokeWords,
             "the unguided counter spoke a stroke word, so no track can be attributed by one",
         )
         assertTrue("Rep 5" in spoken && CadencePlan.LAST_REP in spoken, "the calls it does write")
+        assertTrue("Rep 5, target" in spoken && "Rep 4, last rep" in spoken, "and the sensor-counted set's")
     }
 
     /**

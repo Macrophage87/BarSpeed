@@ -148,8 +148,11 @@ private val SECTIONS =
         ),
         GuideSection(
             "Voice",
-            "Voice count is ON by default: the eccentric counted out loud, each rep called at " +
-                "lockout, 'last rep', 'done', and the rest countdown. 'Guided tempo' goes further: " +
+            "Voice count is ON by default, with the rest countdown. When you tap the reps, each " +
+                "rep is called, then 'last rep' and 'done'. When the sensor counts, each rep is " +
+                "called at lockout, with the target marked: 'Rep 4, last rep', 'Rep 5, target'. " +
+                "It never says 'done', so keep going if you have more and end the set yourself. " +
+                "'Guided tempo' goes further: " +
                 "the app calls the whole cadence, counting only the seconds strictly inside each " +
                 "stroke, and the rep number is spoken at the START of the rep IN PLACE OF " +
                 "that rep's first stroke word, with that stroke's counts continuing from the " +
