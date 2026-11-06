@@ -119,7 +119,8 @@ private val SECTIONS =
         GuideSection(
             "Sensors",
             "Pair the bar sensor and the heart-rate strap once under Devices. They reconnect on " +
-                "their own. Using two bar sensors? Label them A and B there. " +
+                "their own. Using two bar sensors? The app labels them A and B there; tap a " +
+                "label to swap them. " +
                 "Clip the bar sensor to the bar, or to the weight stack on a cable machine. " +
                 "Top-bar dots: green = sending data, amber = connecting or sending nothing, " +
                 "red = failed, grey = off. " +
