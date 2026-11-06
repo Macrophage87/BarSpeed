@@ -377,7 +377,7 @@
         },
         "recovered": {
           "const": true,
-          "description": "This set was written back into History from an interrupted set's capture rather than by the set ending (#100): its end is the last journaled instant, its reps the segmenter's, and it carries no plan targets, side, tempo or rating. Absent on every other set, and on every set recorded before database v21, when nothing could write one."
+          "description": "This set was written back into History from an interrupted set's capture rather than by the set ending (#100): its end is the last journaled instant, its reps the lifter's or the guide's journaled count where either counted the set, and otherwise the batch segmenter's, and it carries no plan targets, side or rating. A recovered set carries no silence word (`sensorsSilent`, `sensorsSoleSilent`): those are link readings taken as a set ends, and the links ended with the process, so their absence here does not mean the stream was analysable. Absent on every other set, and on every set recorded before database v21, when nothing could write one."
         },
         "voidReason": {
           "type": "string",

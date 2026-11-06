@@ -669,11 +669,13 @@ data class SetRecordEntity(
      * #42 stage 1 keeps a set's streams on disk while it is recorded, so a
      * process that dies mid-set leaves the capture behind; the Home card can
      * put it back into History. Such a row is NOT an ordinary set: nothing
-     * ended it, so its end is the last instant that reached the disk, its
-     * reps are the batch segmenter's (the live count died with the process),
-     * and everything the lifter would have given at set end -- the effort
-     * tap, a correction, the plan's targets -- was never captured. This
-     * column is how History and both export documents say so.
+     * ended it, so its end is the last instant that reached the disk; its
+     * reps are the lifter's or the guide's journaled count, stated, where
+     * either counted the set, and the batch segmenter's where the sensor did
+     * (the live count died with the process); and everything the lifter
+     * would have given at set end -- the effort tap, a correction, the plan's
+     * targets -- was never captured, nor any silence word. This column is how
+     * History and both export documents say so.
      *
      * Its own column and never a reuse of `side`, `tempo` or [geometryJson],
      * which each already mean something on every row (#100's own rule).

@@ -3057,11 +3057,13 @@ data class SessionExport(
          * left on disk -- rather than by the set ending. Such a set is not
          * what this document's own description calls the rest of the
          * session: nothing ended it, so its end is the last instant that
-         * reached the disk; its reps are the segmenter's, because the live
-         * count died with the process; and it carries no plan targets, side,
-         * tempo or effort rating, because none was captured. A set whose own
-         * session had closed sits alone in a session of its own rather than
-         * in the one it was lifted in. OMITTED WHEN FALSE, `added`'s shape.
+         * reached the disk; its reps are the lifter's or the guide's
+         * journaled count, stated, where either counted the set, and the
+         * batch segmenter's where the sensor did, because the live count died
+         * with the process; and it carries no plan targets, side, effort
+         * rating or silence word, because none was captured. It sits in a
+         * session of its own unless its own session was still open and
+         * current. OMITTED WHEN FALSE, `added`'s shape.
          * NOT RETROACTIVE in the sense that matters: read from database v21's
          * `recovered` column, which is 0 on every row an earlier build wrote,
          * and nothing before v21 could write a recovered row, so a missing
@@ -4250,11 +4252,18 @@ data class SetExport(
      * A process killed mid-set leaves the set's streams on disk (#42 stage 1),
      * and the lifter can put them back as a row. That row is not an ordinary
      * set and is never published as one: nothing ended it, so its end is the
-     * last instant that reached the disk; its reps are the batch segmenter's,
-     * because the live count died with the process; and it carries no plan
-     * targets, side, tempo or effort rating, because none was captured. If
-     * the session it was lifted in had closed, it sits in a single-set
-     * session of its own -- a closed session's summary is never rewritten.
+     * last instant that reached the disk; its reps are the lifter's or the
+     * guide's journaled count, stated, where either counted the set (published
+     * `manual` or `metronome`), and the batch segmenter's over an analysable
+     * stream where the sensor did (`analysis`), because the live count died
+     * with the process; and it carries no plan targets, side or effort rating,
+     * because none was captured. It carries no silence word either: those are
+     * link readings taken as a set ends, and the links ended with the process,
+     * so on a recovered set an absent [sensors] block does not mean the stream
+     * was analysable. It sits in a single-set session of its own unless its
+     * own session was still open and current -- a closed session's summary is
+     * never rewritten -- and where it rejoins its session it takes the next
+     * free position, after any set recorded after the interruption.
      *
      * OMITTED WHEN FALSE, [added]'s shape. A missing key is the truth on every
      * older document: before database v21 nothing could write a recovered
