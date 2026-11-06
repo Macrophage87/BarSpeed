@@ -131,7 +131,11 @@ class JournalRecovery(
      * leaves the journal on disk -- the only copy of the set -- and the
      * failure reaches the caller. A process killed between the row and the
      * discard leaves a capture whose set is stored, which the next attempt
-     * answers AlreadyStored and removes without writing it twice.
+     * answers AlreadyStored and removes without writing it twice. That is
+     * asked before the re-analysis, so a stored set whose capture the
+     * re-analysis would refuse -- a sensor-counted set whose analysis
+     * withheld, whose row carries the live count -- goes too, rather than
+     * being told no count survived (#100 review round 3, Lens A N2).
      *
      * A NEW SESSION IS TWO WRITES, NOT ONE (#100 review round 1, Lens A N6,
      * Lens B N5): `recordFirstSet` opens the session with the set in it, and
@@ -146,25 +150,24 @@ class JournalRecovery(
      * does not otherwise make, and that has not been designed.
      */
     suspend fun recover(orphan: OrphanedSet, writeOutstanding: Boolean): RecoveryOutcome {
+        val header = orphan.header
+        // Asked before the re-analysis can refuse (#100 review round 3,
+        // Lens A N2): a capture whose set is already a row is that row's
+        // leftover whatever its streams now say. The row's exercise and
+        // instant are the journal's own -- `prepare` writes facts.exercise's
+        // id and the header's startedAtMs -- so nothing here needs the
+        // analysis. A capture with no facts is refused below, as before.
+        val stored = header.facts?.let { storedAlready(header, it.exercise.id) } == true
+        if (stored && !writeOutstanding) {
+            store.discard(orphan)
+            return RecoveryOutcome.AlreadyStored
+        }
         val set =
             when (val prepared = prepare(orphan)) {
                 is PreparedRecovery.Refused -> return RecoveryOutcome.Refused(prepared.refusal)
                 is PreparedRecovery.Ready -> prepared.set
             }
-        val header = orphan.header
         val now = nowMs()
-        // Every session that could hold this set: begun before it, and no
-        // earlier than the header's own session or the resume look-back,
-        // whichever reaches further. Wider than the header's session alone,
-        // because a session opened for an earlier recovery of this same
-        // capture begins at the set's own start.
-        val from = minOf(header.sessionStartedAtMs, set.startedAtMs - SessionResumePolicy.LOOKBACK_MS)
-        val stored =
-            JournalRecoveryPolicy.alreadyStored(
-                set.exerciseId,
-                set.startedAtMs,
-                repository.setsBegunInSessionsBetween(from, set.startedAtMs),
-            )
         val latest = repository.latestSession(now - SessionResumePolicy.LOOKBACK_MS, now)
         val target = JournalRecoveryPolicy.target(header.sessionId, latest, now, writeOutstanding, stored)
         return when (target) {
@@ -188,6 +191,23 @@ class JournalRecovery(
                 RecoveryOutcome.Stored(written.sessionId, written.setId, newSession = true)
             }
         }
+    }
+
+    /**
+     * Whether a row of [exerciseId] begun at [header]'s instant is already in
+     * any session that could hold it: begun before it, and no earlier than
+     * the header's own session or the resume look-back, whichever reaches
+     * further. Wider than the header's session alone, because a session
+     * opened for an earlier recovery of this same capture begins at the
+     * set's own start.
+     */
+    private suspend fun storedAlready(header: SetJournalHeader, exerciseId: String): Boolean {
+        val from = minOf(header.sessionStartedAtMs, header.startedAtMs - SessionResumePolicy.LOOKBACK_MS)
+        return JournalRecoveryPolicy.alreadyStored(
+            exerciseId,
+            header.startedAtMs,
+            repository.setsBegunInSessionsBetween(from, header.startedAtMs),
+        )
     }
 
     /** [orphan]'s streams read back and re-analysed into the row it would become. */
