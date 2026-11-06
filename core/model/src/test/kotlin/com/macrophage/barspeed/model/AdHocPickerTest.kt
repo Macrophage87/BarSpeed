@@ -163,7 +163,8 @@ class AdHocPickerTest {
     fun `a one-sided lift offers a side`() {
         assertTrue(AdHocPicker.offersSide("suitcase_carry", emptyList(), emptyList()))
         assertTrue(AdHocPicker.offersSide("single_arm_dumbbell_row", emptyList(), emptyList()))
-        assertTrue(AdHocPicker.offersSide("dumbbell_curl", listOf(lift("dumbbell_curl", 1, side = "left")), emptyList()))
+        val leftCurl = listOf(lift("dumbbell_curl", 1, side = "left"))
+        assertTrue(AdHocPicker.offersSide("dumbbell_curl", leftCurl, emptyList()))
         assertTrue(AdHocPicker.offersSide("rfess", emptyList(), plan(block("rfess", side = "right"))))
     }
 
