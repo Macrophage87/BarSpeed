@@ -130,7 +130,7 @@ private val SECTIONS =
             "Plans",
             "Plans come from robocoach. Plans, then Import plan: paste the JSON or pick the " +
                 "file. Any problems are listed before anything changes. Tap a plan to see every " +
-                "set, and approve it to make it active. No robocoach plan? The prompt at the " +
+                "set, then tap Make active. No robocoach plan? The prompt at the " +
                 "bottom of this page gets any LLM to write one.",
         ),
         GuideSection(
@@ -152,8 +152,9 @@ private val SECTIONS =
         ),
         GuideSection(
             "Voice",
-            "Voice cues are on by default. The 'Voice cues' switch on any Record screen turns " +
-                "them off or on; tempo sets still call the cadence. " +
+            "Voice cues are on by default. Turn them off or on with the 'Voice cues' switch: on " +
+                "the setup and ready screens, and at the top of Record during a set and the rest. " +
+                "Tempo sets still call the cadence. " +
                 "Every tempo set except an explosive lift is called stroke by stroke, sensor or " +
                 "not, after a lead-in: 5 seconds unless the plan says otherwise, and you can " +
                 "change it on the rest screen. " +
@@ -167,9 +168,10 @@ private val SECTIONS =
                 "'Up, Rep 1… Up, Rep 2…', and the last one 'Up, Last rep'. The prep then says " +
                 "'Rep numbers mark the end of each drive'. From the top, a 1010 is called by " +
                 "stroke only, with the count on screen. " +
-                "Sensor-counted sets call each rep ('Rep 1', 'Rep 2'…), 'last rep' one rep " +
-                "before the target and 'Rep 5, target' on it, and never 'Done': you end the set. " +
-                "Tap-counted sets end on 'Last rep', 'Done'. " +
+                "When the sensor counts, each rep is called at lockout, with the target marked: " +
+                "'Rep 4, last rep', 'Rep 5, target'. It never says 'done', so keep going if you " +
+                "have more and end the set yourself. When you tap the reps, each rep is called, " +
+                "then 'last rep' and 'done'. " +
                 "Holds and carries get spoken time checks every 5 seconds remaining, then a " +
                 "second-by-second count from 10.",
         ),
