@@ -275,6 +275,25 @@ class JournalRecoveryPolicyTest {
         assertTrue("removed once the set is saved" in body, body)
     }
 
+    /**
+     * A wait names what it waits for (#100 review round 1, Lens A N5, Lens B
+     * N4). A set-end write or a session close finishes on its own, so the
+     * lifter is told to wait. The record screen's own hold, SESSION, is
+     * released when that screen goes away, so held under Home it is either a
+     * set still recording or a leaked hold, and "try again in a moment" would
+     * never come true: the note says where to finish the set, and what clears
+     * a hold left by a swiped task -- `rescuedRestoreNote`'s reading.
+     */
+    @Test
+    fun `a wait names what it waits for`() {
+        val saving = JournalRecoveryPolicy.waitNote(setOf(RecordingHold.SESSION, RecordingHold.SET_WRITE))
+        assertTrue("being saved" in saving, saving)
+        val recording = JournalRecoveryPolicy.waitNote(setOf(RecordingHold.SESSION))
+        assertFalse("in a moment" in recording, recording)
+        assertTrue("Record screen" in recording, recording)
+        assertTrue("force-stop" in recording, recording)
+    }
+
     @Test
     fun `every refusal has its own note`() {
         val notes = RecoveryRefusal.entries.map(JournalRecoveryPolicy::refusalNote)
