@@ -196,8 +196,12 @@ abstract class GattClient(protected val context: Context) {
      * in [onReady]; `AutoConnectManager` calls this every
      * `SensorBattery.REFRESH_INTERVAL_MS` so the percent on screen is not
      * the one read at connect time an hour ago. A no-op by default.
+     *
+     * [stillWanted] is asked again at the moment the read would be sent, for
+     * a client that sends it later than this call (`WitmotionClient` posts it
+     * to the main looper); false drops it.
      */
-    open fun refreshBattery() {}
+    open fun refreshBattery(stillWanted: () -> Boolean = { true }) {}
 
     protected fun updateBattery(pct: Int) {
         val current = stateFlow.value
@@ -421,10 +425,12 @@ class WitmotionClient(context: Context, private val clock: () -> Long = System::
      * measurements, but what the unit's firmware does to its own output while
      * it answers is not something this code can see.
      */
-    override fun refreshBattery() {
+    override fun refreshBattery(stillWanted: () -> Boolean) {
         val g = gatt ?: return
         if (connectionState.value !is ConnectionState.Connected) return
-        commandHandler.post { writeCommand(g, WitmotionCommands.readRegister(WitmotionProtocol.REG_BATTERY)) }
+        commandHandler.post {
+            if (stillWanted()) writeCommand(g, WitmotionCommands.readRegister(WitmotionProtocol.REG_BATTERY))
+        }
     }
 
     private companion object {
@@ -449,9 +455,9 @@ class HrmClient(context: Context, private val clock: () -> Long = System::curren
     }
 
     /** The strap's standard battery characteristic again; see [GattClient.refreshBattery]. */
-    override fun refreshBattery() {
+    override fun refreshBattery(stillWanted: () -> Boolean) {
         val g = gatt ?: return
-        if (connectionState.value is ConnectionState.Connected) readBattery(g)
+        if (connectionState.value is ConnectionState.Connected && stillWanted()) readBattery(g)
     }
 
     private fun readBattery(gatt: BluetoothGatt) {

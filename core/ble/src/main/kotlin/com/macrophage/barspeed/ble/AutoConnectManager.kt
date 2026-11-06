@@ -283,17 +283,54 @@ class AutoConnectManager(
                 scope.launch {
                     while (true) {
                         delay(SensorBattery.REFRESH_INTERVAL_MS)
-                        for (client in listOf(imuClient, imuClientB, hrmClient)) {
-                            try {
-                                client.refreshBattery()
-                            } catch (e: Exception) {
-                                currentCoroutineContext().ensureActive()
-                            }
-                        }
+                        // The strap always; the bar sensors only while no
+                        // set is capturing (see [holdBatteryRefresh]).
+                        refreshBatteries(listOf(hrmClient, imuClient, imuClientB))
                     }
                 }
         }
         if (adapterReceiver == null) registerAdapterReceiver()
+    }
+
+    /**
+     * True while a set is capturing: the bar sensors' battery is then not
+     * asked for (coordinator review of ble-devices F2). A WitMotion battery
+     * read is a register-read command written to the unit mid-stream, and
+     * capture must be faithful; what the unit's firmware does to its 100 Hz
+     * output while it answers has not been measured ([Field]), so the app
+     * does not ask during a set at all. The strap is still read: its battery
+     * is a plain GATT read with no bearing on the bar's samples.
+     *
+     * Volatile because the battery job reads it off the main thread, and the
+     * WitMotion read re-checks it on the main looper just before writing, so
+     * a read the job queued a moment before a set started is dropped rather
+     * than sent into the set.
+     */
+    @Volatile
+    private var batteryHeld = false
+
+    /**
+     * Hold the bar sensors' battery reads while [held]; `RecordViewModel`
+     * holds from the moment a set begins until it leaves IN_SET by any path.
+     * Releasing reads both bar sensors once, so the percent is fresh at the
+     * start of every rest. A connect's own read in `onReady` is not held: it
+     * goes with the unlock and rate commands a reconnect sends anyway.
+     */
+    fun holdBatteryRefresh(held: Boolean) {
+        val released = batteryHeld && !held
+        batteryHeld = held
+        if (released) refreshBatteries(listOf(imuClient, imuClientB))
+    }
+
+    private fun refreshBatteries(clients: List<GattClient>) {
+        for (client in clients) {
+            try {
+                if (client === hrmClient) client.refreshBattery() else client.refreshBattery { !batteryHeld }
+            } catch (e: Exception) {
+                // A throw here must not reach appScope's default handler.
+                // Nothing to report: the next read is five minutes off.
+            }
+        }
     }
 
     /**
