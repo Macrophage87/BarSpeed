@@ -12,6 +12,7 @@ import com.macrophage.barspeed.model.DeviceScanListPolicy
 import com.macrophage.barspeed.model.DualSensorSetup
 import com.macrophage.barspeed.model.DualSetupStep
 import com.macrophage.barspeed.model.ScanRow
+import com.macrophage.barspeed.model.SensorLabelPolicy
 import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.model.Sighting
 import kotlinx.coroutines.CancellationException
@@ -20,6 +21,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -196,8 +198,36 @@ class DevicesViewModel(app: Application) : AndroidViewModel(app) {
             emptyMap(),
         )
 
-    fun setSensorRole(address: String, role: SensorRole?) {
-        guarded("Could not save the sensor's label") { container.settings.setSensorRole(address, role) }
+    /**
+     * A tap on [tapped] in [address]'s label row (ble-devices F3).
+     *
+     * What it writes is `SensorLabelPolicy.onChipTap`'s answer: a tap never
+     * leaves two units on one label, and a tap on the label a unit already
+     * carries swaps the pair. Clearing a label is no longer offered: with
+     * two paired the auto-labelling below would put one straight back, and
+     * a wrong label is now one tap from right.
+     *
+     * Paired units and labels are read fresh from the stores at the tap,
+     * not from this screen's `WhileSubscribed` copies, so the decision is
+     * made on what is written rather than on what was last drawn.
+     */
+    fun tapSensorLabel(address: String, tapped: SensorRole) {
+        guarded("Could not save the sensor's label") {
+            val paired = pairedImu(container.deviceRegistry.knownDevices.first())
+            val roles = container.settings.sensorRoles.first()
+            container.settings.setSensorRoles(SensorLabelPolicy.onChipTap(address, tapped, paired, roles))
+        }
+    }
+
+    private fun pairedImu(known: List<KnownDevice>) = known.filter { it.role == DeviceRole.IMU }.map { it.address }
+
+    /**
+     * Try every link that is down again now (ble-devices F7): the Retry
+     * button beside "Couldn't connect" on a row. `AutoConnectManager` also
+     * starts the backoff over, so the next attempt is not thirty seconds off.
+     */
+    fun retryNow() {
+        container.autoConnect.retryNow()
     }
 
     /**
@@ -208,6 +238,43 @@ class DevicesViewModel(app: Application) : AndroidViewModel(app) {
      * clears that one, and the next tap that reaches its write clears this.
      */
     val actionError = MutableStateFlow<String?>(null)
+
+    /**
+     * Label two paired bar sensors A and B without asking (ble-devices F3).
+     *
+     * The first paired gets A and the second B; a unit paired beside one
+     * that is already labelled gets the other letter. Which writes is
+     * `SensorLabelPolicy.autoAssign`'s answer, where a test holds it; it
+     * writes nothing once both are labelled, so its own write re-emitting
+     * the labels ends the loop on the next pass. Before this, the second
+     * unit read "Not linked" and recorded nothing until two chip taps.
+     *
+     * Declared after [actionError] because it writes it on a failure, and
+     * property initialisers and `init` blocks run in the order written.
+     *
+     * Only while this screen's ViewModel lives, which is where units are
+     * paired. Two units left unlabelled by an older build are labelled the
+     * next time Devices is opened, not before. Nothing in this repository
+     * executes a ViewModel: compile- and lint-gated only.
+     */
+    init {
+        viewModelScope.launch {
+            combine(container.deviceRegistry.knownDevices, container.settings.sensorRoles) { known, roles ->
+                SensorLabelPolicy.autoAssign(pairedImu(known), roles)
+            }.collect { writes ->
+                // Not through [guarded]: that clears [actionError] on
+                // success, and this write is not a tap, so it must not wipe
+                // the reason the lifter's last tap failed.
+                try {
+                    container.settings.setSensorRoles(writes)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    actionError.value = "Could not label the sensors: ${e.message ?: e.javaClass.simpleName}"
+                }
+            }
+        }
+    }
 
     /**
      * Run one tap's DataStore write and link change, reporting a throw instead

@@ -2,6 +2,7 @@ package com.macrophage.barspeed.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -22,14 +24,20 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.macrophage.barspeed.ble.DeviceRole
+import com.macrophage.barspeed.ble.KnownDevice
 import com.macrophage.barspeed.model.ConnectionState
 import com.macrophage.barspeed.model.DeviceLinkRole
 import com.macrophage.barspeed.model.DevicePairingPolicy
@@ -37,10 +45,13 @@ import com.macrophage.barspeed.model.DualSensorSetup
 import com.macrophage.barspeed.model.DualSetupStep
 import com.macrophage.barspeed.model.PreferenceControl
 import com.macrophage.barspeed.model.SensorRole
+import com.macrophage.barspeed.model.SensorStatusCopy
 import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.ConnectionChip
 import com.macrophage.barspeed.ui.components.PermissionBanner
+import com.macrophage.barspeed.ui.components.TurnOnBluetoothButton
 import com.macrophage.barspeed.ui.components.rememberArmedDelivery
+import kotlinx.coroutines.delay
 
 /**
  * Which physical accelerometer this one is, issue #156.
@@ -74,12 +85,16 @@ import com.macrophage.barspeed.ui.components.rememberArmedDelivery
  * reworded. A unit no link is maintaining still reads "Not linked", which is
  * said as absence rather than drawn as a failed connection.
  *
- * Clearing a label is offered because a wrong one is worse than none: an
- * unlabelled pair records one stream and says so, a mislabelled pair records
- * two under the wrong names.
+ * Labels are given without asking since UX review 2026-11-06 (ble-devices
+ * F3): the ViewModel labels the first paired unit A and the second B, and a
+ * chip tap swaps the pair rather than setting one unit alone, so two units can
+ * no longer be tapped onto one label. Clearing a label used to be offered here
+ * because a wrong one is worse than none; with the swap a wrong label is one
+ * tap from right, and with two paired a cleared one would be put straight back,
+ * so the clear is gone. `SensorLabelPolicy` holds both rules.
  */
 @Composable
-private fun SensorRoleRow(assigned: SensorRole?, onAssign: (SensorRole?) -> Unit) {
+private fun SensorRoleRow(assigned: SensorRole?, onTap: (SensorRole) -> Unit) {
     Spacer(Modifier.height(4.dp))
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
@@ -90,7 +105,7 @@ private fun SensorRoleRow(assigned: SensorRole?, onAssign: (SensorRole?) -> Unit
         SensorRole.entries.forEach { role ->
             FilterChip(
                 selected = assigned == role,
-                onClick = { onAssign(if (assigned == role) null else role) },
+                onClick = { onTap(role) },
                 label = { Text(role.name) },
             )
         }
@@ -167,6 +182,67 @@ private fun PreferenceRow(control: PreferenceControl, onUse: () -> Unit) {
     }
 }
 
+/**
+ * How long this screen has watched [state] sit in Connecting, in
+ * milliseconds, re-read once a second (ble-devices F7).
+ *
+ * Measured from when THIS SCREEN first saw the link connecting, not from when
+ * the link started trying, which nothing publishes; so on opening Devices a
+ * unit that has been missing for an hour gets its words ten seconds late
+ * rather than at once. The judgement is `SensorStatusCopy.connecting`'s.
+ */
+@Composable
+private fun rememberConnectingMs(state: ConnectionState?): Long {
+    val waited = remember { mutableLongStateOf(0L) }
+    val connecting = state is ConnectionState.Connecting
+    LaunchedEffect(connecting) {
+        waited.longValue = 0L
+        if (connecting) {
+            val since = System.currentTimeMillis()
+            while (true) {
+                delay(1_000)
+                waited.longValue = System.currentTimeMillis() - since
+            }
+        }
+    }
+    return waited.longValue
+}
+
+/**
+ * What a paired row says about its link in words, under the name (ble-devices
+ * F5, F7).
+ *
+ * The words are `SensorStatusCopy`'s, where a test holds them. The raw reason
+ * stays, small and grey beneath, because it is what a bug report needs; it
+ * used to be the only line, printed in the error colour, so the lifter read
+ * "Service discovery failed (133)" on the screen meant for fixing things.
+ */
+@Composable
+private fun LinkStatusLines(state: ConnectionState?, name: String, isStrap: Boolean, onRetry: () -> Unit) {
+    when (state) {
+        is ConnectionState.Failed -> {
+            val copy = SensorStatusCopy.failed(state, isStrap)
+            Text(copy.line, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            copy.detail?.let { Text(it, color = BarColors.Ghost, style = MaterialTheme.typography.labelSmall) }
+            if (copy.offerRetry || copy.offerTurnOnBluetooth) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (copy.offerRetry) {
+                        OutlinedButton(onClick = onRetry, contentPadding = ButtonDefaults.TextButtonContentPadding) {
+                            Text("Retry")
+                        }
+                    }
+                    if (copy.offerTurnOnBluetooth) TurnOnBluetoothButton()
+                }
+            }
+        }
+        is ConnectionState.Connecting ->
+            SensorStatusCopy.connecting(name, rememberConnectingMs(state))?.let {
+                Text(it, color = BarColors.Amber, style = MaterialTheme.typography.bodySmall)
+            }
+        is ConnectionState.Connected, ConnectionState.Disconnected, null -> Unit
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = viewModel()) {
@@ -187,6 +263,9 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
     val links by viewModel.linkAddresses.collectAsState()
     val roles by viewModel.sensorRoles.collectAsState()
     val rolesLine by viewModel.dualRolesLine.collectAsState()
+    // The device a Forget tap is asking about, or null (ble-devices F11): a
+    // sweaty mis-tap used to unpair the unit and drop its link at once.
+    var forgetting by remember { mutableStateOf<KnownDevice?>(null) }
 
     Scaffold(
         topBar = {
@@ -200,26 +279,39 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
             )
         },
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
-            // The troubleshooting screen. The per-device reason line below is
-            // left alone rather than replaced: it reports one link's last
-            // failure and carries five other reasons besides this one, and it
-            // is driven by ConnectionState where this is driven by the gate.
-            // They disagree for up to one backoff period after a grant, because
-            // the client keeps its stale Failed until the next connect attempt.
-            // No Spacer here: PermissionBanner carries its own trailing gap so
-            // one is not paid when the banner draws nothing (GRANTED).
-            PermissionBanner()
-            Text("Paired sensors", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(8.dp))
-            if (known.isEmpty()) {
-                Text(
-                    "None yet. Scan below and pair your bar sensor and heart-rate strap once — " +
-                        "the app auto-connects from then on.",
-                )
+        // ONE scrolling list for the whole screen (ble-devices F4). It used to
+        // be a fixed Column with only the found list scrolling in whatever
+        // height was left, so with two sensors and a strap paired the found
+        // list was squeezed to nothing, and on a small phone the Scan button
+        // could not be reached at all. Keys carry a prefix because a paired
+        // unit a running scan also sights is in both lists.
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(16.dp),
+        ) {
+            item(key = "header") {
+                Column {
+                    // The troubleshooting screen. The per-device lines below
+                    // report one link's last failure and are driven by
+                    // ConnectionState, where this is driven by the gate. They
+                    // disagree for up to one backoff period after a grant,
+                    // because the client keeps its stale Failed until the next
+                    // connect attempt. No Spacer here: PermissionBanner
+                    // carries its own trailing gap so one is not paid when the
+                    // banner draws nothing (GRANTED).
+                    PermissionBanner()
+                    Text("Paired sensors", style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(8.dp))
+                    if (known.isEmpty()) {
+                        Text(
+                            "None yet. Scan below and pair your bar sensor and heart-rate strap once — " +
+                                "the app auto-connects from then on.",
+                        )
+                    }
+                    DualSetupCard(setupStep, rolesLine)
+                }
             }
-            DualSetupCard(setupStep, rolesLine)
-            known.forEach { device ->
+            items(known, key = { "paired-${it.address}" }) { device ->
                 // Keyed on ADDRESS, not on role. Keyed on role, two saved
                 // devices of one role showed the same link on both rows --
                 // latent while nobody paired two IMUs, and real the moment #156
@@ -252,6 +344,13 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
                             rememberArmedDelivery(imuStateB, imuFrameAtMsB, imuArmedAtMsB)
                         DeviceLinkRole.HEART_RATE, DeviceLinkRole.NOT_LINKED -> null
                     }
+                val isStrap = device.role == DeviceRole.HRM
+                // "Sensor A", "Sensor B", "Bar sensor" or "Heart-rate strap" in
+                // the sentences; the chip gets the short form, "A ✓ 64%", or
+                // the dots' own "Bar" / "HR" (ble-devices F7, copy F4: the
+                // chip used to print the role enum, "IMU …").
+                val name = SensorStatusCopy.deviceName(isStrap, roles[device.address])
+                val chipLabel = roles[device.address]?.takeUnless { isStrap }?.name ?: roleChip(device.role)
                 Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                     Column(Modifier.padding(12.dp)) {
                         Row(horizontalArrangement = Arrangement.SpaceBetween) {
@@ -273,14 +372,7 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
                                     // reading at all.
                                     Text(it, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
                                 }
-                                if (state is ConnectionState.Failed) {
-                                    // This screen is the only surface that shows the reason string.
-                                    Text(
-                                        state.reason,
-                                        color = MaterialTheme.colorScheme.error,
-                                        style = MaterialTheme.typography.bodySmall,
-                                    )
-                                }
+                                LinkStatusLines(state, name, isStrap, onRetry = viewModel::retryNow)
                             }
                             if (state == null) {
                                 // NOT a Disconnected chip. No link is pointed
@@ -293,11 +385,11 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
                                     color = BarColors.Sub,
                                 )
                             } else {
-                                ConnectionChip(roleChip(device.role), state, delivery = delivery)
+                                ConnectionChip(chipLabel, state, delivery = delivery)
                             }
                             // Kept a TextButton (#201): it unpairs the unit, so it stays quieter
-                            // than the controls that pair one.
-                            TextButton(onClick = { viewModel.forget(device) }) { Text("Forget") }
+                            // than the controls that pair one. It asks first (ble-devices F11).
+                            TextButton(onClick = { forgetting = device }) { Text("Forget") }
                         }
                         // Outside the IMU block: which unit of a role the app
                         // reads is a question every role has, and the pairing
@@ -317,69 +409,83 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
                         if (device.role == DeviceRole.IMU) {
                             SensorRoleRow(
                                 assigned = roles[device.address],
-                                onAssign = { viewModel.setSensorRole(device.address, it) },
+                                onTap = { viewModel.tapSensorLabel(device.address, it) },
                             )
                         }
                     }
                 }
             }
-            Spacer(Modifier.height(16.dp))
-            Button(onClick = viewModel::toggleScan, modifier = Modifier.fillMaxWidth()) {
-                Text(if (scanning) "Stop scanning" else "Scan for sensors")
+            item(key = "scan") {
+                Column {
+                    Spacer(Modifier.height(16.dp))
+                    Button(onClick = viewModel::toggleScan, modifier = Modifier.fillMaxWidth()) {
+                        Text(if (scanning) "Stop scanning" else "Scan for sensors")
+                    }
+                    scanError?.let { raw ->
+                        // Plain words, the raw text small beneath, and the
+                        // one-tap fix when the phone's Bluetooth is what is
+                        // off (ble-devices F5).
+                        val copy = SensorStatusCopy.scanFailed(raw)
+                        Text(
+                            copy.line,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        copy.detail?.let {
+                            Text(it, color = BarColors.Ghost, style = MaterialTheme.typography.labelSmall)
+                        }
+                        if (copy.offerTurnOnBluetooth) TurnOnBluetoothButton()
+                    }
+                    // A pair, forget, label or switch that did not take (#50): before
+                    // it was caught, the same failure killed the process.
+                    actionError?.let {
+                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
             }
-            scanError?.let {
-                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-            }
-            // A pair, forget, label or switch that did not take (#50): before
-            // it was caught, the same failure killed the process.
-            actionError?.let {
-                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-            }
-            Spacer(Modifier.height(8.dp))
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                items(found, key = { it.device.address }) { entry ->
-                    val device = entry.device
-                    // Keyed by address, so a re-sighting redraws the row it is
-                    // already in rather than being treated as a new one. The
-                    // ORDER is decided by DeviceScanListPolicy, which does not
-                    // read the signal: a device must not move because a packet
-                    // arrived (#183).
-                    Card(Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(12.dp)) {
+            items(found, key = { "found-${it.device.address}" }) { entry ->
+                val device = entry.device
+                // Keyed by address, so a re-sighting redraws the row it is
+                // already in rather than being treated as a new one. The
+                // ORDER is decided by DeviceScanListPolicy, which does not
+                // read the signal: a device must not move because a packet
+                // arrived (#183).
+                Card(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text(
+                            "${device.name} · ${DevicePairingPolicy.unitTag(device.address)}",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = if (entry.row.alreadyPaired) BarColors.Sub else BarColors.Text,
+                        )
+                        Text(
+                            "${device.address} · ${device.rssi} dBm" +
+                                (device.likelyRole?.let { " · looks like a ${roleName(it).lowercase()}" } ?: ""),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = BarColors.Sub,
+                        )
+                        if (entry.row.alreadyPaired) {
+                            // Shown rather than hidden: a missing row reads
+                            // as "the scan did not find it", and while the
+                            // second unit is being paired this row is the
+                            // proof the first one is on and in range. The
+                            // pair buttons are what must not be here --
+                            // pairing again could only re-file the unit
+                            // under the other role, which would strand
+                            // preferred_imu on an address preferred(IMU)
+                            // no longer matches.
                             Text(
-                                "${device.name} · ${DevicePairingPolicy.unitTag(device.address)}",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = if (entry.row.alreadyPaired) BarColors.Sub else BarColors.Text,
-                            )
-                            Text(
-                                "${device.address} · ${device.rssi} dBm" +
-                                    (device.likelyRole?.let { " · looks like a ${roleName(it).lowercase()}" } ?: ""),
+                                "Already paired · listed above",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = BarColors.Sub,
                             )
-                            if (entry.row.alreadyPaired) {
-                                // Shown rather than hidden: a missing row reads
-                                // as "the scan did not find it", and while the
-                                // second unit is being paired this row is the
-                                // proof the first one is on and in range. The
-                                // pair buttons are what must not be here --
-                                // pairing again could only re-file the unit
-                                // under the other role, which would strand
-                                // preferred_imu on an address preferred(IMU)
-                                // no longer matches.
-                                Text(
-                                    "Already paired · listed above",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = BarColors.Sub,
-                                )
-                            } else {
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    OutlinedButton(onClick = { viewModel.pair(device, DeviceRole.IMU) }) {
-                                        Text("Pair as bar sensor")
-                                    }
-                                    OutlinedButton(onClick = { viewModel.pair(device, DeviceRole.HRM) }) {
-                                        Text("Pair as heart-rate strap")
-                                    }
+                        } else {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(onClick = { viewModel.pair(device, DeviceRole.IMU) }) {
+                                    Text("Pair as bar sensor")
+                                }
+                                OutlinedButton(onClick = { viewModel.pair(device, DeviceRole.HRM) }) {
+                                    Text("Pair as heart-rate strap")
                                 }
                             }
                         }
@@ -387,6 +493,24 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
                 }
             }
         }
+    }
+
+    forgetting?.let { device ->
+        val name = SensorStatusCopy.deviceName(device.role == DeviceRole.HRM, roles[device.address])
+        AlertDialog(
+            onDismissRequest = { forgetting = null },
+            title = { Text("Forget $name?") },
+            text = { Text("BarSpeed stops connecting to it. To use it again, scan and pair it.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.forget(device)
+                        forgetting = null
+                    },
+                ) { Text("Forget") }
+            },
+            dismissButton = { TextButton(onClick = { forgetting = null }) { Text("Cancel") } },
+        )
     }
 }
 

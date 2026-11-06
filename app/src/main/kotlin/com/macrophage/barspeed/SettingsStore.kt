@@ -150,11 +150,21 @@ class SettingsStore(private val context: Context) {
                 .toMap()
         }
 
-    /** Label a device, or clear its label when [role] is null. */
-    suspend fun setSensorRole(address: String, role: SensorRole?) {
-        val key = stringPreferencesKey("$SENSOR_ROLE_KEY_PREFIX$address")
+    /**
+     * Write several devices' labels in ONE edit (ble-devices F3).
+     *
+     * A swap moves two labels, and two separate edits would let
+     * [sensorRoles] emit the moment between them, when both units carry one
+     * label; the Devices screen's auto-labelling collector would see that
+     * collision, and so would a set started in that instant. One edit, one
+     * emission.
+     */
+    suspend fun setSensorRoles(roles: Map<String, SensorRole>) {
+        if (roles.isEmpty()) return
         context.settingsDataStore.edit { prefs ->
-            if (role == null) prefs.remove(key) else prefs[key] = SensorCapturePolicy.wireOf(role)
+            roles.forEach { (address, role) ->
+                prefs[stringPreferencesKey("$SENSOR_ROLE_KEY_PREFIX$address")] = SensorCapturePolicy.wireOf(role)
+            }
         }
     }
 
