@@ -5,6 +5,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -38,20 +39,54 @@ class SchemaSensorCoverageContractTest {
 
     private val marker = "1.26 (#242, #287, a unit that cannot stand for the set beside its partner)"
 
+    /**
+     * Review round 1 (lens A 2, lens B B2): the rule compares SPANS, first
+     * arrival to last, and never reads where a stream ended; the text said it
+     * ended short. It now says what is computed, that a late start reads the
+     * same, and that a mid-set gap is not caught.
+     */
     @Test
     fun `analysedFellBack names all three causes`() {
         val d = sensorDescription("analysedFellBack")
-        for (fact in listOf("THREE CAUSES", "STOPPED EARLY", "NEVER MOVED", "0.01 g", "one second")) {
+        val facts =
+            listOf("THREE CAUSES", "SPANNED LESS OF THE SET", "STARTED LATE", "NEVER MOVED", "0.01 g", "one second")
+        for (fact in facts) {
             assertTrue(fact in d, "analysedFellBack does not state: $fact")
         }
+        assertTrue("A GAP IS NOT CAUGHT" in d, "analysedFellBack does not name the mid-set dropout it misses")
+        assertFalse("its stream ending more than one second" in d, "analysedFellBack still says the stream ENDED short")
+    }
+
+    /** Review round 1 (lens A 1): the opener said too few frames was the only cause. */
+    @Test
+    fun `analysedFellBack opens with the 1_26 causes`() {
+        val opener = sensorDescription("analysedFellBack").substringBefore(" ABSENT means")
+        assertTrue("FROM 1.26" in opener, "the analysedFellBack opener still names one cause: $opener")
+    }
+
+    /**
+     * Review round 1 (lens A 4, lens B B3): a still or short-span unit is named
+     * in `silent` whenever its link was not delivering as the set ended, so
+     * "`silent` does not name it" was a false absolute; and the `silent`
+     * opener and its "written only where" sentence said too few frames alone.
+     */
+    @Test
+    fun `silent says when a unit moved off for the 1_26 causes is named`() {
+        val fellBack = sensorDescription("analysedFellBack")
+        assertFalse("so `silent` does not name it" in fellBack, "the false absolute about silent is still stated")
+        assertTrue("named in `silent` only when its link was not delivering" in fellBack, "fellBack: when named")
+        val silent = sensorDescription("silent")
+        assertTrue("or, FROM 1.26 (#242, #287), were moved off" in silent.substringBefore(" keyed by role"))
+        assertTrue("Until 1.26 the row was written only where" in silent, "silent: written-only-where unqualified")
+        assertTrue("or one that never moved while its partner did" in silent, "silent: the still unit")
     }
 
     @Test
     fun `the fallback basis and silent say what they now cover`() {
         val basis = sensorDescription("analysedRoleBasis")
-        assertTrue("stopped early" in basis && "never moved" in basis, "fallback does not cover the two causes")
+        assertTrue("started late or stopped early" in basis && "never moved" in basis, "fallback: the two causes")
         assertTrue("never the one a `stackSignature` names" in basis, "a still unit's signature is not ruled out")
-        assertTrue("stopped early beside its partner" in sensorDescription("silent"), "silent: the early stop")
+        assertTrue("started late or stopped early beside its partner" in sensorDescription("silent"), "silent: span")
     }
 
     @Test
@@ -62,14 +97,33 @@ class SchemaSensorCoverageContractTest {
         for (fact in listOf("NOT RETROACTIVE", "DATABASE_VERSION does NOT move", "94 ms", "0.0374 g")) {
             assertTrue(fact in entry, "the #242/#287 entry does not state: $fact")
         }
+        assertTrue("SPAN -- first arrival to last" in entry, "the #242 entry does not say it compares spans")
+        assertTrue("is NOT caught" in entry, "the #242 entry does not name the mid-set dropout")
+        assertFalse("stream ENDED more than one second" in entry, "the #242 entry still says the stream ENDED short")
     }
 
     @Test
     fun `the shipped prompt says the analysis also moves off an early stop or a still unit`() {
         assertTrue(
-            "also off a unit that stopped early beside its partner, or never moved while its partner did" in
-                shippedPrompt,
+            "also off a unit whose stream spanned less of the set than its partner's -- it started late or " +
+                "stopped early -- or never moved while its partner did" in shippedPrompt,
             "the coach is not told the two new causes",
+        )
+        assertTrue("came back before the end spans the set" in shippedPrompt, "the coach: the gap is not named")
+    }
+
+    /** Review round 1 (lens A 1): the prompt's own definitions of the two keys said too few frames alone. */
+    @Test
+    fun `the shipped prompt's definitions of analysedFellBack and silent carry the 1_26 causes`() {
+        assertFalse(
+            "true only when the unit the set ARMED delivered too few frames to analyse while" in shippedPrompt,
+            "the prompt still says analysedFellBack is only too few frames",
+        )
+        assertTrue("could not stand for the set while another could" in shippedPrompt)
+        assertTrue(
+            "one the analysis moved off for a short span or for never moving, but only when its link was not" in
+                shippedPrompt,
+            "the prompt's silent definition still says too few frames alone",
         )
     }
 }
