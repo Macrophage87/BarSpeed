@@ -149,7 +149,7 @@ private val SECTIONS =
         ),
         GuideSection(
             "Voice",
-            "Voice count is ON by default, with the rest countdown. When you tap the reps, each " +
+            "Voice cues are ON by default, with the rest countdown. When you tap the reps, each " +
                 "rep is called, then 'last rep' and 'done'. When the sensor counts, each rep is " +
                 "called at lockout, with the target marked: 'Rep 4, last rep', 'Rep 5, target'. " +
                 "It never says 'done', so keep going if you have more and end the set yourself. " +
@@ -177,7 +177,9 @@ private val SECTIONS =
                 "they're performed, starting on 'Up', with the same two rules. Guided mode is " +
                 "automatic for tempo work when no sensor is connected. Holds and carries get " +
                 "spoken time checks every 5 seconds remaining, then a second-by-second count " +
-                "from 10.",
+                "from 10. Turn voice cues off or on with the 'Voice cues' switch: on the setup " +
+                "and ready screens, and at the top of Record during a set and the rest. " +
+                "Tempo sets still call the cadence.",
         ),
         GuideSection(
             "Exports",

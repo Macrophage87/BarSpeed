@@ -60,6 +60,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -139,6 +140,7 @@ import com.macrophage.barspeed.model.TempoAdjustPolicy
 import com.macrophage.barspeed.model.TempoDigit
 import com.macrophage.barspeed.model.TimedSetEndPolicy
 import com.macrophage.barspeed.model.UnwrittenClose
+import com.macrophage.barspeed.model.VoiceCueControl
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.record.PlannedSlot
 import com.macrophage.barspeed.record.RecordEntry
@@ -285,7 +287,7 @@ fun RecordScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(titleFor(state)) },
+                title = { Text(titleFor(state), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
                     // Kept a TextButton (#201): the app bar's navigation slot, the same act as the
                     // system back gesture. Leaving mid-set is the loss the exit gate guards, so it
@@ -295,8 +297,14 @@ fun RecordScreen(
                 actions = {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(end = 16.dp),
                     ) {
+                        // The voice switch, during a set and the rest: the two
+                        // stages that had none, so from set 2 on the voice
+                        // could not be muted or unmuted (settings-onboarding
+                        // F1). SETUP and READY draw it inline with its caption.
+                        if (VoiceCueControl.inTopBar(state.stage)) AudioCueChip(state, viewModel)
                         // Two dots only when a second sensor is really in play:
                         // two paired, both labelled, and this set armed for
                         // both. Otherwise the bar would carry a permanently
@@ -1018,8 +1026,9 @@ private fun SetupStage(state: RecordState, viewModel: RecordViewModel, hideResum
     OutlinedButton(onClick = viewModel::startAdHocSession, modifier = Modifier.fillMaxWidth()) {
         Text("Start ad-hoc session (no plan)")
     }
-    Spacer(Modifier.height(8.dp))
-    AudioCueChip(state, viewModel)
+    // Clear of the button above, record-setup F9's reason on READY.
+    Spacer(Modifier.height(24.dp))
+    AudioCueChipWithCaption(state, viewModel)
 }
 
 /**
@@ -1091,13 +1100,25 @@ private fun foregroundRefusalText(failure: ForegroundStartFailure): String {
         "Keep the screen on until this set is saved; the next set tries again."
 }
 
+/** The voice switch; its words and where it is drawn are [VoiceCueControl]'s. */
 @Composable
 private fun AudioCueChip(state: RecordState, viewModel: RecordViewModel) {
     FilterChip(
         selected = state.audioCues,
         onClick = viewModel::toggleAudioCues,
-        label = { Text(if (state.audioCues) "Voice count ON" else "Voice count off") },
+        label = { Text(VoiceCueControl.label(state.audioCues)) },
     )
+}
+
+/**
+ * The inline switch on SETUP and READY, with the one line that says what it
+ * leaves on: a guided cadence speaks whatever the switch says
+ * (settings-onboarding F2).
+ */
+@Composable
+private fun AudioCueChipWithCaption(state: RecordState, viewModel: RecordViewModel) {
+    AudioCueChip(state, viewModel)
+    Text(VoiceCueControl.TEMPO_CAPTION, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
 }
 
 @Composable
@@ -1175,15 +1196,17 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
     // close is where it is (#49, #333). READY draws SessionCloseControls below,
     // so a close can be asked for here; beginSet asks the same question, so a
     // tap that reaches it anyway starts nothing.
+    // The voice switch sits ABOVE START, 24 dp clear of it. It sat 8 dp under
+    // the 56 dp button, where a thumb that missed START by a few millimetres
+    // silenced the set (record-setup F9).
+    AudioCueChipWithCaption(state, viewModel)
+    Spacer(Modifier.height(24.dp))
     if (RestControlPolicy.readyMayStartSet(state.sessionClose)) {
         Button(onClick = confirmTap(viewModel::beginSet), modifier = Modifier.fillMaxWidth().height(56.dp)) {
             Text(CountingPolicy.startSetLabel(counter), fontWeight = FontWeight.Bold)
         }
     }
     Spacer(Modifier.height(8.dp))
-    // The Row went with the demo chip (#262). It spaced two chips; one chip
-    // lays out identically without it, at the same Start alignment.
-    AudioCueChip(state, viewModel)
     SessionCloseControls(state, viewModel)
 }
 
