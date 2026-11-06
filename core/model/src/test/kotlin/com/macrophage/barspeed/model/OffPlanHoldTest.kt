@@ -2,8 +2,10 @@ package com.macrophage.barspeed.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * What the lifter said about a block survives an off-plan set run in the
@@ -88,10 +90,50 @@ class OffPlanHoldTest {
     }
 
     @Test
-    fun `only a one-set added slot is an off-plan slot`() {
-        assertEquals(true, OffPlanHold.isOffPlan(isAddedSet = true, setIndexInExercise = 0, setsInExercise = 1))
-        // ADD SET's appended set of a block is added but continues the block.
-        assertEquals(false, OffPlanHold.isOffPlan(isAddedSet = true, setIndexInExercise = 3, setsInExercise = 4))
-        assertEquals(false, OffPlanHold.isOffPlan(isAddedSet = false, setIndexInExercise = 0, setsInExercise = 1))
+    fun `an added set of another lift than the held slot's gives the hold back as it leaves`() {
+        val held = assertNotNull(OffPlanHold.hold(displaced = a2, stated = standing, side = null))
+        // The off-plan curl, and ADD SET's second curl (set index 1): both added, both another lift.
+        assertTrue(OffPlanHold.departs(isAddedSet = true, departingExerciseId = "leg_curl", held = held))
+        // ADD SET's appended set of the held slot's own lift continues that block.
+        assertFalse(OffPlanHold.departs(isAddedSet = true, departingExerciseId = "leg_press", held = held))
+        assertFalse(OffPlanHold.departs(isAddedSet = false, departingExerciseId = "leg_curl", held = held))
+        assertFalse(OffPlanHold.departs(isAddedSet = true, departingExerciseId = "leg_curl", held = null))
+    }
+
+    @Test
+    fun `a displaced planned slot is held, and a displaced added slot keeps the hold standing`() {
+        val standingHold = HeldStatements(a2, standing, side = null)
+        val corrected = NextSetStatements(loadKg = 110.0, reps = null, durationS = null, tempo = null)
+        val heldA = OffPlanHold.holdOnDisplace(a2, displacedIsAdded = false, corrected, null, standing = null)
+        assertEquals(110.0, assertNotNull(heldA).stated.loadKg)
+        assertEquals(
+            standingHold,
+            OffPlanHold.holdOnDisplace(curl, displacedIsAdded = true, NextSetStatements.NONE, null, standingHold),
+        )
+    }
+
+    /**
+     * Review of fullrev-fix-data: A0, off-plan curl, A1. The curl runs and A1
+     * gets 100 back (hold spent); then "Add another" curl lands in front of A1
+     * and wiped the 100, and after it (an added set at index 1, not one-set)
+     * nothing carried, so A1 recorded 90.
+     */
+    @Test
+    fun `a second set of the off-plan lift added in front of the block keeps the block's load`() {
+        val held = OffPlanHold.holdOnDisplace(a2, displacedIsAdded = false, standing, null, standing = null)
+        assertTrue(OffPlanHold.departs(isAddedSet = true, departingExerciseId = "leg_curl", held = held))
+        val firstBack = assertNotNull(OffPlanHold.resumed(held, next = a2))
+        assertEquals(100.0, firstBack.inputs.statedKg)
+        // Spent; ADD SET of the curl now displaces A1 with 100 standing for it.
+        val stated =
+            NextSetStatements(
+                firstBack.inputs.statedKg,
+                firstBack.inputs.statedReps,
+                null,
+                firstBack.inputs.statedTempo,
+            )
+        val again = OffPlanHold.holdOnDisplace(a2, displacedIsAdded = false, stated, null, standing = null)
+        assertTrue(OffPlanHold.departs(isAddedSet = true, departingExerciseId = "leg_curl", held = again))
+        assertEquals(100.0, assertNotNull(OffPlanHold.resumed(again, next = a2)).inputs.statedKg)
     }
 }

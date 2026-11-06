@@ -170,6 +170,39 @@ class OffPlanSetTest {
         assertNull(removed.heldStatements)
     }
 
+    /**
+     * Review of fullrev-fix-data: off-plan curl, run, and the squat's 110 given
+     * back (hold spent); then "Add another" curl lands in front of squat set 2.
+     * appendedState re-seeded to NONE and wiped the 110, and the second curl
+     * (added, set index 1) was not read as off-plan, so set 2 recorded 100.
+     *
+     * The rest after the second curl runs through restingState, which a test
+     * here cannot drive (it takes a PendingSetWrite); removing the second curl
+     * goes through the same OffPlanHold.departs / resumed pair.
+     */
+    @Test
+    fun `adding another set of the off-plan lift keeps the block's standing load`() {
+        val inserted = assertNotNull(offPlanAddedState(resting(queueIndex = 0), "leg_curl"))
+        // The curl has run and the 110 stands for squat set 2 again.
+        val afterCurl =
+            inserted.copy(queueIndex = 1, loadInput = "110", statedLoadKg = 110.0, heldStatements = null)
+        val appended = assertNotNull(appendedState(afterCurl))
+        assertEquals(
+            listOf("back_squat", "leg_curl", "leg_curl", "back_squat", "back_squat"),
+            appended.queue.map {
+                it.exercise.id
+            },
+        )
+        val held = assertNotNull(appended.heldStatements)
+        assertEquals("back_squat", held.slot.exerciseId)
+        assertEquals(1, held.slot.setIndexInExercise)
+        assertEquals(110.0, held.stated.loadKg)
+        val removed = assertNotNull(removedState(appended))
+        assertEquals(110.0, removed.statedLoadKg)
+        assertEquals("110", removed.loadInput)
+        assertNull(removed.heldStatements)
+    }
+
     @Test
     fun `an off-plan set holds the statements standing for the slot it displaces`() {
         val corrected = resting(queueIndex = 0).copy(loadInput = "110", statedLoadKg = 110.0)
