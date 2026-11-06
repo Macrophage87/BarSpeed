@@ -101,8 +101,8 @@ data class RecordedSensors(
      * whichever unit's own roll says it rode the stack, which can be the
      * partner while this flag stays FALSE. [analysedRoleBasis] is what
      * separates the two, and this flag keeps meaning exactly one thing --
-     * the armed unit went quiet -- because `SetAnalyzer` blanks a set on it
-     * (#247) and a signature flip must not be blanked.
+     * the armed unit could not stand for the set -- because `SetAnalyzer`
+     * blanks a set on it (#247) and a signature flip must not be blanked.
      *
      * TOO FEW, not none, since #209. The armed unit may have put a handful of
      * frames in its buffer and a file in the raw archive; what it did not do
@@ -174,11 +174,13 @@ data class RecordedSensors(
      */
     val shortfall: DualShortfall? = null,
     /**
-     * Which ARMED roles delivered too few frames to analyse across this whole
-     * set, and what the app could see of each one's link when the set ended
-     * (#213, #209) -- and since #242 and #287 also an armed role
-     * [SensorCapturePolicy.analysable] refused for a short span or for never
-     * moving, named only when its link was not delivering as the set ended.
+     * Which ARMED roles [SensorCapturePolicy.analysable] refused -- for too
+     * few frames to analyse across this whole set (#213, #209), or since #242
+     * and #287 for a short span or for never moving -- and what the app could
+     * see of each one's link when the set ended. Whatever the cause, a role is
+     * named only when its link was not delivering as the set ended, so one
+     * whose last frame landed inside the three seconds before the end is not
+     * named on a set of any length (`ArmedCaptureTest` pins it).
      *
      * TOO FEW RATHER THAN NONE since #209, and it is the same boundary the
      * analysis uses: a role under [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES]
@@ -226,7 +228,8 @@ data class RecordedSensors(
     /**
      * What the app could see of the ONE armed link on a set whose stream
      * carries no role, or null when that link delivered a stream the
-     * analysis could run on or there was none (#224, bar widened by #209).
+     * analysis could run on, was still delivering as the set ended, or there
+     * was none (#224, bar widened by #209).
      *
      * [silent]'s answer for the set that has no key to hang it off. A role
      * exists only where two paired units carry two different labels, so on one
@@ -258,9 +261,11 @@ data class RecordedSensors(
      *
      * NULL MEANS THE SET CAPTURED A STREAM THE ANALYSIS COULD USE from that
      * one link -- at least [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES] of it,
-     * since #209 -- or, on a set shorter than
-     * [ArmedSilencePolicy.SILENT_AFTER_MS], that its last frame arrived during
-     * the preceding rest and read as delivering -- or that the row was written
+     * since #209 -- or that it sent fewer but was still delivering as the set
+     * ended: its last frame landed inside the
+     * [ArmedSilencePolicy.SILENT_AFTER_MS] ending at the set's end, on a set of
+     * any length, and on a shorter set that frame can be one from the
+     * preceding rest -- or that the row was written
      * by a build that could not observe an unroled link at all, so a row that
      * says nothing here was never asked. A link that fed a whole set and then
      * went silent is null here too: the caller refuses the word wherever the
@@ -965,8 +970,8 @@ object SensorCapturePolicy {
      *   on its span does not count as moving, so an armed unit that moved and
      *   stopped half way, beside a covering partner that never moved, hands
      *   the analysis to the still partner, flagged as a fallback -- not the
-     *   other way round, which would keep figures describing half the set
-     *   with nothing saying so. Where that still unit's roll is read as
+     *   other way round, which would keep figures describing half the set,
+     *   flagged at most by `silent`, never by `analysedFellBack`. Where that still unit's roll is read as
      *   riding a load, the fallback is then refused in `SetAnalyzer` under
      *   either kind of declaration (#247, #279); what the analysis resolves
      *   from such a stream otherwise is not pinned. `ShortOrStillUnitTest`
