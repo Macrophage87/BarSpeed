@@ -138,8 +138,10 @@ class CycleRepCounter internal constructor(
         val magnitude = live.accMagnitudeG ?: return RepCall.Hold
         val quiet = live.quiet ?: return RepCall.Hold
         val before = rule.called
-        lastClosed = rule.feed(LiveFrame(live.elapsedS, live.accelMps2 * driveSign, magnitude, quiet))
-        return if (rule.called > before) RepCall.Speak(rule.called, timestampMs) else RepCall.Hold
+        val closed = rule.feed(LiveFrame(live.elapsedS, live.accelMps2 * driveSign, magnitude, quiet))
+        lastClosed = closed
+        if (rule.called <= before) return RepCall.Hold
+        return RepCall.Speak(rule.called, timestampMs, closed?.let { DriveWindow(it.driveStartS, it.driveEndS) })
     }
 }
 

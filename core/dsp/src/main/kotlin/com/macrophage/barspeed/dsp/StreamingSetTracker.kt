@@ -213,6 +213,28 @@ class StreamingSetTracker(
     /** Latched false by [noteRunaway]; published as [LiveSetState.countTrusted]. */
     private var countTrusted = true
 
+    private val driveRunRing = ArrayDeque<DriveRun>()
+
+    /**
+     * One movement run in the DRIVE direction that passed the same
+     * qualification gate the tracker's own count reads, whether or not that
+     * count paired it into a rep. Seconds on [LiveSetState.elapsedS]'s clock;
+     * [meanMps] and [peakMps] are the run's mean and peak velocity in the drive
+     * direction, the figures [countRep] would have taken from it.
+     */
+    data class DriveRun(val startS: Double, val endS: Double, val meanMps: Double, val peakMps: Double)
+
+    /**
+     * The last [DRIVE_RUN_RING] qualified drive runs, oldest first.
+     *
+     * Read by [LiveRepFigures], which gives each call of the live counter the
+     * run its drive falls in. That is how a bar comes to belong to a rep the
+     * voice called rather than to one [countRep] paired: on a sensor-counted
+     * set the two counts are different rules and need not agree.
+     */
+    val recentDriveRuns: List<DriveRun>
+        get() = driveRunRing.toList()
+
     var state: LiveSetState = LiveSetState()
         private set
 
@@ -366,6 +388,7 @@ class StreamingSetTracker(
                     runDisplacement <= thresholds.maxRunDisplacementM
             if (qualified) {
                 lastQualifiedRunType = runType
+                if (isConcentric(runType)) noteDriveRun(timeS)
                 onQualifiedRun(runType)
             }
         }
@@ -419,6 +442,12 @@ class StreamingSetTracker(
         }
     }
 
+    private fun noteDriveRun(endS: Double) {
+        val mean = if (runSampleCount > 0) runVelocitySum / runSampleCount else 0.0
+        driveRunRing.addLast(DriveRun(runStartS, endS, mean, runVelocityMax))
+        if (driveRunRing.size > DRIVE_RUN_RING) driveRunRing.removeFirst()
+    }
+
     private fun countRep() {
         repCount++
         if (runSampleCount > 0) repVelocities += runVelocitySum / runSampleCount
@@ -442,6 +471,9 @@ class StreamingSetTracker(
                 velocityScale = direction.sensorToLifter,
                 driveIsPositive = direction.driveIsPositive,
             )
+
+        /** How many qualified drive runs [recentDriveRuns] keeps. */
+        const val DRIVE_RUN_RING = 8
 
         const val RATE_WARMUP_SAMPLES = 24
         const val RATE_WARMUP_SPAN_S = 1.0

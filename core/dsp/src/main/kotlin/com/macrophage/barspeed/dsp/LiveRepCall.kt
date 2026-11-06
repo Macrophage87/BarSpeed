@@ -24,9 +24,24 @@ sealed interface RepCall {
      * decision, on the same epoch-ms clock as the IMU stream, the cue track
      * and the rep marks -- so a caller writing this to the cue track writes an
      * instant every other stream can be lined up against.
+     *
+     * [drive] is the drive the call closes, on `LiveSetState.elapsedS`'s clock,
+     * where the counter knows it: [CycleRepCounter] sets it, the two retired
+     * counters leave it null. [LiveRepFigures] reads it to give the call its
+     * own bar.
      */
-    data class Speak(val count: Int, val atTimestampMs: Long) : RepCall
+    data class Speak(val count: Int, val atTimestampMs: Long, val drive: DriveWindow? = null) : RepCall
 }
+
+/**
+ * The drive a rep call closes: when the counter's drive run started and ended,
+ * in seconds on `LiveSetState.elapsedS`'s reconstructed clock.
+ *
+ * What the counter measured as the DRIVE -- for [CycleRepCounter] a run of
+ * smoothed drive-frame acceleration -- and not a velocity run: it ends where
+ * the bar stops speeding up, which is before the lockout.
+ */
+data class DriveWindow(val startS: Double, val endS: Double)
 
 /**
  * The batch rep detector, applied to the set as it arrives. Issue #145.

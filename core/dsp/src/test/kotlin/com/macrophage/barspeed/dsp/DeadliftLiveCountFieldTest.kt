@@ -138,6 +138,26 @@ class DeadliftLiveCountFieldTest {
         return spoken
     }
 
+    /**
+     * The bars a sensor-counted set draws under the count, beside the calls:
+     * `RecordViewModel`'s wiring, tracker -> counter -> [LiveRepFigures], with
+     * the counter from `LiveRepCounters.forCounted` as in [liveCalls].
+     */
+    private fun liveBars(fixture: String): Pair<List<RepCall.Speak>, List<RepFigure?>> {
+        val tracker = StreamingSetTracker.forLift(deadlift)
+        val counter = LiveRepCounters.forCounted(RepCounter.SENSOR, deadlift) ?: error("no counter")
+        val figures = LiveRepFigures()
+        val spoken = mutableListOf<RepCall.Speak>()
+        for (sample in load(fixture)) {
+            val call = counter.feed(tracker.feed(sample), sample.timestampMs)
+            if (call is RepCall.Speak) {
+                spoken += call
+                figures.onCall(call, tracker.recentDriveRuns)
+            }
+        }
+        return spoken to figures.figures
+    }
+
     private fun finalState(fixture: String): LiveSetState {
         val tracker = StreamingSetTracker.forLift(deadlift)
         var state = LiveSetState()
@@ -232,6 +252,29 @@ class DeadliftLiveCountFieldTest {
             assertFalse(state.countTrusted, "${set.name}: countTrusted")
             val partner = finalState("${set.name}-imu-b")
             assertFalse(partner.countTrusted, "${set.name}-imu-b: countTrusted")
+        }
+    }
+
+    /**
+     * As many bars as the voice said, on every stream of every set (dsp-core
+     * F1, UX review 2026-11-06).
+     *
+     * The bars used to be the tracker's own pairing, the [shippedCalls] rule:
+     * 3, 1 and 2 bars under a count of 5, 5 and 5 (the `state.repCount` pin
+     * above is that number). Now there is one bar per call, and a call no
+     * qualified tracker run lines up with is a bar with no figure, not a missing
+     * bar. Role b is pinned too: it calls five on each set, and its integrator
+     * gives a figure to only two of fifteen.
+     */
+    @Test
+    fun `the live bars are as many as the calls, and a call without a run is a bar without a figure`() {
+        sets.forEach { set ->
+            listOf(set.name, "${set.name}-imu-b").forEach { stream ->
+                val (calls, bars) = liveBars(stream)
+                assertEquals(calls.size, bars.size, "$stream: bars against calls")
+                assertEquals(5, bars.size, "$stream: bars")
+                assertTrue(calls.all { it.drive != null }, "$stream: every cycle call names its drive")
+            }
         }
     }
 
