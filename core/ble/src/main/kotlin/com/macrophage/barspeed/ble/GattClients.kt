@@ -24,6 +24,7 @@ import com.macrophage.barspeed.model.ConnectionPriorityPolicy
 import com.macrophage.barspeed.model.ConnectionState
 import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ImuSample
+import com.macrophage.barspeed.model.SensorBattery
 import com.macrophage.barspeed.witmotion.WitmotionCommands
 import com.macrophage.barspeed.witmotion.WitmotionFrame
 import com.macrophage.barspeed.witmotion.WitmotionProtocol
@@ -188,6 +189,15 @@ abstract class GattClient(protected val context: Context) {
          */
         const val NO_LINK_OPENED_REASON = "No link could be opened"
     }
+
+    /**
+     * Ask the unit for its battery again, if this link is connected (UX
+     * review 2026-11-06, ble-devices F2). Every connect already asks once,
+     * in [onReady]; `AutoConnectManager` calls this every
+     * `SensorBattery.REFRESH_INTERVAL_MS` so the percent on screen is not
+     * the one read at connect time an hour ago. A no-op by default.
+     */
+    open fun refreshBattery() {}
 
     protected fun updateBattery(pct: Int) {
         val current = stateFlow.value
@@ -364,7 +374,7 @@ class WitmotionClient(context: Context, private val clock: () -> Long = System::
                 is WitmotionFrame.Measurement -> samplesFlow.tryEmit(frame.sample)
                 is WitmotionFrame.RegisterData ->
                     if (frame.startRegister == WitmotionProtocol.REG_BATTERY && frame.values.isNotEmpty()) {
-                        updateBattery(estimateBatteryPct(frame.values[0].toInt()))
+                        updateBattery(SensorBattery.percentFromCentivolts(frame.values[0].toInt()))
                     }
             }
         }
@@ -397,10 +407,24 @@ class WitmotionClient(context: Context, private val clock: () -> Long = System::
         }
     }
 
-    /** WT901BLECL reports battery voltage in centivolts; map to a rough percent. */
-    private fun estimateBatteryPct(centivolts: Int): Int {
-        val volts = centivolts / 100.0
-        return (((volts - 3.4) / (4.1 - 3.4)) * 100).toInt().coerceIn(0, 100)
+    /**
+     * The battery register again (ble-devices F2), on the main-looper handler
+     * [onReady]'s commands go through. Skipped unless Connected: before then
+     * [onReady] has not run and nothing is unlocked.
+     *
+     * The register reports centivolts; `SensorBattery.percentFromCentivolts`
+     * is the map, moved there unchanged so a test holds it.
+     *
+     * WHETHER A REGISTER READ MID-STREAM COSTS ANY 100 Hz FRAMES has not been
+     * watched on a WT901BLECL: [Field]. The reply is one RegisterData frame in
+     * the same notify stream, which the decoder already separates from
+     * measurements, but what the unit's firmware does to its own output while
+     * it answers is not something this code can see.
+     */
+    override fun refreshBattery() {
+        val g = gatt ?: return
+        if (connectionState.value !is ConnectionState.Connected) return
+        commandHandler.post { writeCommand(g, WitmotionCommands.readRegister(WitmotionProtocol.REG_BATTERY)) }
     }
 
     private companion object {
@@ -421,6 +445,16 @@ class HrmClient(context: Context, private val clock: () -> Long = System::curren
     val samples: SharedFlow<HrSample> = samplesFlow
 
     override fun onReady(gatt: BluetoothGatt) {
+        readBattery(gatt)
+    }
+
+    /** The strap's standard battery characteristic again; see [GattClient.refreshBattery]. */
+    override fun refreshBattery() {
+        val g = gatt ?: return
+        if (connectionState.value is ConnectionState.Connected) readBattery(g)
+    }
+
+    private fun readBattery(gatt: BluetoothGatt) {
         try {
             gatt.getService(UUID.fromString(HeartRateProfile.BATTERY_SERVICE_UUID))
                 ?.getCharacteristic(UUID.fromString(HeartRateProfile.BATTERY_LEVEL_CHARACTERISTIC_UUID))

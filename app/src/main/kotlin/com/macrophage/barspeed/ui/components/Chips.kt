@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -9,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -16,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import com.macrophage.barspeed.model.ArmedDelivery
 import com.macrophage.barspeed.model.ArmedSilencePolicy
 import com.macrophage.barspeed.model.ConnectionState
+import com.macrophage.barspeed.model.SensorBattery
 import com.macrophage.barspeed.ui.BarColors
 import kotlinx.coroutines.delay
 
@@ -97,6 +100,14 @@ fun rememberArmedDelivery(state: ConnectionState, frameAtMs: Long?, armedAtMs: L
  * strap passes null: nothing publishes its frame arrivals, and a dot that
  * turned amber because nobody looked would be the same false claim in the
  * other direction.
+ *
+ * The battery percent sits beside the dot while the link is connected and
+ * has a reading, amber with "low" under `SensorBattery.LOW_PCT` (UX review
+ * 2026-11-06, ble-devices F2). It used to be drawn only on Devices, so the
+ * first sign of a flat sensor was a set that stopped counting. The text and
+ * the threshold are `SensorBattery`'s, where a test holds them. Its colour is
+ * its own, separate from the dot's, so a low battery never reads as a link
+ * state.
  */
 @Composable
 fun SensorDot(label: String, state: ConnectionState, modifier: Modifier = Modifier, delivery: ArmedDelivery? = null) {
@@ -109,12 +120,17 @@ fun SensorDot(label: String, state: ConnectionState, modifier: Modifier = Modifi
             is ConnectionState.Failed -> BarColors.Red
             is ConnectionState.Disconnected -> BarColors.Ghost
         }
-    Text(
-        "$label ●",
-        style = MaterialTheme.typography.bodySmall,
-        color = color,
-        modifier = modifier,
-    )
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        Text("$label ●", style = MaterialTheme.typography.bodySmall, color = color)
+        SensorBattery.badgeOf(state)?.let { badge ->
+            Text(
+                " $badge",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (SensorBattery.isLowOf(state)) BarColors.Amber else BarColors.Sub,
+                fontWeight = if (SensorBattery.isLowOf(state)) FontWeight.SemiBold else null,
+            )
+        }
+    }
 }
 
 /**
@@ -153,7 +169,10 @@ fun ConnectionChip(
                     // why, which the app does not know.
                     "$label no data" to ChipTone.WARN
                 } else {
-                    ("$label ✓" + (state.batteryPct?.let { " $it%" } ?: "")) to ChipTone.OK
+                    // Low battery turns the chip amber (ble-devices F2); the
+                    // words are SensorBattery's, shared with the dots.
+                    val tone = if (SensorBattery.isLowOf(state)) ChipTone.WARN else ChipTone.OK
+                    ("$label ✓" + (SensorBattery.badgeOf(state)?.let { " $it" } ?: "")) to tone
                 }
             is ConnectionState.Connecting -> "$label …" to ChipTone.WARN
             is ConnectionState.Failed -> "$label ✗" to ChipTone.BAD

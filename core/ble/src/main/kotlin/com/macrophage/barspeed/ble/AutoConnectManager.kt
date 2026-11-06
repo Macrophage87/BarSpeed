@@ -6,6 +6,7 @@ import com.macrophage.barspeed.model.DeviceLinkRole
 import com.macrophage.barspeed.model.DevicePairingPolicy
 import com.macrophage.barspeed.model.ReconnectPolicy
 import com.macrophage.barspeed.model.ReconnectStep
+import com.macrophage.barspeed.model.SensorBattery
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -136,6 +137,7 @@ class AutoConnectManager(
     private var imuJobB: Job? = null
     private var hrmJob: Job? = null
     private var livenessJob: Job? = null
+    private var batteryJob: Job? = null
 
     /**
      * Which device the second link maintains, or null to leave it down.
@@ -233,6 +235,26 @@ class AutoConnectManager(
                     launch { imuClientB.samples.collect { watch(imuFrameAtB, it.timestampMs) } }
                 }
         }
+        // The battery again every few minutes on each connected link (UX
+        // review 2026-11-06, ble-devices F2). Each connect still reads it
+        // once in `onReady`; without this the percent on screen was the one
+        // from connect time, which could be ninety minutes old. Guarded like
+        // `maintain`, for its reason: this scope has no exception handler.
+        if (batteryJob == null) {
+            batteryJob =
+                scope.launch {
+                    while (true) {
+                        delay(SensorBattery.REFRESH_INTERVAL_MS)
+                        for (client in listOf(imuClient, imuClientB, hrmClient)) {
+                            try {
+                                client.refreshBattery()
+                            } catch (e: Exception) {
+                                currentCoroutineContext().ensureActive()
+                            }
+                        }
+                    }
+                }
+        }
     }
 
     /**
@@ -290,10 +312,12 @@ class AutoConnectManager(
         imuJobB?.cancel()
         hrmJob?.cancel()
         livenessJob?.cancel()
+        batteryJob?.cancel()
         imuJob = null
         imuJobB = null
         hrmJob = null
         livenessJob = null
+        batteryJob = null
         imuClient.disconnect()
         imuClientB.disconnect()
         hrmClient.disconnect()
