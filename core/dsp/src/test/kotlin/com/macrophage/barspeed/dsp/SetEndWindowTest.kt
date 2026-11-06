@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.dsp
 
 import com.macrophage.barspeed.model.LiveFallbackPolicy
+import com.macrophage.barspeed.model.SensorLossPolicy
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.VoiceCue
 import kotlin.test.Test
@@ -690,5 +691,25 @@ class SetEndWindowTest {
         assertEquals(SetEnd.NotCued, SetEnd.of(listOf(cue), cadenceGuided = true))
         assertEquals(SetEnd.NotCued, SetEnd.of(listOf(cue), cadenceGuided = false))
         assertTrue(LiveFallbackPolicy.WITHHELD_CUE !in SetEnd.TERMINAL_CUES)
+    }
+
+    /**
+     * The sensor-loss words do not bound a rep list or seed the rest clock
+     * either (UX review 2026-11-06, BLE F1; export 1.27).
+     *
+     * `Sensor lost` and `Sensor back` are written to a sensor-counted set's
+     * cue track through `speakCue`, for the reason [LiveFallbackPolicy]'s word
+     * is. A set the lifter goes on counting by hand after `Sensor lost` must
+     * keep every rep after it, so neither may be terminal, and with no
+     * terminal word or tap on the record the rest still runs from the set's
+     * end.
+     */
+    @Test
+    fun `the sensor-loss words are not terminal cues`() {
+        val words = listOf(SensorLossPolicy.LOST_CUE, SensorLossPolicy.BACK_CUE)
+        for (word in words) assertTrue(word !in SetEnd.TERMINAL_CUES, "$word is terminal")
+        val cues = words.mapIndexed { i, word -> VoiceCue(1_000L + i * 5_000L, word) }
+        assertEquals(SetEnd.NotCued, SetEnd.of(cues, cadenceGuided = false))
+        assertEquals(20_000L, RestStart.of(cues, cadenceGuided = false, emptyList(), null, 20_000L))
     }
 }

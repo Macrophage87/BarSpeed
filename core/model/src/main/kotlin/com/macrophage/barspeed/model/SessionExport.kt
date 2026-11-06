@@ -3183,6 +3183,34 @@ data class SessionExport(
          * `added` column. `SchemaOffPlanSetContractTest` pins this marker and
          * the `added` sentence.
          *
+         * 1.27 FURTHER ENTRY (sensor-loss cue) ADDS NO KEY: two more strings
+         * join [SetExport.voiceCues], on sensor-counted sets only (UX review
+         * 2026-11-06, BLE F1). `Sensor lost` is spoken and recorded once every
+         * bar sensor the set armed -- the only one, or both -- has sent no
+         * frame for `ArmedSilencePolicy.SILENT_AFTER_MS` (3 s) or has no link,
+         * and `Sensor back` when frames resume; each at most once per set, and
+         * only with the voice cues on. [SensorLossPolicy] is the decision.
+         * NEITHER IS TERMINAL: neither is in `SetEnd.TERMINAL_CUES`, so
+         * neither bounds a rep list nor seeds the rest clock, and a set the
+         * lifter goes on counting by hand keeps every rep (`SetEndWindowTest`
+         * in `:core:dsp` pins it).
+         *
+         * `No count` ([LiveFallbackPolicy.WITHHELD_CUE]), recorded from
+         * v0.1.55 (#280) when a two-sensor set's live count is given up at a
+         * feed switch, is documented here for the first time: no earlier
+         * entry logged it, and it is not terminal either. `Set started` and
+         * `Set ended` at the START and END taps of an unguided rep set
+         * ([UnguidedSetCall]) are spoken and NOT recorded, so such a set's
+         * track gains neither; `Set ended` on a guided or timed set is
+         * recorded exactly as before.
+         *
+         * Filed under 1.27 because 1.27 is unreleased. NOT RETROACTIVE: a set
+         * recorded before this entry carries neither string. No key is
+         * added, removed, renamed or retyped, `DATABASE_VERSION` does NOT
+         * move, and the plan schema is untouched. voiceCues' description
+         * names all three sensor-status words; `SchemaSensorLossCueContractTest`
+         * pins the log entry and that sentence.
+         *
          * FURTHER 1.27 ENTRY (tempo notation): `tempoCompliance.prescribed`
          * is written so it parses back (core-model review 2026-11-06, F5).
          * `Tempo.notation()` is its sole producer (`Exporters.kt`). A tempo
