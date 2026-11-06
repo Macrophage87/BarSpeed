@@ -236,6 +236,24 @@ object RestControlPolicy {
      * the plain finish. A state that draws nothing has no primary rather than
      * a defaulted one.
      */
+    /**
+     * What the rest screen draws in START's slot, full width under the ring
+     * (UX review 2026-11-06, rest F6, F11).
+     *
+     * START NEXT SET whenever it is drawn. Once it is withheld after the last
+     * planned set there is nothing left to stack a session-ending control
+     * against, so the finish takes the slot -- and then the rating panel the
+     * finish asks for, so the tap's answer appears where the tap was. A close
+     * that came back failed is NOT moved: its notice and retry stay with the
+     * rest of the close block, and an in-flight close draws nothing. Null is
+     * an empty slot. The close block skips whatever this returns, so no
+     * control is drawn twice.
+     */
+    fun startSlot(screen: RestControls): RestControl? = when (screen.primary) {
+        RestControl.START_NEXT_SET, RestControl.FINISH_SESSION, RestControl.RATE_SESSION -> screen.primary
+        RestControl.RETRY_FINISH, null -> null
+    }
+
     private fun primaryOf(drawn: Set<RestControl>): RestControl? = listOf(
         RestControl.START_NEXT_SET,
         RestControl.RATE_SESSION,
