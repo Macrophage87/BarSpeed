@@ -618,6 +618,10 @@ class SessionRepository(
             // re-runs the analyzer. Read here, beside the blob, never by an
             // exporter, whose constant describes the DOCUMENT it writes.
             analysisSchemaVersion = SessionExport.SCHEMA_VERSION,
+            // Copied as the caller states it (#100): only the recovery of an
+            // interrupted set's capture states true, and a row it writes must
+            // never read as a set that ended.
+            recovered = set.recovered,
             // Written only when the caller states one. There is no default
             // to fall back on: an invented geometry reads exactly like a
             // measured one and would be believed.
