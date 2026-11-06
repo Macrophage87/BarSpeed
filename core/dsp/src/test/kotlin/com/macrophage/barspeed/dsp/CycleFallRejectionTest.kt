@@ -134,17 +134,21 @@ class CycleFallRejectionTest {
     }
 
     /**
-     * THE APP'S COUNTER, through `LiveRepCounters.forCounted(SENSOR)`, makes
-     * the same calls as the counter built by the predicate: the early FALL
-     * is ignored on an eccentric-first lift and drops the drive on a
-     * concentric-first one. A DIFFERENTIAL, red until the app's counter reads
-     * [CycleRule.fallRejectsFor].
+     * THE APP'S COUNTER, through `LiveRepCounters.forCounted(SENSOR)`. On a
+     * concentric-first lift it is the counter built by the predicate, and
+     * the early FALL drops the drive.
+     *
+     * Re-baselined. Until the owner's 2026-11-06 session the app's
+     * eccentric-first counter was the predicate's too, and called this pull
+     * at 3.2 s. An eccentric-first lift now runs `LockoutRepCounter`, which
+     * opens a rep only on an eccentric; this pull is a concentric with none
+     * before it -- the shape of a squat's walk-out -- and draws nothing.
      */
     @Test
-    fun `the app's counter ignores an early FALL on an eccentric-first lift`() {
+    fun `the app's counter drops a concentric-first pull on an early FALL`() {
         fun app(direction: LiftDirection) = LiveRepCounters.forCounted(RepCounter.SENSOR, direction)
             ?: error("a sensor-counted set must arm a counter")
-        assertEquals(listOf(3.2), pullWithEarlyFall().calls(app(eccentricFirst)), "eccentric-first")
+        assertEquals(emptyList(), pullWithEarlyFall().calls(app(eccentricFirst)), "eccentric-first")
         assertEquals(emptyList(), pullWithEarlyFall().calls(app(concentricFirst)), "concentric-first")
     }
 
