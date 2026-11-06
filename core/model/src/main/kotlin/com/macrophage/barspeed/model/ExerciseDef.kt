@@ -620,15 +620,30 @@ data class ExerciseDef(
             )
 
         /**
+         * The free-weight subset of [START_MODIFIERS], the only words that may
+         * prefix an ECCENTRIC table id. A free-weight overhead extension starts
+         * locked out and lowers first; on a cable, band or machine the elbows
+         * start bent behind the head and the first move is the extension, so
+         * `cable_overhead_triceps_extension` keeps the "overhead" hint's
+         * CONCENTRIC.
+         */
+        private val FREE_WEIGHT_MODIFIERS =
+            setOf("dumbbell", "db", "barbell", "kettlebell", "kb", "seated", "weighted", "single", "arm", "smith")
+
+        /**
          * [START_PHASE_BY_ID]'s answer for these tokens: the whole id, or a
-         * table id preceded only by [START_MODIFIERS] words. Matching is on
-         * whole tokens at the END of the id, so a table id with words after
-         * it (`step_up_jump`) is not matched.
+         * table id preceded only by modifier words -- [START_MODIFIERS] for a
+         * CONCENTRIC entry, [FREE_WEIGHT_MODIFIERS] for an ECCENTRIC one.
+         * Matching is on whole tokens at the END of the id, so a table id with
+         * words after it (`step_up_jump`) is not matched.
          */
         private fun tableStart(tokens: List<String>): StartPhase? {
             for (k in tokens.indices) {
-                if (tokens.take(k).any { it !in START_MODIFIERS }) return null
-                START_PHASE_BY_ID[tokens.drop(k).joinToString("_")]?.let { return it }
+                val prefix = tokens.take(k)
+                if (prefix.any { it !in START_MODIFIERS }) return null
+                val start = START_PHASE_BY_ID[tokens.drop(k).joinToString("_")] ?: continue
+                val allowed = start == StartPhase.CONCENTRIC || prefix.all { it in FREE_WEIGHT_MODIFIERS }
+                return if (allowed) start else null
             }
             return null
         }
