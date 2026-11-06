@@ -147,26 +147,23 @@ class SquatLiveCountFieldTest {
 
     /**
      * What the app counts on the five squats, through the one call
-     * `RecordViewModel` makes, on both units, once the FALL rejection is held
-     * to concentric-first lifts (#335).
+     * `RecordViewModel` makes, on both units.
      *
-     * A DIFFERENTIAL, re-baselined from 5, 1, 2, 1 and 5 -- what v0.1.57 said
-     * and the test above keeps, by name -- and red until the app's counter
-     * reads `CycleRule.fallRejectsFor`.
-     *
-     * Role a, each against the owner's bound of at least 4 and most likely 5:
-     * - set 1, 6: one over the likely 5. v0.1.57 already called 5 here, and
-     *   the sixth call is a drive the FALL used to drop, so either it is a
-     *   real rep and the hand 5 is one short, or it is a call on set-up or
-     *   re-rack motion. Nothing in the capture says which.
-     * - sets 2, 3 and 4, 4, 5 and 5: inside the bound, where v0.1.57 said 1,
-     *   2 and 1.
-     * - set 5, 5: unchanged, the likely count.
-     * Role b reads 4, 5, 4, 5 and 6.
+     * A DIFFERENTIAL, re-baselined twice. #335 took it from v0.1.57's 5, 1,
+     * 2, 1 and 5 (kept by name above) to 6, 4, 5, 5, 5 on role a and 4, 5, 4,
+     * 5 and 6 on role b, once the FALL rejection was held to concentric-first
+     * lifts. Now an eccentric-first lift is counted at its lockout by
+     * `LockoutRepCounter`, after the owner's 2026-11-06 session showed the
+     * full-cycle rule calling the walk-out and every rep a rep late, and both
+     * units read 5, 5, 4, 4 and 5 -- every set inside the owner's bound of at
+     * least 4, most likely 5, where role a's set 1 and role b's sets 1, 3 and
+     * 5 were outside it. Red until `LiveCounterPolicy` selects
+     * [com.macrophage.barspeed.model.LiveCounter.LOCKOUT] for an
+     * eccentric-first set.
      */
     @Test
     fun `the app counts the five squats live`() {
-        assertEquals(listOf(6, 4, 5, 5, 5), sets.map { calls(app(), it.name).size }, "role a, sets 1-5")
-        assertEquals(listOf(4, 5, 4, 5, 6), sets.map { calls(app(), "${it.name}-imu-b").size }, "role b, sets 1-5")
+        assertEquals(listOf(5, 5, 4, 4, 5), sets.map { calls(app(), it.name).size }, "role a, sets 1-5")
+        assertEquals(listOf(5, 5, 4, 4, 5), sets.map { calls(app(), "${it.name}-imu-b").size }, "role b, sets 1-5")
     }
 }
