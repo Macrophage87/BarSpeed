@@ -461,8 +461,9 @@ object SetGeometryPolicy {
      * `SessionRepository.exerciseById` produces for both of its non-seed
      * branches. The ad-hoc path resolves an unseen id through
      * [ExerciseDef.inferred] (#69 item 4), so it reports inferred on that
-     * path too. Neither path is reachable from the UI with an unseen id
-     * today, because the exercise picker offers seeded ids only.
+     * path too. Both are reachable from the UI since the exercise picker
+     * offers recent and planned ids as well as the seeds (UX review
+     * 2026-11-06, `AdHocPicker.options`).
      */
     fun describe(used: ExerciseDef, declared: PlanExerciseDef?): ResolvedGeometry {
         val seeded = ExerciseDef.seedById(used.id) != null

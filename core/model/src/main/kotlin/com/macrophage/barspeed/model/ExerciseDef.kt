@@ -212,12 +212,12 @@ data class ExerciseDef(
          * [BODYWEIGHT_IDS] is body-weight work whether or not a plan declared
          * it. There is no plan here to declare anything, so `declared` is null
          * and the seed default decides. #229 item 3, and part of #61's
-         * population. Only `dead_hang` of the eight is in [SEED], which is
-         * `RecordState.exerciseOptions`, so it is the only one the picker can
-         * reach today -- #239's three are not seed entries, so widening the
-         * table changed nothing an ad-hoc set can currently exercise; it is
-         * this call that makes the seed follow if the picker ever reaches
-         * one.
+         * population. Only `dead_hang` of the eight is in [SEED]; the others
+         * reach the picker since the UX review of 2026-11-06, which builds
+         * `RecordState.exerciseOptions` from the lifter's recent lifts and the
+         * active plan before the seeds (`AdHocPicker.options`, each id through
+         * this function). So a pull-up he has recorded or a plan lists is
+         * offered, and this call is what makes it body-weight work there.
          *
          * `copy` rather than a fresh constructor call, deliberately: the seed
          * entry for `dead_hang` carries a display name and a HOLD kind, and
@@ -230,9 +230,13 @@ data class ExerciseDef(
          * inferences, so one id meant two exercises depending on which path
          * asked. The stack default comes with it, which is #229 item 3's
          * `sensorOnStack` half: an ad-hoc set against a [STACK_MOUNTED_IDS]
-         * id rides the stack as a plan slot does. Neither is reachable from
-         * the picker today -- it offers [SEED] alone, and no seed id is
-         * stack-mounted -- so this closes a landmine rather than a live bug.
+         * id rides the stack as a plan slot does. Both are LIVE since the
+         * picker offers recent and planned ids as well as [SEED] (UX review
+         * 2026-11-06): an ad-hoc lat pulldown resolves here. What this path
+         * still lacks is a plan's declarations -- an ad-hoc set has none, so a
+         * lift whose drive goes down keeps `concentricUp = true` here, where an
+         * off-plan set of it inside a plan session takes the plan's
+         * (`AdHocPicker.offPlanExercise`).
          */
         fun resolvedById(id: String): ExerciseDef {
             val base = seedById(id) ?: inferred(id)

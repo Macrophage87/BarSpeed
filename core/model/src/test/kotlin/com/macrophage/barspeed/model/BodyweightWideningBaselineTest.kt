@@ -97,21 +97,19 @@ class BodyweightWideningBaselineTest {
     }
 
     /**
-     * What the three do on the AD-HOC path: nothing, because the picker cannot
-     * reach them. `RecordState.exerciseOptions` is [ExerciseDef.SEED] and none
-     * of the three is a seed entry, so an ad-hoc set against one of them is not
-     * reachable from the exercise picker today and the widening changes no
-     * ad-hoc behaviour that can be exercised. [ExerciseDef.resolvedById]
-     * already routes every id through [SetGeometryPolicy.bodyweightMount], so
-     * the day the picker does reach one, the seed follows with no further
-     * change -- which is the near-neighbour trap avoided rather than a claim
-     * that the path is live.
+     * None of the three is a seed entry. When this was written the ad-hoc
+     * picker offered [ExerciseDef.SEED] alone, so none of them was reachable
+     * there. Since the UX review of 2026-11-06 the picker also offers the
+     * lifter's recent and planned ids (`AdHocPicker.options`), so they are,
+     * and [ExerciseDef.resolvedById] routing every id through
+     * [SetGeometryPolicy.bodyweightMount] is what makes the seed follow on
+     * that path with no further change.
      */
     @Test
-    fun `the ad-hoc picker offers seed entries only and none of the three is one`() {
+    fun `none of the three is a seed entry`() {
         three.forEach { id ->
             assertNull(ExerciseDef.seedById(id), "$id must not be a seed entry")
-            assertTrue(ExerciseDef.SEED.none { it.id == id }, "$id must not be in the picker's list")
+            assertTrue(ExerciseDef.SEED.none { it.id == id }, "$id must not be in the seed list")
         }
     }
 

@@ -1122,9 +1122,9 @@ class SessionRepository(
      * resolves it through [ExerciseDef.resolvedById], which falls back to
      * [ExerciseDef.inferred] for a non-seed id, the definition this
      * method's own fallback builds, so the two paths agree on start, kind
-     * and stack mount for an id with no stored row (#69 item 4). The picker
-     * offers `ExerciseDef.SEED` alone, so that ad-hoc case is unreachable
-     * today.
+     * and stack mount for an id with no stored row (#69 item 4). That
+     * ad-hoc case is reachable since the picker offers recent and planned ids
+     * as well as the seeds (UX review 2026-11-06, `AdHocPicker.options`).
      */
     suspend fun exerciseById(id: String): ExerciseDef {
         ExerciseDef.seedById(id)?.let { return it }
