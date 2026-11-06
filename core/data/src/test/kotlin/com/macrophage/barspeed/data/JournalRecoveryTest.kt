@@ -423,6 +423,22 @@ class JournalRecoveryTest {
     }
 
     /**
+     * A recovered set carries no silence word (#100 review round 1, Lens A
+     * B2). Role b was armed and delivered nothing, which the set's own write
+     * would publish as `silent` from the link states read as the set ended;
+     * those links ended with the process, so the recovery reads none and
+     * publishes none. The export's descriptions say so, because an absent
+     * word there would otherwise read as a stream that delivered.
+     */
+    @Test
+    fun `a recovered set carries no silence word`() = runTest {
+        val set = ready(recovery(FakeSessionDao()).prepare(journaled()))
+        assertEquals(SensorRole.B, set.sensors?.expected?.first(), "the fixture no longer arms b")
+        assertEquals(emptyMap(), set.sensors?.silent)
+        assertNull(set.sensors?.soleSilent)
+    }
+
+    /**
      * A kill mid-append leaves a final line with no newline, and a cut inside
      * its last field still parses -- as a sample with a wrong yaw. Only
      * complete lines are read.
