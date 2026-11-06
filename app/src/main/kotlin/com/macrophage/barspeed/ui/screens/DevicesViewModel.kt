@@ -3,6 +3,7 @@ package com.macrophage.barspeed.ui.screens
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.macrophage.barspeed.AppLog
 import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.ble.DeviceRole
 import com.macrophage.barspeed.ble.DiscoveredDevice
@@ -24,6 +25,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+private const val TAG = "DevicesViewModel"
 
 /**
  * Which paired device each row shows the state of.
@@ -184,6 +187,10 @@ class DevicesViewModel(app: Application) : AndroidViewModel(app) {
                         roleByAddress = roles,
                     ).second
                 target to held
+            }.catch { e ->
+                // For the auto-labelling collector's reason below: a failed
+                // store read must not reach viewModelScope's default handler.
+                AppLog.w(TAG, "second-sensor arming stopped: the stores could not be read", e)
             }.collect { (target, held) ->
                 if (target != held) container.autoConnect.setSecondaryImuAddress(target)
             }
@@ -261,6 +268,12 @@ class DevicesViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             combine(container.deviceRegistry.knownDevices, container.settings.sensorRoles) { known, roles ->
                 SensorLabelPolicy.autoAssign(pairedImu(known), roles)
+            }.catch { e ->
+                // A DataStore read failing (an IOException from either store)
+                // ends auto-labelling for this screen rather than the process,
+                // which would take a set in progress with it. The labels stay
+                // as they were; a chip tap still writes them.
+                AppLog.w(TAG, "sensor auto-labelling stopped: the stores could not be read", e)
             }.collect { writes ->
                 // Not through [guarded]: that clears [actionError] on
                 // success, and this write is not a tap, so it must not wipe
