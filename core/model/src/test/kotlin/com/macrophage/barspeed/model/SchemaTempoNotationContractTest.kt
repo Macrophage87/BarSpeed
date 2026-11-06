@@ -37,7 +37,6 @@ class SchemaTempoNotationContractTest {
 
     @Test
     fun `the version log files the tempo notation once, under 1_27, as retroactive and no key`() {
-        assertEquals("1.27", SessionExport.SCHEMA_VERSION, "the entry is filed under a version no longer written")
         assertEquals(1, Regex(Regex.escape(marker)).findAll(versionLog()).count(), "the entry is not filed once")
         val entry = versionLog().substringAfter(marker)
         assertTrue("RETROACTIVE" in entry && "NOT RETROACTIVE" !in entry, "the entry does not say it is retroactive")

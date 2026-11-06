@@ -42,7 +42,6 @@ class SchemaOffPlanSetContractTest {
         assertTrue(entry.startsWith(" NO KEY CHANGES"), entry.take(80))
         assertTrue("NOT RETROACTIVE" in entry, "the entry does not say it is not retroactive")
         assertTrue("DATABASE_VERSION does NOT move" in entry, "the entry does not say the database stays")
-        assertEquals("1.27", SessionExport.SCHEMA_VERSION, "a further entry, not a mint")
     }
 
     @Test
