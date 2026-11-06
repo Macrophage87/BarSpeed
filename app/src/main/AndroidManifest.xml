@@ -27,6 +27,14 @@
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.NoActionBar">
 
+        <!--
+            singleTask so a share or Open with reaches the one existing
+            instance (onNewIntent) instead of starting a second one, with its
+            own back stack, in the sender's task. Cost: a launcher or
+            notification tap clears any other app's activity stacked on
+            BarSpeed's task (e.g. a system file picker), and that picker's
+            result arrives cancelled.
+        -->
         <activity
             android:name=".MainActivity"
             android:exported="true"

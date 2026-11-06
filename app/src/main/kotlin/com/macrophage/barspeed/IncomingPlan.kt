@@ -3,6 +3,7 @@ package com.macrophage.barspeed
 import android.content.Intent
 import android.net.Uri
 import androidx.core.content.IntentCompat
+import com.macrophage.barspeed.model.ArrivalClaim
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.getAndUpdate
@@ -66,10 +67,22 @@ object IncomingPlanInbox {
      */
     val arrivals: StateFlow<Int> = count
 
+    private val announcement = ArrivalClaim()
+
     fun offer(plan: IncomingPlan) {
         held.value = plan
+        // Set before the count moves, so the effect the count wakes always
+        // finds the arrival to claim.
+        announcement.arrive()
         count.update { it + 1 }
     }
+
+    /**
+     * True once per arrival, for whoever announces it. In the process, with
+     * the inbox, and not in saved UI state, which would outlive [arrivals]
+     * across a process death and swallow every later share.
+     */
+    fun claimArrival(): Boolean = announcement.claim()
 
     /** Takes the held plan, once: a second caller gets null. */
     fun take(): IncomingPlan? = held.getAndUpdate { null }

@@ -16,9 +16,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -186,14 +183,14 @@ private fun AppNav(sessionLive: () -> Boolean) {
     //
     // Keyed on the arrival count, not on the held plan: a Plans ViewModel
     // already alive can take the plan before this effect runs, and the toast
-    // must still be shown. The handled count is saved so a rotation does not
-    // act on the same arrival twice.
+    // must still be shown. Each arrival is claimed once from the inbox, so a
+    // rotation re-running this effect finds nothing to claim; the claim lives
+    // in the process with the arrivals, not in saved state, which would
+    // outlive them across a process death and ignore every later share.
     val arrivals by IncomingPlanInbox.arrivals.collectAsState()
-    var handledArrivals by rememberSaveable { mutableIntStateOf(0) }
     val context = LocalContext.current
     LaunchedEffect(arrivals) {
-        if (arrivals <= handledArrivals) return@LaunchedEffect
-        handledArrivals = arrivals
+        if (!IncomingPlanInbox.claimArrival()) return@LaunchedEffect
         val onRecord = runCatching { navController.getBackStackEntry("record") }.isSuccess
         if (onRecord || sessionLive()) {
             Toast.makeText(context, "Plan received: open Plans to review it.", Toast.LENGTH_LONG).show()
