@@ -801,9 +801,9 @@ private fun CrashReportNotice(
  * 2026-11-06 (home-nav F6) it asks too, because a mis-tap there removed the
  * only copy of a set. A rescued database is the larger case --
  * potentially an entire training history, three to four orders of
- * magnitude larger, deletable from the FIRST screen of every cold launch. [SessionDetailScreen]'s delete-one-session dialog
- * is the bar this meets; issue #111
- * asked for that card's SHAPE, not its confirmation posture.
+ * magnitude larger, deletable from the FIRST screen of every cold launch.
+ * [SessionDetailScreen]'s delete-one-session dialog is the bar this meets;
+ * issue #111 asked for that card's SHAPE, not its confirmation posture.
  *
  * DISCARD IS OFFERED ON ALL THREE STATES, INCLUDING THE FRAGMENT, and this
  * is a reversal of the previous round's fix -- recorded rather than quietly
