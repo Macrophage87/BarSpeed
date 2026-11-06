@@ -284,7 +284,8 @@ object DatabaseRescue {
         if (DatabaseDowngradePolicy.decide(stored, compiledVersion) == DatabaseOpenAction.OPEN) {
             return RescueOutcome.NotNeeded
         }
-        startInto(databaseFile, File(rescueRoot, "$DIR_PREFIX${System.currentTimeMillis()}"), marker, move, deleteMarker)
+        val target = File(rescueRoot, "$DIR_PREFIX${System.currentTimeMillis()}")
+        startInto(databaseFile, target, marker, move, deleteMarker)
     }.getOrElse { RescueOutcome.Failed(it::class.simpleName ?: "unknown") }
 
     /**
