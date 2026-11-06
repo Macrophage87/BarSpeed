@@ -499,7 +499,7 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
         val name = SensorStatusCopy.deviceName(device.role == DeviceRole.HRM, roles[device.address])
         AlertDialog(
             onDismissRequest = { forgetting = null },
-            title = { Text("Forget $name?") },
+            title = { Text("Forget ${name.replaceFirstChar { it.lowercase() }}?") },
             text = { Text("BarSpeed stops connecting to it. To use it again, scan and pair it.") },
             confirmButton = {
                 TextButton(
