@@ -204,7 +204,7 @@ fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewMo
             val summary = result.summary
             AlertDialog(
                 onDismissRequest = viewModel::dismissImportResult,
-                title = { Text("Approve plan?") },
+                title = { Text("Make this plan active?") },
                 text = {
                     Column(Modifier.verticalScroll(rememberScrollState())) {
                         Text("\"${summary.planName}\"", style = MaterialTheme.typography.titleSmall)
@@ -240,23 +240,25 @@ fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewMo
                         )
                         Spacer(Modifier.height(6.dp))
                         Text(
-                            "Approving makes this the active plan for new sessions.",
+                            "New sessions will follow this plan.",
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
                 },
-                // "APPROVE & START" is the filled primary (UX review 2026-11-06,
+                // "MAKE ACTIVE & START" is the filled primary (UX review 2026-11-06,
                 // plans F2): a plan is usually imported to be lifted now, and
-                // plain Approve left the lifter on this list hunting for the
-                // card's Start. Plain Approve stays, as a TextButton, for a plan
-                // imported on a rest day. A plan with no sets has nothing to
-                // start, so it gets Approve alone. Discard/Cancel are unchanged.
+                // making it active alone left the lifter on this list hunting for
+                // the card's START. Plain "Make active" stays, as a TextButton, for
+                // a plan imported on a rest day. A plan with no sets has nothing to
+                // start, so it gets "Make active" alone. Discard/Cancel are
+                // unchanged. One verb for one act (copy F6): the cards, Plan
+                // detail and this gate all say "Make active".
                 confirmButton = {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = { viewModel.approve(summary.planId) }) { Text("Approve") }
+                        TextButton(onClick = { viewModel.approve(summary.planId) }) { Text("Make active") }
                         if (summary.totalSets > 0) {
                             Button(onClick = { viewModel.approveAndStart(summary.planId) }) {
-                                Text(PlanStartPolicy.APPROVE_AND_START)
+                                Text(PlanStartPolicy.MAKE_ACTIVE_AND_START)
                             }
                         }
                     }

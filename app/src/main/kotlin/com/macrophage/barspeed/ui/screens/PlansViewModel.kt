@@ -235,7 +235,7 @@ class PlansViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * The gate's "APPROVE & START": the approval and the start in one tap, for
+     * The gate's "MAKE ACTIVE & START": the approval and the start in one tap, for
      * the plan imported to lift today (UX review 2026-11-06, plans F2).
      *
      * The gate is closed first and the rest is [start] unchanged, so the

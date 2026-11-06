@@ -192,7 +192,7 @@ private fun AppNav(sessionLive: () -> Boolean) {
     }
     // A plan handed in from outside goes to Plans, where its ViewModel takes it
     // into the import gate. Not while a session is on: navigating over it
-    // would strand it, and APPROVE & START from that gate would open a second
+    // would strand it, and MAKE ACTIVE & START from that gate would open a second
     // Record beside the one capturing. "On" is both this instance's back
     // stack and the process-wide SESSION hold; singleTask in the manifest is
     // what makes this the only instance whose back stack there is to ask. The

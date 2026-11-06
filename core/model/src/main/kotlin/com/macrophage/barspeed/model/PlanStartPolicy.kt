@@ -105,16 +105,10 @@ object PlanStartPolicy {
     const val START = "START"
 
     /**
-     * The import gate's consent word for approving a fresh import and starting
-     * it in one tap. Not used by [decide]: a stored plan's start says
-     * [MAKE_ACTIVE_AND_START], the same verb as the "Make active" control.
-     */
-    const val APPROVE_AND_START = "APPROVE & START"
-
-    /**
      * The consent word on a start that also makes a never-activated plan the
-     * active one. One verb for one act (UX review 2026-11-06, copy F6): this
-     * and the "Make active" control both do `PlanDao.activate`.
+     * active one: [decide]'s staged prompt, and the import gate's one-tap
+     * button. One verb for one act (UX review 2026-11-06, copy F6): both, and
+     * every "Make active" control, do `PlanDao.activate`.
      */
     const val MAKE_ACTIVE_AND_START = "MAKE ACTIVE & START"
 
