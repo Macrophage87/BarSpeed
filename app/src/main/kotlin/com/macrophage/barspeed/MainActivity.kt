@@ -61,8 +61,12 @@ class MainActivity : ComponentActivity() {
         gate.refresh(hasBlePermissions(), shouldShowBleRationale())
         ensureAsked()
         // A recreated Activity is handed the intent it was launched with
-        // again; that plan was already taken into the gate the first time.
-        if (savedInstanceState == null) receivePlan(intent)
+        // again, and so is one reopened from Recents (with no saved state, so
+        // only the flag tells it apart): either way that plan was already
+        // taken into the gate the first time, and taking it again would stage
+        // a duplicate.
+        val fromHistory = (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0
+        if (savedInstanceState == null && !fromHistory) receivePlan(intent)
         // launchMode singleTask: every share or Open with, including one sent
         // while the app is already open, reaches this one instance here.
         addOnNewIntentListener { receivePlan(it) }
