@@ -92,16 +92,15 @@ data class Tempo(
 
     private fun isSingleDigit(value: Double): Boolean = value == Math.floor(value) && value in 0.0..9.0
 
-    private fun formatComponent(value: Double): String =
-        if (value == Math.floor(value) && abs(value) < 1e15) {
-            value.toLong().toString()
-        } else if (value.isFinite()) {
-            // Plain decimal digits: Double.toString would write 1.0E-5, and
-            // the dash in its exponent would split it in parse.
-            BigDecimal(value.toString()).stripTrailingZeros().toPlainString()
-        } else {
-            value.toString()
-        }
+    private fun formatComponent(value: Double): String = if (value == Math.floor(value) && abs(value) < 1e15) {
+        value.toLong().toString()
+    } else if (value.isFinite()) {
+        // Plain decimal digits: Double.toString would write 1.0E-5, and
+        // the dash in its exponent would split it in parse.
+        BigDecimal(value.toString()).stripTrailingZeros().toPlainString()
+    } else {
+        value.toString()
+    }
 
     companion object {
         fun parse(text: String): Tempo {
