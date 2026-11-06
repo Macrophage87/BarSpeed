@@ -477,4 +477,80 @@ class ArmedCaptureTest {
         assertSame(only, capture.samples)
         assertNull(capture.sensors, "a declaration was invented for a set whose one unit delivered")
     }
+
+    /**
+     * PIN, L10 review round 3 (lens A BLK-1, lens B B2). The case the
+     * published `silent` description left out: on a set of ANY length, an
+     * armed unit refused for too few frames whose last frame landed inside
+     * the three seconds before the set ended reads `DELIVERING`, so
+     * `ArmedSilencePolicy.silent` drops it and the row names nobody -- while
+     * `analysedFellBack` still says the analysis moved. Composed through
+     * `storedDeliveryByRole`, the reading the row is actually given, rather
+     * than with a word handed in, so the drop is the code's own and not the
+     * fixture's.
+     *
+     * Behaviour unchanged: this pins what the text is corrected to say.
+     */
+    @Test
+    fun `a refused unit whose handful of frames ended inside the window is not named in silent`() {
+        val setEnd = 30_000L
+        val handful = stream(5, firstMs = 28_960L)
+        val partner = stream(3_000)
+        val delivery = ArmedSilencePolicy.storedDeliveryByRole(
+            SensorRole.A,
+            SensorRole.B,
+            ArmedLinks(
+                analysedState = ConnectionState.Connected("A"),
+                analysedFrameAtMs = handful.last().timestampMs,
+                analysedArmedAtMs = 0L,
+                secondaryState = ConnectionState.Connected("B"),
+                secondaryFrameAtMs = partner.last().timestampMs,
+                secondaryArmedAtMs = 0L,
+            ),
+            setStartedAtMs = 0L,
+            setEndedAtMs = setEnd,
+        )
+
+        val capture = armedCaptureOf(armed(SensorRole.A, SensorRole.B), SensorRole.B, handful, partner, delivery)
+
+        val sensors = assertNotNull(capture.sensors, "a set that fell back must still record what it armed")
+        assertEquals(SensorRole.B, sensors.analysed, "the analysis stayed on five frames")
+        assertTrue(sensors.analysedFellBack, "the row does not say the analysis moved")
+        assertEquals(emptyMap(), sensors.silent, "a unit whose last frame was inside the window was named")
+    }
+
+    /**
+     * PIN, the one-sensor sibling (L10 review round 3, lens A N2): the same
+     * handful of frames ending inside the window on a set whose one stream
+     * carries no role stores no `soleSilent`, and with nothing else to say the
+     * set records no `sensors` block at all. Behaviour unchanged.
+     */
+    @Test
+    fun `a one-sensor set whose handful of frames ended inside the window stores no word`() {
+        val address = "AA:BB:CC:DD:EE:01"
+        val handful = stream(5, firstMs = 28_960L)
+        val sole = ArmedSilencePolicy.storedSoleSilence(
+            roster = SensorCapturePolicy.roster(
+                pairedImuAddresses = listOf(address),
+                preferredAddress = address,
+                roleByAddress = emptyMap(),
+            ),
+            pairedImuAddresses = listOf(address),
+            links = ArmedLinks(
+                analysedState = ConnectionState.Connected("A"),
+                analysedFrameAtMs = handful.last().timestampMs,
+                analysedArmedAtMs = 0L,
+                secondaryState = ConnectionState.Disconnected,
+                secondaryFrameAtMs = null,
+                secondaryArmedAtMs = 0L,
+            ),
+            setStartedAtMs = 0L,
+            setEndedAtMs = 30_000L,
+        )
+
+        val capture = armedCaptureOf(null, null, handful, emptyList(), soleDelivery = sole)
+
+        assertNull(sole, "the stored reading named a link whose last frame was inside the window")
+        assertNull(capture.sensors, "a declaration was recorded for a set whose one link read as delivering")
+    }
 }
