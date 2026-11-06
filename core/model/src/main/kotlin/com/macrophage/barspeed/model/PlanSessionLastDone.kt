@@ -31,6 +31,8 @@ object PlanSessionLastDone {
         .mapValues { (_, runs) -> runs.maxOf { it.startedAtMs } }
 
     /** "Last done Tue 4 Nov", in the zone and locale given. */
-    fun label(startedAtMs: Long, zone: ZoneId, locale: Locale): String =
-        "Last done " + DateTimeFormatter.ofPattern("EEE d MMM", locale).format(Instant.ofEpochMilli(startedAtMs).atZone(zone))
+    fun label(startedAtMs: Long, zone: ZoneId, locale: Locale): String {
+        val day = Instant.ofEpochMilli(startedAtMs).atZone(zone)
+        return "Last done " + DateTimeFormatter.ofPattern("EEE d MMM", locale).format(day)
+    }
 }

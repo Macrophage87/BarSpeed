@@ -181,7 +181,8 @@ object PlanWarningDisplay {
                     "$exercise: the plan doesn't say it pulls down, so every rep would be read off the wrong stroke."
             "\"progression\": " in body && "the set is asked the wrong question" in body ->
                 PlanWarningRule.PROGRESSION_MISMATCH to
-                    "$exercise: progression doesn't match its sets, so the rating after each set asks the wrong question."
+                    "$exercise: progression doesn't match its sets, " +
+                    "so the rating after each set asks the wrong question."
             "but no \"implement\"" in body ->
                 PlanWarningRule.IMPLEMENT_UNDECLARED to "$exercise: no equipment type, so no loading line is shown."
             "normally starts at" in body ->
