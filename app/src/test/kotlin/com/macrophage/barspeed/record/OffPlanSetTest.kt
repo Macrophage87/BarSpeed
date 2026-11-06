@@ -123,6 +123,24 @@ class OffPlanSetTest {
     }
 
     @Test
+    fun `a wrong off-plan pick can be removed, giving back the plan's queue and boxes`() {
+        val before = resting(queueIndex = 0)
+        val added = assertNotNull(offPlanAddedState(before, "leg_curl"))
+        assertEquals(1, added.removeSetTarget?.removeAt)
+        val removed = assertNotNull(removedState(added))
+        assertEquals(queue, removed.queue)
+        assertEquals("100", removed.loadInput)
+        assertEquals("5", removed.repsInput)
+    }
+
+    @Test
+    fun `an off-plan pick on READY can be removed`() {
+        val ready = RecordState(stage = Stage.READY, queue = queue, queueIndex = 0, adHoc = false)
+        val added = assertNotNull(offPlanAddedState(ready, "dead_hang"))
+        assertEquals(queue, assertNotNull(removedState(added)).queue)
+    }
+
+    @Test
     fun `an ad-hoc session has no plan to leave`() {
         assertNull(offPlanAddedState(RecordState(adHoc = true), "leg_curl"))
     }

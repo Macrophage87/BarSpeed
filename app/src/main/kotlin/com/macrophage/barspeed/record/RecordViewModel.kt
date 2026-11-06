@@ -2370,7 +2370,7 @@ internal fun removedState(s: RecordState): RecordState? {
     if (s.adHoc) return null
     val target = s.removeSetTarget ?: return null
     val at = target.removeAt
-    val queue = s.queue.toMutableList().apply { removeAt(at) }
+    val queue = s.queue.toMutableList().apply { removeAt(at) }.let { offPlanRemovalSensorMoves(s.queue[at], it, at) }
     if (!target.wasUpcoming) return s.copy(queue = queue)
     val upcoming = queue.getOrNull(at) ?: return s.copy(queue = queue)
     // The statements are cleared (NONE): the slot that moved up is outside the

@@ -173,3 +173,19 @@ internal fun offPlanAddedState(s: RecordState, exerciseId: String): RecordState?
         durationInput = fill.durationS.toString(),
     )
 }
+
+/**
+ * [queue] (with [removed] already taken out at [at]) with the "move the
+ * sensor" flag of the slot that moved up recomputed, when [removed] was an
+ * off-plan set (record-setup F2): [offPlanAddedState] set that flag against
+ * the off-plan lift, and with it gone the slot follows whatever is before it
+ * again. An appended set of a block is left alone; its removal changes no
+ * neighbour's exercise.
+ */
+internal fun offPlanRemovalSensorMoves(removed: PlannedSlot, queue: List<PlannedSlot>, at: Int): List<PlannedSlot> {
+    if (!removed.isAddedSet || removed.setIndexInExercise != 0) return queue
+    val movedUp = queue.getOrNull(at) ?: return queue
+    val previousId = queue.getOrNull(at - 1)?.exercise?.id
+    val change = previousId != null && previousId != movedUp.exercise.id
+    return queue.toMutableList().apply { set(at, movedUp.copy(isExerciseChange = change)) }
+}
