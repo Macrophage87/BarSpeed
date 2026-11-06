@@ -1,10 +1,8 @@
 package com.macrophage.barspeed.dsp
 
 import com.macrophage.barspeed.model.RepCounter
-import com.macrophage.barspeed.model.StartPhase
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
  * THE CORPUS TABLE for issue #335: every committed IMU stream's live count
@@ -83,19 +81,14 @@ class FallRejectionCorpusTest {
     }
 
     /**
-     * What the APP counts on every concentric-first stream, through
+     * What the APP counts on every committed stream, through
      * `LiveRepCounters.forCounted(SENSOR)`, is the predicate column above,
-     * stream by stream.
-     *
-     * Every stream, until the owner's 2026-11-06 session. An eccentric-first
-     * stream is now counted by `LockoutRepCounter`, which has no FALL, so the
-     * predicate column describes the app only where the lift starts with
-     * its concentric; `LockoutCorpusTest` pins the eccentric-first streams.
+     * stream by stream. A DIFFERENTIAL: red on the eight streams that move
+     * until the app's counter reads [CycleRule.fallRejectsFor].
      */
     @Test
-    fun `the app counts the predicate's column on every concentric-first stream`() {
-        val concentricFirst = streams.filter { it.second.startsWith == StartPhase.CONCENTRIC }
-        val app = concentricFirst.associate { (stream, direction) ->
+    fun `the app counts the predicate's column on every committed stream`() {
+        val app = streams.associate { (stream, direction) ->
             val counter = LiveRepCounters.forCounted(RepCounter.SENSOR, direction)
                 ?: error("a sensor-counted set must arm a counter")
             val tracker = StreamingSetTracker.forLift(direction)
@@ -103,8 +96,6 @@ class FallRejectionCorpusTest {
                 counter.feed(tracker.feed(sample), sample.timestampMs) is RepCall.Speak
             }
         }
-        val expected = rows.filter { row -> concentricFirst.any { it.first == row.stream } }
-        assertTrue(expected.isNotEmpty(), "concentric-first streams")
-        assertEquals(expected.associate { it.stream to it.after }, app, "the app's live count, stream by stream")
+        assertEquals(rows.associate { it.stream to it.after }, app, "the app's live count, stream by stream")
     }
 }

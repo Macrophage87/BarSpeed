@@ -76,6 +76,21 @@ data class ExerciseDef(
     val isTimed: Boolean get() = kind == ExerciseKind.HOLD || kind == ExerciseKind.CARRY
 
     /**
+     * True for a squat: a rep-counted lift that lowers first and whose id
+     * names the word "squat" -- back, front, box, pause, goblet, overhead,
+     * split, hack. A squat clean or squat snatch is not one: both start with
+     * the pull, so [startsWith] is concentric, and they are explosive.
+     *
+     * It decides one thing, which live rep counter runs (`LiveCounterPolicy`).
+     * The counter it selects was fitted on the owner's back squat alone
+     * (2026-11-06), so every other squat here is reached by name, not by
+     * measurement; on bench press and Romanian deadlift captures that counter
+     * did worse than the full-cycle one, which is why it stops at the word.
+     */
+    val isSquat: Boolean
+        get() = kind == ExerciseKind.DYNAMIC && startsWith == StartPhase.ECCENTRIC && tokens(id).name("squat")
+
+    /**
      * True when the lift begins at the top of its range, so the first movement
      * of every rep is downward. This is what the voice guide announces and what
      * the tempo digits are positioned against.

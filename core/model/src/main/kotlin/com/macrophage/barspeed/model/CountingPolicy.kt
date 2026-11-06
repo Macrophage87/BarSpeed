@@ -21,10 +21,9 @@ enum class RepCounter {
      * rep-based lift with no prescribed tempo and an IMU connected.
      *
      * WHICH detector is [LiveCounterPolicy.counterFor]'s answer and not a fact
-     * about this member. It is `LockoutRepCounter` on an eccentric-first lift
-     * since the owner's 2026-11-06 session and `CycleRepCounter` on a
-     * concentric-first one; it was `CycleRepCounter` on every lift since
-     * issue #305, was
+     * about this member. It is `LockoutRepCounter` on a squat since the
+     * owner's 2026-11-06 session and `CycleRepCounter` on every other lift;
+     * it was `CycleRepCounter` on every lift since issue #305, was
      * `DriveImpulseCounter` from #301 and `LiveRepCaller` from #286 until then;
      * the naming here read `LiveRepCaller`
      * as though the choice were fixed, and it is not.

@@ -172,22 +172,22 @@ object LiveCounterPolicy {
      * reverting this decision is one row, and each carries a corpus pin that
      * re-derives what it did (`LiveRepCallCorpusTest`, `LiveCountDifferentialTest`).
      *
-     * ## [startsWith]
+     * ## [squat]
      *
-     * The phase the set's geometry declares first, `LiftDirection.startsWith`
-     * in `:core:dsp`. A concentric-first set -- the deadlift off the floor,
-     * the press, the row -- runs [LiveCounter.CYCLE], which every paragraph
-     * above is about. An eccentric-first one -- the squat, the bench press,
-     * the Romanian deadlift -- runs [LiveCounter.LOCKOUT] since the owner's
-     * 2026-11-06 session, where the full-cycle rule called his walk-out as
-     * rep 1, every squat a rep late and the last on the rack, and dropped
-     * two of five reps on the empty bar.
+     * [ExerciseDef.isSquat], carried as `LiftDirection.squat` in `:core:dsp`.
+     * A squat runs [LiveCounter.LOCKOUT] since the owner's 2026-11-06
+     * session, where the full-cycle rule called his walk-out as rep 1, every
+     * squat a rep late and the last on the rack, and dropped two of five reps
+     * on the empty bar. Every other lift runs [LiveCounter.CYCLE], which every
+     * paragraph above is about.
+     *
+     * THE OWNER CHOSE SQUATS ONLY over every lowering-first lift
+     * (2026-11-06). The lockout rule was fitted on his back squat alone, and
+     * on the bench press and Romanian deadlift captures held it misses 12
+     * reps against the full-cycle rule's 6 (`LockoutCorpusTest`).
      */
-    fun counterFor(counter: RepCounter, startsWith: StartPhase): LiveCounter? = when (counter) {
-        RepCounter.SENSOR -> when (startsWith) {
-            StartPhase.CONCENTRIC -> LiveCounter.CYCLE
-            StartPhase.ECCENTRIC -> LiveCounter.LOCKOUT
-        }
+    fun counterFor(counter: RepCounter, squat: Boolean): LiveCounter? = when (counter) {
+        RepCounter.SENSOR -> if (squat) LiveCounter.LOCKOUT else LiveCounter.CYCLE
         RepCounter.MANUAL, RepCounter.METRONOME, RepCounter.NOBODY -> null
     }
 }
