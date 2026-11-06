@@ -162,32 +162,41 @@ object CountingPolicy {
     }
 
     /**
-     * The planned count the in-set voice may treat as a MILESTONE, or null
-     * where it may not.
+     * Which words the in-set voice says at and just before the planned count.
      *
-     * Null on a [RepCounter.SENSOR] set, and that is a defect fix rather than
-     * a taste decision. `VoiceMilestonePolicy.repMilestone` says `"Done"` at
-     * the planned count and every spoken word is written to the cue track, so
-     * a counter reaching the planned count puts a terminal word on the record
-     * at that instant. That word no longer bounds the analysed rep list of a
-     * set no cadence ran on -- `SetEnd.of` takes `SetTargets.cadenceGuided`
-     * since #285 -- but it is still what the lifter HEARS, and a sensor whose
-     * count runs ahead calling the set over is a wrong thing to say.
+     * [VoiceMilestonePolicy.Milestones.MARKS_TARGET] on a [RepCounter.SENSOR]
+     * set, and that is a defect fix rather than a taste decision.
+     * `VoiceMilestonePolicy.repMilestone` says `"Done"` at the planned count
+     * under the other answer, and every spoken word is written to the cue
+     * track, so a counter reaching the planned count puts a terminal word on
+     * the record at that instant. That word no longer bounds the analysed rep
+     * list of a set no cadence ran on -- `SetEnd.of` takes
+     * `SetTargets.cadenceGuided` since #285 -- but it is still what the lifter
+     * HEARS, and a sensor whose count runs ahead calling the set over is a
+     * wrong thing to say.
      *
      * A sensor-counted set is exactly the set where the counter can reach the
      * planned count without the lifter having finished, and a max-intent
      * straight-reps set is exactly the set where the lifter may do MORE reps
-     * than were prescribed. So the sensor names reps and never calls the set
-     * over: `"Rep N"` on every rep, no `"Last rep"`, no `"Done"`.
+     * than were prescribed. So the sensor names every rep and never calls the
+     * set over: no `"Done"`.
      *
      * A [RepCounter.MANUAL] set keeps the milestone, and keeping it is the
      * decision #285 took: the lifter hears the same word at the planned count,
      * because the voice is the live channel and the count feedback is what it
      * is for. What changed is what the ANALYSER does with the word, not what
      * is said.
+     *
+     * The planned count itself is handed to every counter. Until this answer
+     * existed the sensor was handed none (`milestonePlannedReps`), which was
+     * the only way to keep `"Done"` off it.
      */
-    fun milestonePlannedReps(counter: RepCounter, plannedReps: Int?): Int? =
-        if (counter == RepCounter.SENSOR) null else plannedReps
+    fun milestones(counter: RepCounter): VoiceMilestonePolicy.Milestones =
+        if (counter == RepCounter.SENSOR) {
+            VoiceMilestonePolicy.Milestones.MARKS_TARGET
+        } else {
+            VoiceMilestonePolicy.Milestones.CALLS_SET_OVER
+        }
 
     /**
      * What the START SET button says about who is about to count.

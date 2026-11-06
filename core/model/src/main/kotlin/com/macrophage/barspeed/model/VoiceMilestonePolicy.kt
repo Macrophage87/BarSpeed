@@ -47,15 +47,41 @@ object VoiceMilestonePolicy {
     }
 
     /**
+     * Which words a counter may say at and just before the planned count.
+     *
+     * Two answers because the two kinds of counter can be wrong in different
+     * directions. The lifter's own tap is the count, so the tap counter may
+     * call the set over. A sensor can reach the planned count before the
+     * lifter has finished, and on a straight-reps set the lifter may go past
+     * it, so the sensor's voice never calls the set over.
+     * `CountingPolicy.milestones` says which a set gets.
+     */
+    enum class Milestones {
+        /** `"Last rep"` one before the planned count and `"Done"` at it. */
+        CALLS_SET_OVER,
+
+        /** The sensor's: every rep is named, and nothing calls the set over. */
+        MARKS_TARGET,
+    }
+
+    /**
      * What is said as rep [repCount] completes, or null where nothing is said
      * and the announced-rep latch does not move.
      *
      * Null on a repeat of the rep already announced and on zero, so a count
      * that stands still says nothing. [plannedReps] null is a set with no
      * planned count -- every rep is "Rep N" and none is the last.
+     *
+     * [milestones] is which words the planned count gets; see [Milestones].
      */
-    fun repMilestone(repCount: Int, announcedRep: Int, plannedReps: Int?): String? {
+    fun repMilestone(
+        repCount: Int,
+        announcedRep: Int,
+        plannedReps: Int?,
+        milestones: Milestones = Milestones.CALLS_SET_OVER,
+    ): String? {
         if (repCount == announcedRep || repCount == 0) return null
+        if (milestones == Milestones.MARKS_TARGET) return "Rep $repCount"
         return when {
             plannedReps != null && repCount == plannedReps -> "Done"
             plannedReps != null && repCount == plannedReps - 1 && plannedReps > 1 -> "Last rep"

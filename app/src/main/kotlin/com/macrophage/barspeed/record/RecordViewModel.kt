@@ -4348,14 +4348,16 @@ private class SensorRepCounter {
 private class VoiceMilestones(private val speak: (String) -> Unit) {
     private var announceReps = false
     private var plannedReps: Int? = null
+    private var milestones = VoiceMilestonePolicy.Milestones.CALLS_SET_OVER
     private var countedPhase: Phase = Phase.IDLE
     private var spokenSecond = 0
     private var announcedRep = 0
 
-    /** Clear every latch for a new set, and take the set's own two facts. */
-    fun startSet(announceReps: Boolean, plannedReps: Int?) {
+    /** Clear every latch for a new set, and take the set's own three facts. */
+    fun startSet(announceReps: Boolean, plannedReps: Int?, milestones: VoiceMilestonePolicy.Milestones) {
         this.announceReps = announceReps
         this.plannedReps = plannedReps
+        this.milestones = milestones
         countedPhase = Phase.IDLE
         spokenSecond = 0
         announcedRep = 0
@@ -4378,13 +4380,14 @@ private class VoiceMilestones(private val speak: (String) -> Unit) {
     }
 
     /**
-     * Voice at each lockout: "Rep N" as reps complete, "Last rep" going into
-     * the final planned rep, and "Done" when the count is hit. Reached from
-     * the live frame above and from the manual tap.
+     * Voice at each lockout: "Rep N" as reps complete, and at and just before
+     * the planned count whatever [VoiceMilestonePolicy.repMilestone] says for
+     * this set's [milestones]. Reached from the live frame above and from the
+     * manual tap.
      */
     fun announceRep(repCount: Int) {
         if (!announceReps) return
-        val cue = VoiceMilestonePolicy.repMilestone(repCount, announcedRep, plannedReps) ?: return
+        val cue = VoiceMilestonePolicy.repMilestone(repCount, announcedRep, plannedReps, milestones) ?: return
         announcedRep = repCount
         speak(cue)
     }
@@ -4971,16 +4974,16 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         val manualSet = CountingPolicy.tallyIsTheCount(counter)
         val sensorCounted = counter == RepCounter.SENSOR
         // Never announce reps on timed sets: a carry's gait can trip the rep
-        // detector. And never hand the SENSOR's counter a planned count: the
-        // milestone word at that count is "Done", and a sensor whose count runs
-        // ahead would be telling the lifter their set is over when it is not. A
-        // straight-reps set is exactly the set where the lifter may do more reps
-        // than were prescribed. The rule is CountingPolicy's; a MANUAL set keeps
-        // the milestone, and #285 narrowed what the ANALYSER does with the word
-        // rather than changing what is said.
+        // detector. And never let the SENSOR's counter call the set over: a
+        // sensor whose count runs ahead would be telling the lifter their set is
+        // over when it is not, and a straight-reps set is exactly the set where
+        // the lifter may do more reps than were prescribed. The rule is
+        // CountingPolicy's; a MANUAL set keeps "Done", and #285 narrowed what the
+        // ANALYSER does with the word rather than changing what is said.
         milestones.startSet(
             announceReps = !s.currentIsTimed,
-            plannedReps = CountingPolicy.milestonePlannedReps(counter, plannedRepsForSet),
+            plannedReps = plannedRepsForSet,
+            milestones = CountingPolicy.milestones(counter),
         )
         // Who speaks while the work is under way, decided in `:core:model` and
         // pinned there. `SetVoicePolicyTest > the sensor speaks on exactly the

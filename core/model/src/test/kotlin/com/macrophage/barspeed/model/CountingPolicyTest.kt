@@ -2,7 +2,6 @@ package com.macrophage.barspeed.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 
 /**
  * Who counts a set of each shape, and the three things that follow from it.
@@ -166,8 +165,8 @@ class CountingPolicyTest {
     }
 
     /**
-     * The sensor's counter is given no planned count to treat as a milestone,
-     * so it cannot say the word that bounds the analysis.
+     * Only the sensor's counter marks the target rather than calling the set
+     * over, so it cannot say the word that bounds the analysis.
      *
      * `"Done"` is `SetEnd`'s terminal word and reaches the cue track through
      * `speakCue`, so a counter that says it at the planned rep cuts every later
@@ -175,13 +174,27 @@ class CountingPolicyTest {
      * that can reach the planned count before the lifter has finished.
      */
     @Test
-    fun `only the sensor's counter is denied the planned count`() {
-        assertNull(CountingPolicy.milestonePlannedReps(RepCounter.SENSOR, 5))
-        assertNull(CountingPolicy.milestonePlannedReps(RepCounter.SENSOR, null))
-        assertEquals(5, CountingPolicy.milestonePlannedReps(RepCounter.MANUAL, 5))
-        assertEquals(5, CountingPolicy.milestonePlannedReps(RepCounter.METRONOME, 5))
-        assertEquals(5, CountingPolicy.milestonePlannedReps(RepCounter.NOBODY, 5))
-        assertNull(CountingPolicy.milestonePlannedReps(RepCounter.MANUAL, null))
+    fun `only the sensor's counter marks the target instead of calling the set over`() {
+        assertEquals(VoiceMilestonePolicy.Milestones.MARKS_TARGET, CountingPolicy.milestones(RepCounter.SENSOR))
+        for (other in RepCounter.entries - RepCounter.SENSOR) {
+            assertEquals(VoiceMilestonePolicy.Milestones.CALLS_SET_OVER, CountingPolicy.milestones(other), "$other")
+        }
+    }
+
+    /**
+     * Whatever the sensor's voice says at and past the planned count, it is
+     * never a word that calls the set over -- the reason [CountingPolicy.milestones]
+     * exists.
+     */
+    @Test
+    fun `the sensor's voice never says Done or Last rep alone`() {
+        val milestones = CountingPolicy.milestones(RepCounter.SENSOR)
+        for (planned in listOf(null, 1, 2, 5, 12)) {
+            for (rep in 1..15) {
+                val cue = VoiceMilestonePolicy.repMilestone(rep, rep - 1, planned, milestones)
+                assertEquals(true, cue?.startsWith("Rep $rep"), "rep $rep of $planned said $cue")
+            }
+        }
     }
 
     /**
