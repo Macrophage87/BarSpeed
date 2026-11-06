@@ -129,6 +129,40 @@ object RestClockPolicy {
     }
 
     /**
+     * Milliseconds from [nowMs] to the next whole second of a rest that started
+     * at [startedAtMs], in 1..1000 (UX review 2026-11-06, rest F10).
+     *
+     * The countdown sleeps this long and then asks [remainingS] again, so every
+     * tick lands on the second the period is measured in and no tick carries
+     * the previous one's lateness forward. Floor-modulo, so a wall clock that
+     * moved backwards past the start still answers a positive wait.
+     */
+    fun msToNextTick(startedAtMs: Long, nowMs: Long): Long = MS_PER_S - Math.floorMod(nowMs - startedAtMs, MS_PER_S)
+
+    /**
+     * What the countdown says when the remainder moves from [previousS] to
+     * [remainingS], or null for nothing (rest F10).
+     *
+     * Computed from the same clock the ring draws, so the voice and the screen
+     * cannot disagree. Spoken once, as a number is crossed: "Rest over" on
+     * reaching zero, and the digit on reaching 1..[countdownFromS]. A jump
+     * across several seconds -- the CPU slept with the screen off -- says only
+     * where the clock now is, never a late burst of "3, 2, 1". A remainder
+     * that did not fall (a wall clock moved backwards) says nothing.
+     */
+    fun cueOnTick(previousS: Int, remainingS: Int, countdownFromS: Int): String? = when {
+        remainingS >= previousS -> null
+        remainingS == 0 -> REST_OVER
+        remainingS <= countdownFromS -> remainingS.toString()
+        else -> null
+    }
+
+    /** The words the countdown speaks at zero. */
+    const val REST_OVER = "Rest over"
+
+    private const val MS_PER_S = 1_000L
+
+    /**
      * Which of a set's OWN heart-rate samples fall in the rest that followed
      * it, given the instant [startedAtMs] the rest runs from. Issue #178.
      *
