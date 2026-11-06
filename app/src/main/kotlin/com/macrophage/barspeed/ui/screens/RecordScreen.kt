@@ -1208,15 +1208,15 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
             kind = kind ?: ExerciseKind.DYNAMIC,
             imuConnected = state.imuConnected,
         )
-    // Drawn only where RestControlPolicy says READY may start a set while the
-    // close is where it is (#49, #333). READY draws SessionCloseControls below,
-    // so a close can be asked for here; beginSet asks the same question, so a
-    // tap that reaches it anyway starts nothing.
     // The voice switch sits ABOVE START, 24 dp clear of it. It sat 8 dp under
     // the 56 dp button, where a thumb that missed START by a few millimetres
     // silenced the set (record-setup F9).
     AudioCueChipWithCaption(state, viewModel)
     Spacer(Modifier.height(24.dp))
+    // Drawn only where RestControlPolicy says READY may start a set while the
+    // close is where it is (#49, #333). READY draws SessionCloseControls below,
+    // so a close can be asked for here; beginSet asks the same question, so a
+    // tap that reaches it anyway starts nothing.
     if (RestControlPolicy.readyMayStartSet(state.sessionClose)) {
         // Held while the ad-hoc load box would record a 0 it was not given;
         // AdHocForm says "Enter a load" under the box. beginSet refuses too.
