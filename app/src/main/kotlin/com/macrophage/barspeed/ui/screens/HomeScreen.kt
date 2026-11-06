@@ -216,7 +216,7 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
                         StatTile(
                             label = "Sessions",
                             value = "${state.weekSessions}",
-                            sub = "this week",
+                            sub = "last 7 days",
                             modifier = Modifier.weight(1f),
                         )
                     }
