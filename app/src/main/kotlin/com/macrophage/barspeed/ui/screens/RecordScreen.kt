@@ -3129,16 +3129,22 @@ private fun ExplosiveSetStage(state: RecordState, viewModel: RecordViewModel, sl
         // has no correction button otherwise, so it is offered while the
         // sensor is lost: the same `+1 REP` correction, through the same
         // `addManualRep`, as the straight-reps stage (BLE F1).
+        // Stamped for the effort grid's slip guard and spaced 24dp from it,
+        // as on the other +1 stages (record-live F2).
+        var lastRepTapAtMs by remember { mutableStateOf<Long?>(null) }
         if (state.sensorLoss.lost && state.setWrite == SetWriteState.NONE) {
             OutlinedButton(
-                onClick = viewModel::addManualRep,
+                onClick = confirmTap {
+                    lastRepTapAtMs = SystemClock.uptimeMillis()
+                    viewModel.addManualRep()
+                },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
             ) {
                 Text("+1 REP THE SENSOR MISSED", style = MaterialTheme.typography.titleMedium)
             }
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(24.dp))
         }
-        EndSetControl(state, viewModel)
+        EndSetControl(state, viewModel, lastRepTapAtMs)
     }
 }
 
