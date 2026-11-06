@@ -3003,7 +3003,12 @@ data class SessionExport(
          * [UnitMotion.still] -- while its partner did (#287), so the analysis
          * moves by the fallback that already existed: `analysedFellBack`
          * true, `analysedRoleBasis` `fallback`, refused under a mount-specific
-         * declaration (#247). A still unit is also no longer a candidate for
+         * declaration (#247). `silent` may now also name such a unit, only
+         * when its link was not delivering as the set ended -- which an early
+         * stop can be, while a late start or a still unit that streams to the
+         * end reads as delivering and is not named -- and the raw manifest's
+         * `analysedFellBack` and `sensorsSilent` widen with it (raw-meta's
+         * own log). A still unit is also no longer a candidate for
          * the stack signature, whose roll test it passes by lying still.
          * Measured over the committed corpus in `UnitMotionFieldTest`: no
          * committed pair moves under either rule, field-41 set 16's stack
