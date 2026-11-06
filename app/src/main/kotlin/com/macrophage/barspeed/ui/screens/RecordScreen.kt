@@ -117,6 +117,7 @@ import com.macrophage.barspeed.model.SetCardValue
 import com.macrophage.barspeed.model.SetCardValues
 import com.macrophage.barspeed.model.SetEndControl
 import com.macrophage.barspeed.model.SetEndControlPolicy
+import com.macrophage.barspeed.model.SetEndKind
 import com.macrophage.barspeed.model.SetGeometryPolicy
 import com.macrophage.barspeed.model.SetLimiter
 import com.macrophage.barspeed.model.SetLimiterGroup
@@ -3186,11 +3187,26 @@ private fun EndSetControl(state: RecordState, viewModel: RecordViewModel) {
                     complete = state.setComplete,
                     started = state.setStarted,
                 )
-            if (SetEndControl.EFFORT_GRID in controls) {
-                EndSetRpeGrid(state, viewModel, failedTile = SetEndControl.FAILED_TILE in controls)
+            // Top to bottom in the policy's order, so the red failure control
+            // a guided set had mid-set is still the top control at "Done" and
+            // the grid opens below it rather than under the finger (UX review
+            // 2026-11-06, record-live F3).
+            SetEndControlPolicy.drawOrder(controls).forEach { control ->
+                when (control) {
+                    SetEndControl.EFFORT_GRID ->
+                        EndSetRpeGrid(state, viewModel, failedTile = SetEndControl.FAILED_TILE in controls)
+                    SetEndControl.END_FAILED ->
+                        FailSetButton(state, viewModel, gridBelow = SetEndControl.EFFORT_GRID in controls)
+                    SetEndControl.END_UNRATED ->
+                        if (state.setEndKind == SetEndKind.SENSOR_COUNTED) {
+                            EndSetUnratedButton(viewModel)
+                        } else {
+                            EndSetEarlyButton(viewModel)
+                        }
+                    // Drawn inside the grid, never on its own.
+                    SetEndControl.FAILED_TILE -> Unit
+                }
             }
-            if (SetEndControl.END_FAILED in controls) FailSetButton(state, viewModel)
-            if (SetEndControl.END_UNRATED in controls) EndSetEarlyButton(viewModel)
             if (state.mayCancelSet) CancelSetButton(viewModel)
         }
     }
@@ -3282,9 +3298,16 @@ private fun UnsavedSetNotice(viewModel: RecordViewModel) {
  * no verdict at all and is the SKIP beside a grid; this one is the only way
  * out of a set that is already running, and it states a verdict, so it is a
  * filled button rather than an outlined afterthought.
+ *
+ * [gridBelow] is the completed set (UX review 2026-11-06, record-live F3).
+ * This button used to be REPLACED at "Done" by the grid, whose first row of
+ * headroom tiles then sat where it had been, so a lifter grinding a last rep
+ * that failed and reaching for the red button stored "Could have added much
+ * more". It now stays put, the same size and in the same place, and the grid
+ * opens under it without its own failure tile; only the caption changes.
  */
 @Composable
-private fun FailSetButton(state: RecordState, viewModel: RecordViewModel) {
+private fun FailSetButton(state: RecordState, viewModel: RecordViewModel, gridBelow: Boolean) {
     // The failure wording of the set's own ladder, so the button and the tile
     // that replaces it after completion say the same word. A hold breaks
     // early; a snatch is missed.
@@ -3314,7 +3337,13 @@ private fun FailSetButton(state: RecordState, viewModel: RecordViewModel) {
         Text(label.uppercase(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
     }
     Spacer(Modifier.height(6.dp))
-    SectionCaption("How that set felt is asked once it is finished · you can still rate this one while you rest")
+    if (gridBelow) {
+        // The grid's own caption follows directly; this one only has to keep
+        // the gap between the red button and the first tile row.
+        Spacer(Modifier.height(18.dp))
+    } else {
+        SectionCaption("How that set felt is asked once it is finished · you can still rate this one while you rest")
+    }
 }
 
 /**
@@ -3354,6 +3383,28 @@ internal const val END_SET_EARLY_CAPTION =
     "Ends the set with no rating · a set that came up short is recorded as short of target"
 
 /**
+ * The unrated way out of a set the SENSOR is counting (UX review 2026-11-06,
+ * record-live F6). Drawn under the grid, never above it: the +1 REP button
+ * sits above the grid, and a slip off it must not end the set.
+ *
+ * Not END SET EARLY, because on this set nothing is early: no shortfall is
+ * derived from a sensor count, and the lifter may simply be done and not want
+ * to rate at the bar. The rating is then given on the rest screen, where the
+ * effort row reads Not rated and CORRECT opens the same grid.
+ */
+@Composable
+private fun EndSetUnratedButton(viewModel: RecordViewModel) {
+    OutlinedButton(
+        onClick = { viewModel.endSet() },
+        modifier = Modifier.fillMaxWidth().height(64.dp),
+    ) {
+        Text("END SET", style = MaterialTheme.typography.titleLarge)
+    }
+    Spacer(Modifier.height(6.dp))
+    SectionCaption("Ends the set without a rating · rate it with CORRECT while you rest")
+}
+
+/**
  * The effort grid IS the end-set control. Tapping how the set felt ends the set
  * and logs the rating in one action, while the set is still fresh -- there is no
  * separate page between lifting and resting.
@@ -3375,6 +3426,9 @@ private fun EndSetRpeGrid(state: RecordState, viewModel: RecordViewModel, failed
             // Null on an ad-hoc set, which no plan declared anything for.
             EffortScale.askFor(state.currentIsTimed, state.currentSlot?.progression),
         ).filter { failedTile || !it.failed }
+            // On a sensor-counted set "2 reps left" and "1 rep left" come
+            // first, so the usual answer is the first row (record-live F4).
+            .let { SetEndControlPolicy.gridOrder(state.setEndKind, it) { option -> option.rpe } }
     SectionCaption("Tap how that set felt to end it")
     Spacer(Modifier.height(6.dp))
     options.chunked(2).forEach { row ->

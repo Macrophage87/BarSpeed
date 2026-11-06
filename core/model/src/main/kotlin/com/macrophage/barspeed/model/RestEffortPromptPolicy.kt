@@ -75,13 +75,15 @@ data object RestEffortPrompt
  *  - A timed set that DID get the in-set grid owes nothing by either route out
  *    of it. The grid has exactly TWO ways out on a running timed set and only
  *    one of them stores an `rpe`: `SetEndControlPolicy.controls` returns
- *    `{EFFORT_GRID, FAILED_TILE}` whenever that grid is drawn on such a set,
+ *    `{EFFORT_GRID, FAILED_TILE}` whenever that grid is drawn on such a set
+ *    with no completion signal, and `{END_FAILED, EFFORT_GRID}` once its
+ *    clock completes (the failure then sits above the grid, not inside it),
  *    and END SET EARLY is NOT an exit from it -- `SetEndControl.END_UNRATED`
  *    needs `targetMet` false, which on a TIMED kind implies `complete == false`,
  *    which the branch above it already answered with the standalone failure
  *    control. `SetEndControlPolicy`'s own KDoc states it: once such a set is
  *    running, END_UNRATED is unreachable in practice. So a set that left the
- *    in-set grid unrated left by its failure tile, `tappedFailed` stands, and
+ *    in-set grid unrated left by its failure tile or control, `tappedFailed` stands, and
  *    the rating being absent no longer means it is asked. `derivedFailed` is
  *    reached on a different path: a timed set ended during its LEAD-IN, where
  *    `!started` gives END SET EARLY, records measured seconds with `autoEnded`

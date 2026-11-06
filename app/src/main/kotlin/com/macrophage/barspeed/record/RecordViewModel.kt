@@ -4267,6 +4267,9 @@ data class RecordState(
             timed = currentIsTimed,
             explosive = currentExerciseKind == ExerciseKind.EXPLOSIVE,
             guided = guidedSet,
+            // The same flag InSetStage routes on: a rep set that is neither
+            // hand-counted nor guided is the one the SENSOR counts.
+            handCounted = manualSet,
         )
 
     /**

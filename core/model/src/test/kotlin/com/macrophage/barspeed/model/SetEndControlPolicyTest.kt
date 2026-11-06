@@ -38,6 +38,13 @@ class SetEndControlPolicyTest {
     private val rateAndSkip = setOf(SetEndControl.EFFORT_GRID, SetEndControl.END_UNRATED)
     private val failOnly = setOf(SetEndControl.END_FAILED)
 
+    /** A guided or timed set that has just completed: the failure control it had stays, the grid joins it. */
+    private val failThenRate = setOf(SetEndControl.END_FAILED, SetEndControl.EFFORT_GRID)
+
+    /** A sensor-counted set: the grid, its failure tile, and END SET with no rating. */
+    private val rateFailOrEnd =
+        setOf(SetEndControl.EFFORT_GRID, SetEndControl.FAILED_TILE, SetEndControl.END_UNRATED)
+
     private fun controls(c: Triple<SetEndKind, Boolean, Boolean?>) =
         SetEndControlPolicy.controls(kind = c.first, targetMet = c.second, complete = c.third, started = true)
 
@@ -114,16 +121,41 @@ class SetEndControlPolicyTest {
     }
 
     @Test
-    fun `no case offers two unrated ways out at once`() {
+    fun `no case offers two unrated ways out at once, except a sensor-counted set`() {
         // All three end the set with no RPE; they differ only in whether the
         // failure is stored as the lifter's own word. Side by side they would
         // be one decision presented as two, and one of them would be the wrong
         // one.
-        everyCase().forEach { case ->
+        //
+        // The sensor-counted set is the one exception, because there they are
+        // two decisions. Nothing derives a shortfall on it (the sensor total
+        // is never trusted to judge the set), so the failure tile is the only
+        // way to say "I failed"; END SET is "I am done, ask me later", the
+        // unrated way out this policy's KDoc promises every set (UX review
+        // 2026-11-06, record-live F6).
+        everyCase().filter { it.first != SetEndKind.SENSOR_COUNTED }.forEach { case ->
             val unrated =
                 listOf(SetEndControl.FAILED_TILE, SetEndControl.END_UNRATED, SetEndControl.END_FAILED)
                     .count { it in controls(case) }
             assertTrue(unrated <= 1, "$case offers $unrated unrated exits")
+        }
+    }
+
+    @Test
+    fun `a sensor-counted set can always be ended with no rating`() {
+        // No completion signal, and the sensor total is never trusted to judge
+        // the set, so before this the only exits were a rating or a tapped
+        // failure: a lifter who saw the wrong plates, or a sensor still
+        // settling, had to rate a set that never happened. END SET stores no
+        // rating; the rest screen's effort row then reads Not rated and the
+        // Correct popup rates it during the rest.
+        listOf(true, false).forEach { targetMet ->
+            listOf(true, false, null).forEach { complete ->
+                val controls =
+                    SetEndControlPolicy.controls(SetEndKind.SENSOR_COUNTED, targetMet, complete, started = true)
+                assertTrue(SetEndControl.END_UNRATED in controls, "targetMet=$targetMet complete=$complete")
+                assertTrue(SetEndControl.EFFORT_GRID in controls, "targetMet=$targetMet complete=$complete")
+            }
         }
     }
 
@@ -203,12 +235,19 @@ class SetEndControlPolicyTest {
     }
 
     @Test
-    fun `a completed guided or timed set gets the grid it always got`() {
+    fun `a completed guided or timed set keeps its failure control and gains the grid`() {
+        // Before this the grid REPLACED the red failure button at "Done", and
+        // its first row of headroom tiles landed where the button had been: a
+        // lifter who failed the last rep and reached for the red button stored
+        // "Could have added much more" on a failed set (UX review 2026-11-06,
+        // record-live F3). The failure control stays the control it was, and
+        // the grid's own failure tile is withheld so the verdict is on screen
+        // once.
         listOf(SetEndKind.TEMPO_GUIDED, SetEndKind.TIMED).forEach { kind ->
             assertEquals(
-                setOf(SetEndControl.EFFORT_GRID, SetEndControl.FAILED_TILE),
+                failThenRate,
                 SetEndControlPolicy.controls(kind, true, complete = true, started = true),
-                "$kind loses the grid after completing",
+                "$kind swaps its failure control for grid tiles at completion",
             )
             assertEquals(
                 setOf(SetEndControl.EFFORT_GRID, SetEndControl.END_UNRATED),
@@ -224,7 +263,7 @@ class SetEndControlPolicyTest {
         // work. On a manual-count set the app has no completion signal and the
         // effort tile IS how the lifter says the set is over: gating it there
         // would leave no exit at all.
-        listOf(SetEndKind.STRAIGHT_REPS, SetEndKind.EXPLOSIVE).forEach { kind ->
+        listOf(SetEndKind.STRAIGHT_REPS, SetEndKind.EXPLOSIVE, SetEndKind.SENSOR_COUNTED).forEach { kind ->
             listOf(true, false).forEach { targetMet ->
                 listOf(true, false, null).forEach { complete ->
                     assertEquals(
@@ -243,16 +282,71 @@ class SetEndControlPolicyTest {
     }
 
     @Test
-    fun `the grid never shares the screen with the standalone failure control`() {
-        // END_FAILED exists because FAILED_TILE draws nothing by itself. The
-        // two together would put the lifter's own failure verdict on screen
-        // twice, in two controls that store the same fact.
+    fun `the failure verdict is never offered twice`() {
+        // END_FAILED is a control of its own and FAILED_TILE is a tile inside
+        // the grid. The two together would put the lifter's own failure
+        // verdict on screen twice, in two controls that store the same fact.
+        // The grid itself MAY share the screen with END_FAILED since
+        // record-live F3: that is the completed guided or timed set, whose
+        // grid then draws without its failure tile.
         everyCase().forEach { case ->
             val controls = controls(case)
             assertFalse(
-                SetEndControl.EFFORT_GRID in controls && SetEndControl.END_FAILED in controls,
-                "$case draws the grid and the standalone failure control at once",
+                SetEndControl.FAILED_TILE in controls && SetEndControl.END_FAILED in controls,
+                "$case offers the tapped failure twice",
             )
+        }
+    }
+
+    // ---- where the controls sit, UX review 2026-11-06 ----------------------
+
+    @Test
+    fun `the standalone failure control is drawn above the grid`() {
+        // So the red button a lifter reaches for mid-set is still the red
+        // button at the instant the guide says Done, and the grid opens BELOW
+        // it rather than under the finger (record-live F3).
+        assertEquals(
+            listOf(SetEndControl.END_FAILED, SetEndControl.EFFORT_GRID),
+            SetEndControlPolicy.drawOrder(failThenRate),
+        )
+    }
+
+    @Test
+    fun `every control that draws is placed once and the failure tile is left to the grid`() {
+        everyCase().forEach { case ->
+            listOf(true, false).forEach { started ->
+                val controls = SetEndControlPolicy.controls(case.first, case.second, case.third, started)
+                val order = SetEndControlPolicy.drawOrder(controls)
+                assertEquals(controls - SetEndControl.FAILED_TILE, order.toSet(), "$case started=$started")
+                assertEquals(order.distinct(), order, "$case started=$started")
+            }
+        }
+        assertEquals(
+            listOf(SetEndControl.EFFORT_GRID, SetEndControl.END_UNRATED),
+            SetEndControlPolicy.drawOrder(rateFailOrEnd),
+        )
+    }
+
+    private val repTiles =
+        EffortScale.tiles(timed = false, explosive = false, unit = WeightUnit.LB, ask = EffortAsk.LOAD)
+
+    @Test
+    fun `a sensor-counted set puts 2 reps left and 1 rep left in the grid's first row`() {
+        // The owner's target is RIR 1-2, so those two tiles are the usual
+        // answer, and in the ladder's own order they sit in row 3 of 4: below
+        // the fold on a sensor-counted set (record-live F4). The grid draws
+        // two tiles to a row, so the first row is the first two.
+        val ordered = SetEndControlPolicy.gridOrder(SetEndKind.SENSOR_COUNTED, repTiles) { it.rpe }
+        assertEquals(listOf("2 reps left", "1 rep left"), ordered.take(2).map { it.label })
+        assertEquals(repTiles.toSet(), ordered.toSet(), "a tile was dropped or invented")
+        assertEquals(repTiles.size, ordered.size)
+        assertEquals(EffortClaim.FAILED, ordered.last().claim, "the failure tile is no longer last")
+    }
+
+    @Test
+    fun `every other kind keeps the ladder's own order`() {
+        SetEndKind.entries.filter { it != SetEndKind.SENSOR_COUNTED }.forEach { kind ->
+            assertEquals(repTiles, SetEndControlPolicy.gridOrder(kind, repTiles) { it.rpe }, "$kind")
         }
     }
 
@@ -267,7 +361,7 @@ class SetEndControlPolicyTest {
             listOf(true, false).forEach { guided ->
                 assertEquals(
                     SetEndKind.TIMED,
-                    SetEndKind.of(timed = true, explosive = explosive, guided = guided),
+                    SetEndKind.of(timed = true, explosive = explosive, guided = guided, handCounted = false),
                     "a timed set with explosive=$explosive guided=$guided is not TIMED",
                 )
             }
@@ -279,7 +373,7 @@ class SetEndControlPolicyTest {
         listOf(true, false).forEach { guided ->
             assertEquals(
                 SetEndKind.EXPLOSIVE,
-                SetEndKind.of(timed = false, explosive = true, guided = guided),
+                SetEndKind.of(timed = false, explosive = true, guided = guided, handCounted = false),
             )
         }
     }
@@ -288,11 +382,19 @@ class SetEndControlPolicyTest {
     fun `a cadenced rep set is tempo-guided and a hand-counted one is not`() {
         assertEquals(
             SetEndKind.TEMPO_GUIDED,
-            SetEndKind.of(timed = false, explosive = false, guided = true),
+            SetEndKind.of(timed = false, explosive = false, guided = true, handCounted = true),
         )
         assertEquals(
             SetEndKind.STRAIGHT_REPS,
-            SetEndKind.of(timed = false, explosive = false, guided = false),
+            SetEndKind.of(timed = false, explosive = false, guided = false, handCounted = true),
+        )
+    }
+
+    @Test
+    fun `a rep set counted neither by hand nor by the guide is sensor-counted`() {
+        assertEquals(
+            SetEndKind.SENSOR_COUNTED,
+            SetEndKind.of(timed = false, explosive = false, guided = false, handCounted = false),
         )
     }
 
@@ -318,7 +420,7 @@ class SetEndControlPolicyTest {
      * expected answer is stated once, exhaustively, as data.
      *
      * `started = true` throughout. The lead-in window is a separate rule with
-     * its own table below, because folding it in would double 24 rows to 48
+     * its own table below, because folding it in would double 30 rows to 60
      * of which half are the same answer, and a table nobody can read is not a
      * pin.
      */
@@ -340,15 +442,25 @@ class SetEndControlPolicyTest {
             Triple(SetEndKind.EXPLOSIVE, false, true as Boolean?) to rateAndSkip,
             Triple(SetEndKind.EXPLOSIVE, false, false as Boolean?) to rateAndSkip,
             Triple(SetEndKind.EXPLOSIVE, false, null) to rateAndSkip,
+            // Sensor-counted: never gated, and END SET is always beside the
+            // grid (record-live F6). targetMet is true for every such set in
+            // the app today; the false rows are the rule applied anyway.
+            Triple(SetEndKind.SENSOR_COUNTED, true, true as Boolean?) to rateFailOrEnd,
+            Triple(SetEndKind.SENSOR_COUNTED, true, false as Boolean?) to rateFailOrEnd,
+            Triple(SetEndKind.SENSOR_COUNTED, true, null) to rateFailOrEnd,
+            Triple(SetEndKind.SENSOR_COUNTED, false, true as Boolean?) to rateAndSkip,
+            Triple(SetEndKind.SENSOR_COUNTED, false, false as Boolean?) to rateAndSkip,
+            Triple(SetEndKind.SENSOR_COUNTED, false, null) to rateAndSkip,
             // The gate: `complete == false` and nothing else withholds.
             Triple(SetEndKind.TEMPO_GUIDED, true, false as Boolean?) to failOnly,
             Triple(SetEndKind.TEMPO_GUIDED, false, false as Boolean?) to failOnly,
             Triple(SetEndKind.TIMED, true, false as Boolean?) to failOnly,
             Triple(SetEndKind.TIMED, false, false as Boolean?) to failOnly,
-            // Complete, so the grid it always got.
-            Triple(SetEndKind.TEMPO_GUIDED, true, true as Boolean?) to rateAndFail,
+            // Complete: the failure control stays where it was and the grid
+            // opens below it (record-live F3).
+            Triple(SetEndKind.TEMPO_GUIDED, true, true as Boolean?) to failThenRate,
             Triple(SetEndKind.TEMPO_GUIDED, false, true as Boolean?) to rateAndSkip,
-            Triple(SetEndKind.TIMED, true, true as Boolean?) to rateAndFail,
+            Triple(SetEndKind.TIMED, true, true as Boolean?) to failThenRate,
             Triple(SetEndKind.TIMED, false, true as Boolean?) to rateAndSkip,
             // Unjudgeable, so ungated. These four are the reason the argument
             // is nullable at all, and none of them was pinned by equality
@@ -388,7 +500,7 @@ class SetEndControlPolicyTest {
 
     @Test
     fun `every kind, target and completion combination has one stated answer`() {
-        assertEquals(24, expectedWhileRunning.size, "the table does not carry one row per combination")
+        assertEquals(30, expectedWhileRunning.size, "the table does not carry one row per combination")
         assertEquals(
             everyCase().toSet(),
             expectedWhileRunning.keys,

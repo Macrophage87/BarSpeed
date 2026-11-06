@@ -44,6 +44,11 @@ enum class SetEndControl {
  *  - [TIMED]: the clock says so, and since #168 the clock also ends the set.
  *  - [STRAIGHT_REPS]: the LIFTER decides. Nothing in the app knows the set is
  *    over until they say so, and tapping an effort tile is how they say it.
+ *    Hand-counted: the lifter's own +1 REP taps are the count.
+ *  - [SENSOR_COUNTED]: the same, but the sensor counts the reps. Its total is
+ *    never trusted to judge the set, so it is offered an unrated END SET
+ *    beside the grid as well as the failure tile (UX review 2026-11-06,
+ *    record-live F6).
  *  - [EXPLOSIVE]: sensor-counted single drives; the owner's ruling is that
  *    today's behaviour is fine here.
  *
@@ -56,6 +61,7 @@ enum class SetEndKind(val gatesOnCompletion: Boolean) {
     TIMED(gatesOnCompletion = true),
     STRAIGHT_REPS(gatesOnCompletion = false),
     EXPLOSIVE(gatesOnCompletion = false),
+    SENSOR_COUNTED(gatesOnCompletion = false),
     ;
 
     companion object {
@@ -66,14 +72,17 @@ enum class SetEndKind(val gatesOnCompletion: Boolean) {
          * The order is load-bearing. A hold is [TIMED] whatever kind of
          * exercise it is, because it is measured on the clock; an explosive
          * lift never carries a cadence, so it is tested before [TEMPO_GUIDED]
-         * rather than after; and [STRAIGHT_REPS] is what is left, which is the
-         * case with no completion signal.
+         * rather than after; and what is left is a rep set with no completion
+         * signal, [STRAIGHT_REPS] where the lifter's taps count it and
+         * [SENSOR_COUNTED] where the sensor does -- the same split `:app`'s
+         * in-set screen routes on.
          */
-        fun of(timed: Boolean, explosive: Boolean, guided: Boolean): SetEndKind = when {
+        fun of(timed: Boolean, explosive: Boolean, guided: Boolean, handCounted: Boolean): SetEndKind = when {
             timed -> TIMED
             explosive -> EXPLOSIVE
             guided -> TEMPO_GUIDED
-            else -> STRAIGHT_REPS
+            handCounted -> STRAIGHT_REPS
+            else -> SENSOR_COUNTED
         }
     }
 }
@@ -139,6 +148,27 @@ enum class SetEndKind(val gatesOnCompletion: Boolean) {
  * Neither case nags. Every case leaves one tap that ends the set storing no
  * RPE, because a lifter walking away mid-set has to be able to leave.
  *
+ * A [SetEndKind.SENSOR_COUNTED] set is the one exception to "one way out",
+ * and the reason the sentence above is now true of it at all. Its target is
+ * never judged (`RecordState.setTargetMet` is `true` for it), so it took the
+ * first branch and its only exit storing no rpe was a TAPPED failure: a
+ * lifter who saw the wrong plates had to rate, or fail, a set that never
+ * happened. It now gets END SET beside the grid as well as the failure tile.
+ * The two are different statements -- "I failed" against "done, ask me later"
+ * -- and nothing derives a shortfall on such a set to make the tile redundant.
+ * The rating is then given on the rest screen (UX review 2026-11-06,
+ * record-live F6).
+ *
+ * ## The completed guided or timed set keeps its failure control
+ *
+ * Once such a set completes, the grid joins the standalone failure control
+ * rather than replacing it, and the grid's own failure tile is withheld so the
+ * verdict is on screen once. [drawOrder] puts the failure control first. The
+ * grid used to take its place at the instant the guide said Done, and its
+ * first row of headroom tiles landed where the red button had been: a lifter
+ * who failed the last rep and reached for it stored "Could have added much
+ * more" on a failed set (UX review 2026-11-06, record-live F3).
+ *
  * WHAT THAT TAP STORES IS NOT THE SAME EVERYWHERE, and the summary above is
  * the sentence a reader checks the design against, so it is qualified here
  * rather than left to be discovered. On a hand-counted or explosive set the
@@ -147,9 +177,10 @@ enum class SetEndKind(val gatesOnCompletion: Boolean) {
  * during the lead-in. Once such a set is running, [SetEndControl.END_UNRATED]
  * is unreachable in practice, because `RecordState` answers `complete = true`
  * and `complete = null` only in states where [targetMet] is also true -- so
- * the three states a running guided or timed set can be in are the grid with
- * the failure tile, the grid with the failure tile, and the standalone
- * failure control. The exit from an unfinished one therefore always writes a
+ * the states a running guided or timed set can be in are the grid with the
+ * failure tile (no completion signal), the grid under the standalone failure
+ * control (complete), and the standalone failure control alone. The exit
+ * from an unfinished one therefore always writes a
  * verdict. That is the owner's instruction applied honestly rather than an
  * oversight, and the repair is the rest screen: re-rating overwrites the
  * tapped verdict.
@@ -211,7 +242,56 @@ object SetEndControlPolicy {
             // negation reads the same at a glance and gates every ad-hoc hold
             // in the app.
             kind.gatesOnCompletion && complete == false -> setOf(SetEndControl.END_FAILED)
+            // The failure control the set had a moment ago stays where it
+            // was; the grid opens below it (see the KDoc above).
+            kind.gatesOnCompletion && complete == true && targetMet ->
+                setOf(SetEndControl.END_FAILED, SetEndControl.EFFORT_GRID)
+            kind == SetEndKind.SENSOR_COUNTED && targetMet ->
+                setOf(SetEndControl.EFFORT_GRID, SetEndControl.FAILED_TILE, SetEndControl.END_UNRATED)
             targetMet -> setOf(SetEndControl.EFFORT_GRID, SetEndControl.FAILED_TILE)
             else -> setOf(SetEndControl.EFFORT_GRID, SetEndControl.END_UNRATED)
         }
+
+    /**
+     * The controls in [controls] that draw on their own, top to bottom.
+     *
+     * The standalone failure control is first, so on a set that had it
+     * mid-set it is still the top control after the grid appears. END SET
+     * (EARLY) is last, under the grid and away from the +1 REP button that
+     * sits above it. [SetEndControl.FAILED_TILE] is never listed: it is a
+     * tile inside the grid and draws nothing by itself.
+     */
+    fun drawOrder(controls: Set<SetEndControl>): List<SetEndControl> =
+        listOf(SetEndControl.END_FAILED, SetEndControl.EFFORT_GRID, SetEndControl.END_UNRATED)
+            .filter { it in controls }
+
+    /**
+     * The effort grid's [tiles] in the order to draw them, two to a row.
+     *
+     * On a [SetEndKind.SENSOR_COUNTED] set the owner's RIR 1-2 target rungs
+     * (rpe 8 and 9, "2 reps left" and "1 rep left") come first, then the other
+     * two proximity rungs, then the headroom rungs and the failure tile in the
+     * ladder's own order. That grid starts low on the screen, and in ladder
+     * order the usual answer was its third row (UX review 2026-11-06,
+     * record-live F4). Every other kind keeps the ladder's order. Stable, and
+     * it drops or adds nothing.
+     */
+    fun <T> gridOrder(kind: SetEndKind, tiles: List<T>, rpe: (T) -> Int?): List<T> =
+        if (kind != SetEndKind.SENSOR_COUNTED) {
+            tiles
+        } else {
+            tiles.sortedBy { tile ->
+                when (rpe(tile)) {
+                    in TARGET_RPES -> 0
+                    in OTHER_PROXIMITY_RPES -> 1
+                    else -> 2
+                }
+            }
+        }
+
+    /** RIR 2 and RIR 1 on the rep ladder: the owner's usual answer. */
+    private val TARGET_RPES = setOf(8, 9)
+
+    /** "3 reps left" and "Nothing left". */
+    private val OTHER_PROXIMITY_RPES = setOf(7, 10)
 }
