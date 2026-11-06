@@ -125,7 +125,8 @@ sealed interface RecoveryTarget {
      * set is placed, after the decode, so that hold is either a leak (every
      * way out of Record pops it and its ViewModel releases the hold) or a
      * Record screen opened on top of Home during the decode, with a set
-     * started there -- recording, or resting after it, since that screen
+     * started there -- recording, resting after it, or holding a set whose
+     * write failed (see [JournalRecoveryPolicy.RECORDING_NOTE]), since that screen
      * holds SESSION from its first set to the session's close (whole-branch
      * review of 0.2.0, round 2, CAP-R2-B1; round 3, CAP-R3-N1).
      * Nothing is decided until it is released;
@@ -364,7 +365,8 @@ object JournalRecoveryPolicy {
      *   holds live in process memory. That a force-stop clears it on a device
      *   is reasoned, not observed;
      * - a Record screen opened on top of Home during the decode, with a set
-     *   started there: recording now, or resting after it, since that screen
+     *   started there: recording now, resting after it, or holding a set
+     *   whose write failed ([RECORDING_NOTE]), since that screen
      *   acquires SESSION at its first set and releases it only at the
      *   session's close or its own clearing (round 3, CAP-R3-N1). Its leaving
      *   releases the hold.
@@ -402,11 +404,18 @@ object JournalRecoveryPolicy {
     /**
      * [waitNote] while only the record screen's own hold is held: a leaked
      * hold, or a Record screen opened during the decode with a set started
-     * there, recording now or resting after it. The "If you are not
-     * recording" hedge keeps it true while a set records ([waitNote]); at a
-     * rest a force-stop loses no saved set, since that set's row has landed
-     * (a write still running would hold [RecordingHold.SET_WRITE] and answer
-     * [SAVING_NOTE]) and a wait keeps the capture.
+     * there: recording now, resting after it, or holding a set whose write
+     * failed behind SAVE THIS SET AGAIN. The "If you are not recording"
+     * hedge keeps it true while a set records ([waitNote]). At a rest the
+     * set's row has landed (a write still running would hold
+     * [RecordingHold.SET_WRITE] and answer [SAVING_NOTE]). After a failed
+     * write it has not: `launchSetWrite` releases SET_WRITE in its finally
+     * on failure too. That set's capture survives a force-stop only on
+     * disk: `runSetWrite` closes the journal and discards it only once the
+     * row lands, so the card can offer it back, except a timed set, which
+     * the recovery refuses, and a set whose journal never opened, which
+     * lives in memory alone (whole-branch review of 0.2.0, round 4,
+     * M-R4-B1). A wait keeps the capture either way.
      */
     const val RECORDING_NOTE =
         "BarSpeed still counts a recording as running. If you are not recording, force-stop BarSpeed in " +
