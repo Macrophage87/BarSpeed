@@ -37,7 +37,8 @@ The zip holds a CSV per set and sensor, `meta.json` (described by
 ## Importing a plan
 
 Plans come from robocoach. In the app: **Plans → Import plan (paste JSON)** or
-**Import plan from file → Approve**. The plan contract for any LLM is in the app
+**Import plan from file**, then **MAKE ACTIVE & START** (or **Make active** to
+lift it another day). The plan contract for any LLM is in the app
 at **Guide → COPY PLAN PROMPT**; that is the one copy kept in step with the
 code. The machine-readable form is
 [`docs/schemas/plan.schema.json`](docs/schemas/plan.schema.json). A plan file
