@@ -3008,8 +3008,9 @@ data class SessionExport(
          * short of its partner's by more than
          * `SensorCapturePolicy.SPAN_MARGIN_MS` or a tenth of the partner's
          * span, whichever is longer, which is a late start or an early stop
-         * alike (#242; a mid-set gap with frames at both ends is not caught), and one that NEVER MOVED --
-         * [UnitMotion.still] -- while its partner did (#287), so the analysis
+         * alike (#242; a mid-set gap with frames at both ends is not caught),
+         * and one that NEVER MOVED -- [UnitMotion.still] -- while its partner
+         * did (#287), so the analysis
          * moves by the fallback that already existed: `analysedFellBack`
          * true, `analysedRoleBasis` `fallback`, refused under a mount-specific
          * declaration (#247). `silent` may now also name such a unit, only
@@ -3094,9 +3095,8 @@ data class SessionExport(
          * were journaled, and are carried). An interrupted set carries no
          * terminal cue unless the guide had called Done before the kill, so
          * its rep list is bounded by nothing but the end of the journal. It
-         * sits in a
-         * session of its own unless its own session was still open and
-         * current. OMITTED WHEN FALSE, `added`'s shape.
+         * sits in a session of its own unless its own session was still open
+         * and current. OMITTED WHEN FALSE, `added`'s shape.
          * NOT RETROACTIVE in the sense that matters: read from database v21's
          * `recovered` column, which is 0 on every row an earlier build wrote,
          * and nothing before v21 could write a recovered row, so a missing
@@ -3117,8 +3117,8 @@ data class SessionExport(
          * CHANGES, but the figures of a population move. On a horizontal-plane
          * set the sign of the travel axis is fixed by the first movement run
          * of the recording, and from this version that run must also have
-         * travelled `DspConfig.minRomM` (0.10 m), so a settle shorter than that
-         * in the lead-in no longer swaps the set's eccentric and concentric; a
+         * travelled `DspConfig.minRomM` (0.10 m) in the sensor's frame, so a
+         * settle shorter than that in the lead-in no longer swaps the set's eccentric and concentric; a
          * settle of 0.10 m or more still can. Where it moves, `ecc_s`, `con_s`,
          * the velocities, power and the tempo grade of every rep move with it
          * (a synthetic 3 cm settle: drive 1.87 s and 0.212 m/s before, 0.96 s
@@ -3127,8 +3127,8 @@ data class SessionExport(
          * analysis is never re-run, so a set recorded before this version
          * keeps the orientation it was stored with; a set a released build
          * recorded with `analysisSchemaVersion` 1.26 was oriented under the
-         * new rule, and one without the key was recorded before it. Under 1.26 and not
-         * a mint: 1.26 is unreleased. `DATABASE_VERSION` does NOT move for
+         * new rule, and one without the key was recorded before it. Under 1.26
+         * and not a mint: 1.26 is unreleased. `DATABASE_VERSION` does NOT move for
          * this entry. `HorizontalAxisOrientationTest` in `:core:dsp` is the
          * differential.
          */
