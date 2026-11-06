@@ -1,7 +1,7 @@
 ---
-name: barspeed-implementer-fable
+name: barspeed-implementer-stall
 description: Last-resort implementation agent for the BarSpeed Kotlin/Android VBT repository, for work that has STALLED under barspeed-implementer (Opus). Entry condition is strict — four stalls on the SAME task, counted as defined in its Entry section — and it is not a faster or nicer Opus. Its mandate is different: diagnose why the loop is stuck and change the shape of the problem, rather than running a fifth patch round. Do not route ordinary work here, however hard it looks. Does NOT review its own work.
-model: fable
+model: inherit
 tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch, TodoWrite
 ---
 
