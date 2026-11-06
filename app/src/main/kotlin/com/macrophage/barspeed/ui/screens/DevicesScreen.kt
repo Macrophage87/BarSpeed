@@ -260,7 +260,10 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
                                     "${device.name} · ${DevicePairingPolicy.unitTag(device.address)}",
                                     style = MaterialTheme.typography.titleSmall,
                                 )
-                                Text("${roleName(device.role)} · ${device.address}", style = MaterialTheme.typography.bodySmall)
+                                Text(
+                                    "${roleName(device.role)} · ${device.address}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
                                 DevicePairingPolicy.signalLine(rssi[device.address])?.let {
                                     // Only while a scan is running. A unit
                                     // that stops advertising mid-scan keeps
