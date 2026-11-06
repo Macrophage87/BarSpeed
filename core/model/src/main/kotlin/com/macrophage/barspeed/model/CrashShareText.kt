@@ -44,7 +44,10 @@ object CrashShareText {
         }
     }
 
-    private fun versionName(text: String): String? =
-        text.lines().firstOrNull { it.startsWith("version: ") }
-            ?.removePrefix("version: ")?.substringBefore(" (")?.trim()?.takeIf { it.isNotEmpty() }
+    private fun versionName(text: String): String? = text.lines()
+        .firstOrNull { it.startsWith("version: ") }
+        ?.removePrefix("version: ")
+        ?.substringBefore(" (")
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
 }
