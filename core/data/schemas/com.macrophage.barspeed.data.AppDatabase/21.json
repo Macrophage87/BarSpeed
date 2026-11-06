@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 21,
-    "identityHash": "4207fdc7028c60a684194f130d491548",
+    "identityHash": "f487e494b9702e8889ac377524447b6b",
     "entities": [
       {
         "tableName": "plans",
@@ -127,7 +127,7 @@
       },
       {
         "tableName": "set_records",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sessionId` INTEGER NOT NULL, `orderIdx` INTEGER NOT NULL, `exerciseId` TEXT NOT NULL, `exerciseName` TEXT NOT NULL, `loadKg` REAL NOT NULL, `plannedLoadKg` REAL, `workingLoadKg` REAL, `bodyWeightKg` REAL, `rpeScale` TEXT, `actualReps` INTEGER NOT NULL, `repsManual` INTEGER NOT NULL, `liveReps` INTEGER, `plannedReps` INTEGER, `workingReps` INTEGER, `actualDurationS` INTEGER, `plannedDurationS` INTEGER, `workingDurationS` INTEGER, `durationEndedBy` TEXT, `side` TEXT, `plannedSide` TEXT, `rpe` INTEGER, `failed` INTEGER NOT NULL, `failedByLifter` INTEGER, `warmup` INTEGER NOT NULL, `warmupMark` INTEGER, `added` INTEGER NOT NULL, `voided` INTEGER NOT NULL, `voidReason` TEXT, `limiter` TEXT, `limiterNote` TEXT, `tempo` TEXT, `plannedTempo` TEXT, `targetMeanConVelMps` REAL, `velocityLossStopPct` REAL, `plannedRestS` INTEGER, `restStartedAtMs` INTEGER, `plannedPrepS` INTEGER, `prepS` INTEGER, `workBegan` INTEGER, `startedAtMs` INTEGER NOT NULL, `endedAtMs` INTEGER NOT NULL, `analysisJson` TEXT NOT NULL, `analysisSchemaVersion` TEXT, `geometryJson` TEXT, `sensorsJson` TEXT, `hrEndOfSetBpm` INTEGER, `hrAvgBpm` INTEGER, `hrMaxBpm` INTEGER, FOREIGN KEY(`sessionId`) REFERENCES `sessions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sessionId` INTEGER NOT NULL, `orderIdx` INTEGER NOT NULL, `exerciseId` TEXT NOT NULL, `exerciseName` TEXT NOT NULL, `loadKg` REAL NOT NULL, `plannedLoadKg` REAL, `workingLoadKg` REAL, `bodyWeightKg` REAL, `rpeScale` TEXT, `actualReps` INTEGER NOT NULL, `repsManual` INTEGER NOT NULL, `liveReps` INTEGER, `plannedReps` INTEGER, `workingReps` INTEGER, `actualDurationS` INTEGER, `plannedDurationS` INTEGER, `workingDurationS` INTEGER, `durationEndedBy` TEXT, `side` TEXT, `plannedSide` TEXT, `rpe` INTEGER, `failed` INTEGER NOT NULL, `failedByLifter` INTEGER, `warmup` INTEGER NOT NULL, `warmupMark` INTEGER, `added` INTEGER NOT NULL, `voided` INTEGER NOT NULL, `voidReason` TEXT, `limiter` TEXT, `limiterNote` TEXT, `tempo` TEXT, `plannedTempo` TEXT, `targetMeanConVelMps` REAL, `velocityLossStopPct` REAL, `plannedRestS` INTEGER, `restStartedAtMs` INTEGER, `plannedPrepS` INTEGER, `prepS` INTEGER, `workBegan` INTEGER, `startedAtMs` INTEGER NOT NULL, `endedAtMs` INTEGER NOT NULL, `analysisJson` TEXT NOT NULL, `analysisSchemaVersion` TEXT, `recovered` INTEGER NOT NULL, `geometryJson` TEXT, `sensorsJson` TEXT, `hrEndOfSetBpm` INTEGER, `hrAvgBpm` INTEGER, `hrMaxBpm` INTEGER, FOREIGN KEY(`sessionId`) REFERENCES `sessions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "id",
@@ -365,6 +365,12 @@
             "affinity": "TEXT"
           },
           {
+            "fieldPath": "recovered",
+            "columnName": "recovered",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
             "fieldPath": "geometryJson",
             "columnName": "geometryJson",
             "affinity": "TEXT"
@@ -524,7 +530,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '4207fdc7028c60a684194f130d491548')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'f487e494b9702e8889ac377524447b6b')"
     ]
   }
 }

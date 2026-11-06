@@ -721,7 +721,7 @@ abstract class AppDatabase : RoomDatabase() {
          * assumed, so an installed build has run 19 -> 20 and a column added
          * to that hop would never reach its phone.
          *
-         * ONE COLUMN, AND THE OTHER CANDIDATES THIS RELEASE NAMED ARE ALREADY
+         * ONE COLUMN FOR #38, AND THE OTHER CANDIDATES THIS RELEASE NAMED ARE ALREADY
          * STORED. #57's effective kind is `ResolvedGeometry.kind` inside
          * `geometryJson`; #169's tapped-versus-derived failure is
          * `failedByLifter` (v15); #171's DualShortfall is
@@ -740,7 +740,18 @@ abstract class AppDatabase : RoomDatabase() {
          * (the #38 defect itself), and a version inferred from `startedAtMs`
          * against release dates reads exactly like a recorded one.
          *
-         * [Migration20To21Test] pins the statement, the baseline difference,
+         * A SECOND COLUMN JOINED THIS HOP BEFORE IT SHIPPED: `recovered`
+         * (#100), true on a row written from an interrupted set's capture
+         * rather than by the set ending. Added to this hop and not a new
+         * one because 21 has not shipped -- no `v*` tag carries
+         * `DATABASE_VERSION = 21` -- so no installed build has run 20 -> 21
+         * without it. `INTEGER NOT NULL DEFAULT 0`, [MIGRATION_11_12]'s
+         * `added` shape and the opposite of `analysisSchemaVersion`'s: every
+         * row written before v21 was written by its set ending, so 0 is the
+         * truth for them, not a guess. `SetRecordEntity.recovered` states
+         * what the flag means.
+         *
+         * [Migration20To21Test] pins the statements, the baseline difference,
          * the refusal to write into any existing row, and that the hop is in
          * [MIGRATIONS]. None of it executes SQLite; the two-way emulator
          * exercise at the cut is owed.
@@ -749,6 +760,7 @@ abstract class AppDatabase : RoomDatabase() {
             object : Migration(20, 21) {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE set_records ADD COLUMN analysisSchemaVersion TEXT")
+                    db.execSQL("ALTER TABLE set_records ADD COLUMN recovered INTEGER NOT NULL DEFAULT 0")
                 }
             }
 

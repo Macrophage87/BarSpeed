@@ -310,6 +310,16 @@ data class CompletedSet(
      * derived shortfall and stays exactly that.
      */
     val failedByLifter: Boolean? = null,
+    /**
+     * True when this set is being written from an interrupted set's capture
+     * rather than by the set ending (#100). [SetRecordEntity.recovered] states
+     * what the flag means; this is the object that fills it.
+     *
+     * Defaulted false, and the default is the truth for every caller but one:
+     * the record screen writes a set because it ended, and only the recovery
+     * of a journal left behind by a killed process writes one that did not.
+     */
+    val recovered: Boolean = false,
 )
 
 /**

@@ -13,9 +13,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * The v20 -> v21 migration: one nullable TEXT column on `set_records`,
- * `analysisSchemaVersion` -- the session-export schema version current in the
- * build that computed the row's `analysisJson` (#38).
+ * The v20 -> v21 migration: two columns on `set_records`.
+ * `analysisSchemaVersion`, nullable TEXT -- the session-export schema version
+ * current in the build that computed the row's `analysisJson` (#38); and
+ * `recovered`, `INTEGER NOT NULL DEFAULT 0` -- whether the row was written from
+ * an interrupted set's capture rather than by the set ending (#100).
+ *
+ * `recovered` joined this hop before 21 shipped: no `v*` tag carries
+ * `DATABASE_VERSION = 21`, so no installed build has run this hop without it.
  *
  * ## A NEW HOP, not an extension of 20
  *
@@ -37,7 +42,7 @@ import kotlin.test.assertTrue
  *
  * HOW 21.json WAS MADE, said because it differs from its predecessors. No
  * Android SDK exists where this lane ran, so Room's compiler could not write
- * it. It is `20.json` with the one field appended to `set_records` in entity
+ * it. It is `20.json` with the two fields added to `set_records` in entity
  * order, that table's `createSql` extended to match, the version set to 21 and
  * `identityHash` recomputed by a re-implementation of Room 2.7.1's
  * `SchemaIdentityKey` (read from `room-compiler-2.7.1-sources.jar`) that
@@ -118,14 +123,18 @@ class Migration20To21Test {
     }
 
     /**
-     * v21 differs from v20 by exactly the one set_records column, nullable with
-     * no default, TEXT.
+     * v21 differs from v20 by exactly the two set_records columns: the
+     * provenance, nullable TEXT with no default, and the recovered flag, a
+     * NOT NULL INTEGER.
      *
-     * Read off the schema descriptions, so a second column, a retyped one and a
-     * dropped one are all caught.
+     * Read off the schema descriptions, so a third column, a retyped one and a
+     * dropped one are all caught. The committed description carries no
+     * `defaultValue` for `recovered`, as it carries none for `added` or
+     * `voided`: the entity declares no `@ColumnInfo` default, and the SQL
+     * default lives in the migration's statement, pinned below.
      */
     @Test
-    fun `the schema baselines differ by exactly the analysis provenance column`() {
+    fun `the schema baselines differ by exactly the provenance and recovered columns`() {
         for (table in listOf("raw_streams", "sessions", "plans", "custom_exercises")) {
             assertEquals(
                 emptySet(),
@@ -134,9 +143,12 @@ class Migration20To21Test {
             )
         }
         assertEquals(
-            mapOf("analysisSchemaVersion" to Triple("TEXT", false, null)),
+            mapOf(
+                "analysisSchemaVersion" to Triple("TEXT", false, null),
+                "recovered" to Triple("INTEGER", true, null),
+            ),
             columnsOf(21, "set_records") - columnsOf(20, "set_records").keys,
-            "set_records gained something other than the one nullable, defaultless column",
+            "set_records gained something other than the provenance and recovered columns",
         )
     }
 
@@ -155,11 +167,14 @@ class Migration20To21Test {
         }
     }
 
-    /** The migration executes exactly the one append, asserted as a whole list. */
+    /** The migration executes exactly the two appends, asserted as a whole list. */
     @Test
-    fun `the migration runs the one add-column statement and nothing else`() {
+    fun `the migration runs the two add-column statements and nothing else`() {
         assertEquals(
-            listOf("ALTER TABLE set_records ADD COLUMN analysisSchemaVersion TEXT"),
+            listOf(
+                "ALTER TABLE set_records ADD COLUMN analysisSchemaVersion TEXT",
+                "ALTER TABLE set_records ADD COLUMN recovered INTEGER NOT NULL DEFAULT 0",
+            ),
             executedSql(),
         )
     }
@@ -174,10 +189,30 @@ class Migration20To21Test {
         for (sql in executedSql()) {
             assertTrue(sql.startsWith("ALTER TABLE "), "not a column append: $sql")
             assertTrue("ADD COLUMN" in sql, "not a column append: $sql")
-            assertTrue("NOT NULL" !in sql.uppercase(), "an old row has no provenance to give: $sql")
-            assertTrue("DEFAULT" !in sql.uppercase(), "a default names a version for every set already recorded: $sql")
             assertTrue("DROP" !in sql.uppercase() && "RENAME" !in sql.uppercase(), "destructive statement: $sql")
         }
+        val provenance = executedSql().single { "analysisSchemaVersion" in it }
+        assertTrue("NOT NULL" !in provenance.uppercase(), "an old row has no provenance to give: $provenance")
+        assertTrue(
+            "DEFAULT" !in provenance.uppercase(),
+            "a default names a version for every set already recorded: $provenance",
+        )
+    }
+
+    /**
+     * Every row that existed at v20 reads as NOT recovered (#100).
+     *
+     * The opposite rule from the provenance column, and for a measured reason:
+     * before v21 nothing could write a set row from an interrupted capture, so
+     * every existing row was written by its set ending. NOT NULL with a
+     * default of 0 says exactly that; a nullable column would leave every old
+     * row "unknown" about a fact that is known.
+     */
+    @Test
+    fun `every row that existed at v20 reads as not recovered`() {
+        val recovered = executedSql().single { "recovered" in it }
+        assertTrue("NOT NULL" in recovered.uppercase(), "an old row would read as unknown: $recovered")
+        assertTrue("DEFAULT 0" in recovered.uppercase(), "an old row would not read as not recovered: $recovered")
     }
 
     /**
