@@ -146,8 +146,28 @@ data class ExerciseDef(
          * out separately, `SessionRepository.exerciseById`'s fallback and the
          * `CustomExerciseEntity` row `ensureExerciseExists` writes, and
          * [CustomExerciseRepair] compares a stored row against it.
+         *
+         * A whole word that is one of [ABBREVIATIONS], or its plural, is
+         * written in capitals -- `dumbbell_rdl` is "Dumbbell RDL", `kb_swing`
+         * "KB swing" (core-model review 2026-11-06, F7). Every other word keeps
+         * the sentence case above, so rows already stored for ids without an
+         * abbreviation still match and are not rewritten.
          */
-        fun inferredDisplayName(id: String): String = id.replace('_', ' ').replaceFirstChar { it.uppercase() }
+        fun inferredDisplayName(id: String): String = id.split('_')
+            .joinToString(" ", transform = ::abbreviationInCapitals)
+            .replaceFirstChar { it.uppercase() }
+
+        private fun abbreviationInCapitals(word: String): String {
+            val singular = word.removeSuffix("s")
+            return when {
+                word.lowercase() in ABBREVIATIONS -> word.uppercase()
+                singular != word && singular.lowercase() in ABBREVIATIONS -> singular.uppercase() + "s"
+                else -> word
+            }
+        }
+
+        /** Abbreviations plan ids use for a whole word, shown in capitals. */
+        private val ABBREVIATIONS = setOf("rdl", "sldl", "db", "kb", "ohp", "rfe", "rfess", "ez", "trx", "ghd")
 
         /**
          * The definition the app builds for an id it ships no [SEED] entry for
@@ -434,6 +454,7 @@ data class ExerciseDef(
         fun isBodyweightByConstruction(id: String): Boolean = id.lowercase() in BODYWEIGHT_IDS
 
         private val EXPLOSIVE_HINTS = listOf("swing", "snatch", "clean", "jerk", "push_press", "throw", "slam")
+
         // "plank" and "sled" are read in inferKind, each with its own veto.
         private val HOLD_HINTS = listOf("hold", "hang", "wall_sit", "l_sit")
         private val CARRY_HINTS = listOf("carry", "walk", "farmer", "yoke")

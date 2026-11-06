@@ -60,7 +60,10 @@ class InferredExerciseTest {
         assertEquals("RFE split squat", ExerciseDef.inferredDisplayName("rfe_split_squat"))
         assertEquals("Single leg RDLs", ExerciseDef.inferredDisplayName("single_leg_rdls"), "a plural keeps its s")
         assertEquals("EZ bar curl", ExerciseDef.inferredDisplayName("ez_bar_curl"))
-        assertEquals("Rear foot elevated split squat", ExerciseDef.inferredDisplayName("rear_foot_elevated_split_squat"))
+        assertEquals(
+            "Rear foot elevated split squat",
+            ExerciseDef.inferredDisplayName("rear_foot_elevated_split_squat"),
+        )
         assertEquals("Tricep pushdown", ExerciseDef.inferredDisplayName("tricep_pushdown"))
         assertEquals("Kbswing", ExerciseDef.inferredDisplayName("kbswing"), "only a whole word is an abbreviation")
         assertEquals("Dbsnatch", ExerciseDef.inferredDisplayName("dbsnatch"))
