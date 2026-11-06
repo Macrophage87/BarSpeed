@@ -97,18 +97,4 @@ class LiveCountReadoutTest {
     fun `no cadence is published where the count was given up`() {
         assertNull(LiveCountReadout.repsPerMin(10, 10, withheld = true))
     }
-
-    /** Unchanged: the caption names the rep about to be started, one past the count. */
-    @Test
-    fun `the caption names the next rep`() {
-        assertEquals("rep 1 ready", LiveCountReadout.nextRepCaption(0))
-        assertEquals("rep 5 ready", LiveCountReadout.nextRepCaption(4))
-    }
-
-    /** Suppressed where the count was given up, rather than frozen at "rep 1 ready". */
-    @Test
-    fun `no caption where the count was given up`() {
-        assertNull(LiveCountReadout.nextRepCaption(0, withheld = true))
-        assertNull(LiveCountReadout.nextRepCaption(4, withheld = true))
-    }
 }

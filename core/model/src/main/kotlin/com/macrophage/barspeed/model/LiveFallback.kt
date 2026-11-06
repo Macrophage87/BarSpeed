@@ -309,17 +309,4 @@ object LiveCountReadout {
         reps >= 2 && elapsedS > 0 -> reps * 60 / elapsedS
         else -> null
     }
-
-    /**
-     * The caption naming the rep the lifter is about to start, or null where no
-     * count stands behind it.
-     *
-     * Suppressed rather than frozen on a withheld set: "rep 1 ready" through a
-     * set of eight is a statement about the lifter, not about the app's own
-     * state.
-     */
-    fun nextRepCaption(reps: Int, withheld: Boolean = false): String? = when {
-        withheld -> null
-        else -> "rep ${reps + 1} ready"
-    }
 }
