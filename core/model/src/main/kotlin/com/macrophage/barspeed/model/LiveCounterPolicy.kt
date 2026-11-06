@@ -68,6 +68,20 @@ enum class LiveCounter {
      * asserts it nowhere.
      */
     CYCLE,
+
+    /**
+     * `LockoutRepCounter`: an eccentric, then a concentric, called at the
+     * concentric's end -- the lockout -- off a leaky velocity with its bias
+     * taken off. A concentric with no eccentric before it, the unrack, is
+     * never a rep, and nothing waits for a floor.
+     *
+     * Built for the owner's first v0.2.2 session (2026-11-06), where the
+     * full-cycle rule counted the walk-out as rep 1, called every rep while
+     * the next was under way and the last as the bar was racked, and dropped
+     * two of five reps on the empty bar. `LockoutRepCounter`'s KDoc carries
+     * the mechanism and what it was measured on.
+     */
+    LOCKOUT,
 }
 
 /**
@@ -157,9 +171,18 @@ object LiveCounterPolicy {
      * are kept rather than deleted, stated so it is not read as oversight:
      * reverting this decision is one row, and each carries a corpus pin that
      * re-derives what it did (`LiveRepCallCorpusTest`, `LiveCountDifferentialTest`).
+     *
+     * ## [startsWith]
+     *
+     * The phase the set's geometry declares first, `LiftDirection.startsWith`
+     * in `:core:dsp`. Both phases run [LiveCounter.CYCLE] today; it is a
+     * parameter so the row that splits them is one line of this `when`.
      */
-    fun counterFor(counter: RepCounter): LiveCounter? = when (counter) {
-        RepCounter.SENSOR -> LiveCounter.CYCLE
+    fun counterFor(counter: RepCounter, startsWith: StartPhase): LiveCounter? = when (counter) {
+        RepCounter.SENSOR -> when (startsWith) {
+            StartPhase.CONCENTRIC -> LiveCounter.CYCLE
+            StartPhase.ECCENTRIC -> LiveCounter.CYCLE
+        }
         RepCounter.MANUAL, RepCounter.METRONOME, RepCounter.NOBODY -> null
     }
 }
