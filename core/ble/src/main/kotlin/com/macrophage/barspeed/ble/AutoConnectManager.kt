@@ -330,11 +330,14 @@ class AutoConnectManager(
      * Wait up to [ms] for a kick newer than [seen]: any kick, or only the
      * adapter coming on when [adapterOnOnly]. True if one came.
      */
-    private suspend fun kickedWithin(ms: Long, seen: Kicks, adapterOnOnly: Boolean): Boolean =
-        withTimeoutOrNull(ms) {
-            combine(retryGeneration, adapterOnGeneration) { r, a -> Kicks(r, a) }
-                .first { if (adapterOnOnly) it.adapterOn != seen.adapterOn else it != seen }
-        } != null
+    private suspend fun kickedWithin(ms: Long, seen: Kicks, adapterOnOnly: Boolean): Boolean {
+        val kick =
+            withTimeoutOrNull(ms) {
+                combine(retryGeneration, adapterOnGeneration) { r, a -> Kicks(r, a) }
+                    .first { if (adapterOnOnly) it.adapterOn != seen.adapterOn else it != seen }
+            }
+        return kick != null
+    }
 
     /**
      * Advance a link's last-frame instant, at most once per
