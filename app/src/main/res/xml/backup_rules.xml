@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Backup rules for Android 8.0-11 (API 26-30; minSdk is 26). Android 12+
+    reads data_extraction_rules.xml instead; keep the two in step, and see
+    that file for where each path comes from and why.
+
+    Before API 31 this one file covers both cloud backup and device-to-device
+    transfer, so it follows the cloud rules: the database is left out of both.
+    requireFlags="deviceToDeviceTransfer" could scope a database include to
+    transfers, but only from API 28; on 26-27 the attribute is not parsed and
+    the include would land in the cloud and blow the quota. Left out
+    everywhere: the database, inflight/, rescued/, crashes/, the devices
+    DataStore, cache.
+-->
+<full-backup-content>
+    <include domain="file" path="datastore/settings.preferences_pb" />
+    <include domain="sharedpref" path="." />
+</full-backup-content>

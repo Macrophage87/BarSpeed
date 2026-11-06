@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Backup rules for Android 12 (API 31) and later. The API 26-30 twin is
+    backup_rules.xml; keep the two in step.
+
+    Paths come from the code, not from memory:
+      database  accelerometer_lifting.db (+ -wal, -shm)  core/data AppDatabase.DATABASE_NAME
+      file      datastore/settings.preferences_pb        app SettingsStore, preferencesDataStore("settings")
+      file      datastore/devices.preferences_pb         core/ble DeviceRegistry, preferencesDataStore("devices")
+      file      inflight/                                LiftingApp, SetJournalStore
+      file      rescued/                                 core/data DatabaseRescue.RESCUE_DIR
+      file      crashes/                                 core/model CrashLogPolicy.DIR
+      root      cache/                                   share exports (cache/exports)
+
+    An include list means everything not listed is left out, and lint
+    rejects an exclude that is not inside an include, so the cloud section
+    states its exclusions as this comment rather than as tags.
+-->
+<data-extraction-rules>
+    <!--
+        Cloud (Google Drive): 25 MB per-app quota. Over it, Android stops
+        backing the app up at all, with no warning. The Room database holds
+        a gzipped raw IMU CSV per set (raw_streams.csvGzip) and passes that
+        within a few sessions, so it is NOT backed up to the cloud; the
+        session export zip is the archive. Also left out: inflight/ set
+        journals, rescued/ database copies, crashes/, the devices DataStore
+        (sensor addresses for this phone's sensors) and cache.
+
+        What is backed up: the settings DataStore (weight unit, voice cues,
+        body weight, per-exercise lead-in, sensor role by address) and any
+        shared preferences.
+    -->
+    <cloud-backup>
+        <include domain="file" path="datastore/settings.preferences_pb" />
+        <include domain="sharedpref" path="." />
+    </cloud-backup>
+
+    <!--
+        Device-to-device transfer has no quota, so the history comes across.
+        Everything is transferred except:
+          inflight/  a half-written set journal from the old phone would show
+                     up as an interrupted set on the new one;
+          crashes/   diagnostics about the old install;
+          cache/     share exports, rebuilt on demand.
+        rescued/ does transfer: a rescued database may be the only copy of
+        history a failed migration set aside.
+    -->
+    <device-transfer>
+        <exclude domain="file" path="inflight/" />
+        <exclude domain="file" path="crashes/" />
+        <exclude domain="root" path="cache/" />
+    </device-transfer>
+</data-extraction-rules>
