@@ -4706,7 +4706,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * one is reached by no test on the CI path.
      */
     private var lastHrSample: HrSample? = null
-    private var voice: VoiceCounter? = null
+    // Made now whatever the cue toggle says (UX review 2026-11-06, voice F8): the engine binds
+    // asynchronously, so a voice first made at a tempo set's START lost its opening words.
+    private var voice: VoiceCounter? = VoiceCounter(app)
     private val milestones = VoiceMilestones { speakCue(it) }
     private var plannedRepsForSet: Int? = null
 
