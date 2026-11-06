@@ -48,6 +48,10 @@ release gets a did-it-work lens per shipped feature). Standing rules for every l
   `meta.json` — never from memory or filenames. A mislabelled fixture is worse than none, and a
   fixture with no assertion is inert and reads as coverage — lift it with a case pinning it, in
   the same commit.
+- Heart-rate CSVs (`timestamp_ms,hr_bpm,rr_ms`) carry wall-clock times, so shift them with
+  `scripts/rebase-hr-fixture-timestamps.py` before committing, passing all of a session's files
+  in one call; record the printed `offset_ms` in `HrFixtures.kt`'s provenance KDoc. See
+  `core/data/src/test/resources/README.md`.
 
 ## 3. Report to the owner
 
