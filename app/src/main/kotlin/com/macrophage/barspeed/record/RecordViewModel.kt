@@ -1602,6 +1602,25 @@ private fun CoroutineScope.mirroredGuidedRunner(
  * The rest countdown: one tick a second down to zero, with the last three
  * seconds and the end spoken.
  *
+ * EVERY TICK READS THE CLOCK, NOT THE PREVIOUS TICK (UX review 2026-11-06,
+ * rest F10). The remainder is `RestClockPolicy.remainingS` of the rest's own
+ * start instant, `RecordState.restStartedAtMs`, against the wall clock: the
+ * same computation that seeds the screen and the instant the export's rest is
+ * measured from. It used to subtract one per `delay(1_000)`, which added each
+ * loop's overhead to the period and, because `delay` runs on uptime, stopped
+ * counting while the CPU slept with the screen off. `delay` still sleeps
+ * then; the next tick after waking shows the true remainder instead of
+ * resuming where it stopped. Each sleep runs to the next whole second of the
+ * period, `RestClockPolicy.msToNextTick`. A state carrying no start instant
+ * (none should reach here) is given one that reproduces its remainder, so it
+ * counts on as before rather than reading zero.
+ *
+ * THE CUE USES THE SAME CLOCK: `RestClockPolicy.cueOnTick` says the digit or
+ * "Rest over" for the remainder this tick computed, once, as it is crossed.
+ * A wake that jumps several seconds speaks only where the clock now is, never
+ * a late burst of "3, 2, 1". Whether `delay` resumes promptly after a doze on
+ * a real phone is a [Field] question.
+ *
  * Lifted out of [RecordViewModel] for [liveFeedOf]'s reason -- that class is
  * what detekt's `LargeClass` counts against a default of 600; the lift itself
  * changed no behaviour.
@@ -1622,18 +1641,28 @@ private fun CoroutineScope.mirroredGuidedRunner(
  */
 private fun CoroutineScope.restCountdown(stateFlow: MutableStateFlow<RecordState>, voice: () -> VoiceCounter?): Job =
     launch {
+        val restS = stateFlow.value.restTotalS
+        val startedAtMs =
+            stateFlow.value.restStartedAtMs
+                ?: (System.currentTimeMillis() - (restS - stateFlow.value.restRemainingS) * 1_000L)
+        var shown = stateFlow.value.restRemainingS
+        // The span starts at the first word actually said, not at 3: a tick
+        // that jumps (the CPU slept) can skip 3 and land on 2 or on zero.
+        var spanOpen = false
         try {
-            while (stateFlow.value.restRemainingS > 0) {
-                delay(1_000)
-                val remaining = stateFlow.value.restRemainingS - 1
+            while (shown > 0) {
+                delay(RestClockPolicy.msToNextTick(startedAtMs, System.currentTimeMillis()))
+                val remaining = RestClockPolicy.remainingS(restS, startedAtMs, System.currentTimeMillis())
+                if (remaining == shown) continue
+                val cue = RestClockPolicy.cueOnTick(shown, remaining, RecordViewModel.REST_COUNTDOWN_FROM_S)
+                shown = remaining
                 stateFlow.value = stateFlow.value.copy(restRemainingS = remaining)
-                if (stateFlow.value.audioCues) {
-                    if (remaining == RecordViewModel.REST_COUNTDOWN_FROM_S) voice()?.spanStarted()
-                    when (remaining) {
-                        in 1..RecordViewModel.REST_COUNTDOWN_FROM_S -> voice()?.speak(remaining.toString())
-                        0 -> voice()?.speak(NextSetCall.restOver(stateFlow.value.nextSetPhrase()))
-                    }
+                if (cue == null || !stateFlow.value.audioCues) continue
+                if (!spanOpen) {
+                    voice()?.spanStarted()
+                    spanOpen = true
                 }
+                voice()?.speak(if (remaining == 0) NextSetCall.restOver(stateFlow.value.nextSetPhrase()) else cue)
             }
         } finally {
             voice()?.spanEnded()
@@ -2886,6 +2915,7 @@ private fun restingState(
         stage = Stage.RESTING,
         setWrite = SetWriteState.NONE,
         restTotalS = restS,
+        restStartedAtMs = p.restStartedAtMs,
         lastFeedback =
         SetFeedback(
             exerciseName = p.exercise.displayName,
@@ -3868,6 +3898,11 @@ data class RecordState(
     val lastSetExerciseId: String? = null,
     val restRemainingS: Int = 0,
     val restTotalS: Int = 0,
+    /**
+     * When the rest on screen started, the instant [restRemainingS] is counted
+     * from (UX review 2026-11-06, rest F10); null outside a rest's lifetime.
+     */
+    val restStartedAtMs: Long? = null,
     /** RPE the lifter picked for the just-finished set (rest screen), if any. */
     val lastSetRpe: Int? = null,
     /**
