@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -182,7 +183,16 @@ fun SessionDetailScreen(navController: NavController, sessionId: Long) {
             // while the first is still building can overwrite that field
             // before the first tap's picker has read it, not only a second
             // tap on the same button. See SessionDetailViewModel.exporting.
+            // The raw zip leads each row, filled, because it is the file
+            // robocoach reads and the one routine export; it already carries
+            // the detailed session.json, so the two JSON buttons are for
+            // pasting into a chat and stay outlined after it.
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = { viewModel.shareRawZip() },
+                    enabled = !exporting,
+                    modifier = Modifier.weight(1f),
+                ) { Text("Raw zip") }
                 OutlinedButton(
                     onClick = { viewModel.shareJson(false) },
                     enabled = !exporting,
@@ -193,16 +203,16 @@ fun SessionDetailScreen(navController: NavController, sessionId: Long) {
                     enabled = !exporting,
                     modifier = Modifier.weight(1f),
                 ) { Text("Detailed") }
-                OutlinedButton(
-                    onClick = { viewModel.shareRawZip() },
-                    enabled = !exporting,
-                    modifier = Modifier.weight(1f),
-                ) { Text("Raw CSV") }
             }
             Spacer(Modifier.height(8.dp))
             SectionCaption("Save to phone")
             Spacer(Modifier.height(4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = { viewModel.prepareRawZipSave { saveZipLauncher.launch(it) } },
+                    enabled = !exporting,
+                    modifier = Modifier.weight(1f),
+                ) { Text("Raw zip") }
                 OutlinedButton(
                     onClick = { viewModel.prepareJsonSave(false) { saveSummaryLauncher.launch(it) } },
                     enabled = !exporting,
@@ -213,17 +223,10 @@ fun SessionDetailScreen(navController: NavController, sessionId: Long) {
                     enabled = !exporting,
                     modifier = Modifier.weight(1f),
                 ) { Text("Detailed") }
-                OutlinedButton(
-                    onClick = { viewModel.prepareRawZipSave { saveZipLauncher.launch(it) } },
-                    enabled = !exporting,
-                    modifier = Modifier.weight(1f),
-                ) { Text("Raw CSV") }
             }
             Spacer(Modifier.height(4.dp))
             Text(
-                "Share JSON to Claude for analysis (see PROMPTS.md), or save it straight to " +
-                    "the phone (defaults to Downloads); Raw CSV exports the full sensor " +
-                    "streams for Python/R.",
+                "Raw zip is the file robocoach reads.",
                 style = MaterialTheme.typography.bodySmall,
                 color = BarColors.Sub,
             )
