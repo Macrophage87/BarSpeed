@@ -98,12 +98,27 @@ object RemoveSetControl {
     fun target(blocks: List<AddSetSlotKey>, queueIndex: Int, upcomingIndex: Int): RemoveSetTarget? {
         val block = AddSetControl.blockRange(blocks, queueIndex) ?: return null
         val eligible = block.filter { it >= upcomingIndex && blocks[it].isAddedSet }
-        val at = eligible.lastOrNull() ?: return null
+        val at = eligible.lastOrNull() ?: return offPlanTarget(blocks, upcomingIndex)
         return RemoveSetTarget(
             removeAt = at,
             wasUpcoming = at == upcomingIndex,
             removableCount = eligible.size,
         )
+    }
+
+    /**
+     * The OFF-PLAN set coming next, when [target]'s block has nothing to take
+     * (record-setup F2). "Different exercise..." inserts an added set of
+     * another lift at `upcomingIndex` as its own block -- set 0 of 1, the only
+     * added slot with index 0, since an appended set always follows a set of
+     * its block -- so from the rest screen it is outside the finished set's
+     * block. Without this a wrong pick could only be lifted or the session
+     * finished.
+     */
+    private fun offPlanTarget(blocks: List<AddSetSlotKey>, upcomingIndex: Int): RemoveSetTarget? {
+        val upcoming = blocks.getOrNull(upcomingIndex) ?: return null
+        if (!upcoming.isAddedSet || upcoming.setIndexInExercise != 0) return null
+        return RemoveSetTarget(removeAt = upcomingIndex, wasUpcoming = true, removableCount = 1)
     }
 
     /**
