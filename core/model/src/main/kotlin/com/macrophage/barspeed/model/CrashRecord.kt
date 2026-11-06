@@ -51,6 +51,20 @@ data class CrashRecord(
     val versionName: String,
     /** `BuildConfig.VERSION_CODE`, e.g. 53. */
     val versionCode: Int,
+    /**
+     * `Build.VERSION.RELEASE`, e.g. "16". With [sdkInt], [manufacturer] and
+     * [model], so a crash says which phone it came from: the open
+     * foreground-service issues turn on the API level and OEM battery
+     * killers on the maker, and without these the first reply to every
+     * crash had to ask (UX review 2026-11-06, reliability F6).
+     */
+    val androidRelease: String,
+    /** `Build.VERSION.SDK_INT`, e.g. 36. */
+    val sdkInt: Int,
+    /** `Build.MANUFACTURER`, e.g. "Google". */
+    val manufacturer: String,
+    /** `Build.MODEL`, e.g. "Pixel 8". */
+    val model: String,
     /** `DATABASE_VERSION` as the running process has it, so a migration crash dates itself. */
     val databaseVersion: Int,
     /**
@@ -102,6 +116,8 @@ data class CrashRecord(
      * BARSPEED CRASH REPORT
      * at: 2026-09-12T21:14:57.123Z
      * version: 0.1.52 (53)
+     * android: 16 (API 36)
+     * device: Google Pixel 8
      * database: 18
      * screen: record
      * thread: main
@@ -138,6 +154,8 @@ data class CrashRecord(
                 "BARSPEED CRASH REPORT",
                 "at: ${formatInstant(atMs)}",
                 "version: $versionName ($versionCode)",
+                "android: $androidRelease (API $sdkInt)",
+                "device: $manufacturer $model",
                 "database: $databaseVersion",
                 "screen: ${screen ?: NOT_RECORDED}",
                 "thread: $threadName",

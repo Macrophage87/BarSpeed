@@ -1,5 +1,6 @@
 package com.macrophage.barspeed
 
+import android.os.Build
 import android.util.Log
 import com.macrophage.barspeed.data.DATABASE_VERSION
 import com.macrophage.barspeed.model.CrashLogRing
@@ -161,6 +162,10 @@ object CrashReporting {
             atMs = System.currentTimeMillis(),
             versionName = BuildConfig.VERSION_NAME,
             versionCode = BuildConfig.VERSION_CODE,
+            androidRelease = Build.VERSION.RELEASE.orEmpty(),
+            sdkInt = Build.VERSION.SDK_INT,
+            manufacturer = Build.MANUFACTURER.orEmpty(),
+            model = Build.MODEL.orEmpty(),
             databaseVersion = DATABASE_VERSION,
             screen = CurrentScreen.route,
             threadName = thread.name,

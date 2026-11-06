@@ -49,6 +49,10 @@ class CrashRecordRenderTest {
         atMs = Instant.parse("2026-09-12T21:14:57.123Z").toEpochMilli(),
         versionName = "0.1.52",
         versionCode = 53,
+        androidRelease = "16",
+        sdkInt = 36,
+        manufacturer = "Google",
+        model = "Pixel 8",
         databaseVersion = 18,
         screen = screen,
         threadName = "main",
@@ -66,6 +70,8 @@ class CrashRecordRenderTest {
             BARSPEED CRASH REPORT
             at: 2026-09-12T21:14:57.123Z
             version: 0.1.52 (53)
+            android: 16 (API 36)
+            device: Google Pixel 8
             database: 18
             screen: record
             thread: main
@@ -78,6 +84,13 @@ class CrashRecordRenderTest {
             second line
             """.trimIndent() + "\n"
         assertEquals(expected, record().render())
+    }
+
+    @Test
+    fun `the phone and its Android version are named, so the first reply need not ask`() {
+        val lines = record().render().lines()
+        assertEquals("android: 16 (API 36)", lines.first { it.startsWith("android: ") })
+        assertEquals("device: Google Pixel 8", lines.first { it.startsWith("device: ") })
     }
 
     @Test
