@@ -287,6 +287,13 @@ object JournalRecoveryPolicy {
             "session if that session is still open and current; otherwise it is saved as a session of its own. " +
             "The capture on this phone is removed once the set is saved."
 
+    /**
+     * What the lifter is told when [target] answered [RecoveryTarget.Wait],
+     * given the recording holds [held] at the moment of asking.
+     */
+    @Suppress("UNUSED_PARAMETER", "UnusedParameter")
+    fun waitNote(held: Set<RecordingHold>): String = "A set is still being saved -- try again in a moment"
+
     /** What the card says in place of [ACTION_LABEL] when [refusal] refused. */
     fun refusalNote(refusal: RecoveryRefusal): String = when (refusal) {
         RecoveryRefusal.NOT_JOURNALED -> "Recorded before this version, so it cannot be put back into History"

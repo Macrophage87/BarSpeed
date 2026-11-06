@@ -507,10 +507,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             busyInterruptedFlow.update { it + orphan.directory }
             try {
-                val writeOutstanding = container.recordingHolds.held.value.isNotEmpty()
+                val held = container.recordingHolds.held.value
                 val outcome =
-                    withContext(Dispatchers.IO) { container.journalRecovery.recover(orphan, writeOutstanding) }
-                toast(recoveryToast(outcome))
+                    withContext(Dispatchers.IO) { container.journalRecovery.recover(orphan, held.isNotEmpty()) }
+                toast(recoveryToast(outcome, held))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -812,16 +812,20 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 }
 
-/** Names the file after the set it holds, so two captures cannot collide. */
-/** What the lifter is told once [HomeViewModel.recoverInterrupted] has an answer. */
-private fun recoveryToast(outcome: RecoveryOutcome): String = when (outcome) {
+/**
+ * What the lifter is told once [HomeViewModel.recoverInterrupted] has an
+ * answer. [held] is the recording holds the answer was asked under, which is
+ * what a wait is waiting for.
+ */
+private fun recoveryToast(outcome: RecoveryOutcome, held: Set<RecordingHold>): String = when (outcome) {
     is RecoveryOutcome.Stored ->
         if (outcome.newSession) "Saved to History as a session of its own" else "Saved to History in its session"
     RecoveryOutcome.AlreadyStored -> "Already in History -- the capture was removed"
-    RecoveryOutcome.Waiting -> "A set is still being saved -- try again in a moment"
+    RecoveryOutcome.Waiting -> JournalRecoveryPolicy.waitNote(held)
     is RecoveryOutcome.Refused -> JournalRecoveryPolicy.refusalNote(outcome.refusal)
 }
 
+/** Names the file after the set it holds, so two captures cannot collide. */
 private fun interruptedName(orphan: OrphanedSet): String =
     "interrupted-${orphan.header.exerciseId}-${orphan.header.startedAtMs}.zip"
 
