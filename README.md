@@ -40,7 +40,9 @@ Plans come from robocoach. In the app: **Plans → Import plan (paste JSON)** or
 **Import plan from file → Approve**. The plan contract for any LLM is in the app
 at **Guide → COPY PLAN PROMPT**; that is the one copy kept in step with the
 code. The machine-readable form is
-[`docs/schemas/plan.schema.json`](docs/schemas/plan.schema.json).
+[`docs/schemas/plan.schema.json`](docs/schemas/plan.schema.json). A plan file
+starts `{"schemaVersion": "1.15", ...`; that is the version this app accepts.
+You can also open a `.json` plan from Files or share it to BarSpeed.
 
 ## Reporting a bug
 
