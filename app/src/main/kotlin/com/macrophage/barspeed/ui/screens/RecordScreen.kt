@@ -708,17 +708,17 @@ private fun PreviewStage(state: RecordState, viewModel: RecordViewModel) {
         color = BarColors.Sub,
     )
     Spacer(Modifier.height(12.dp))
-    preview.blocks.forEach { block ->
-        PreviewBlockCard(block, state.weightUnit)
-        Spacer(Modifier.height(8.dp))
-    }
-    Spacer(Modifier.height(4.dp))
     // Disabled rather than hidden on an empty session: a plan session with no
     // sets is a plan defect, and a START that silently vanished would read as
     // the app being broken rather than the plan being empty.
     // START is the SAME call the session picker card used to make. The preview
     // did not add a second way into a session; it moved the one that exists
     // behind a screen the lifter has read.
+    // ABOVE the session list, not after it (UX review 2026-11-06,
+    // record-setup F6): a five-exercise session's list is longer than a
+    // screen, and every visit had to scroll to the bottom to start. The
+    // screen's scroll resets to the top on each stage change, so this is on
+    // screen when the preview opens.
     Button(
         onClick = { state.previewSession?.let(viewModel::requestPlanSession) },
         enabled = !preview.isEmpty && state.previewSession != null,
@@ -733,6 +733,11 @@ private fun PreviewStage(state: RecordState, viewModel: RecordViewModel) {
         OutlinedButton(onClick = viewModel::abandonSetup, modifier = Modifier.fillMaxWidth()) {
             Text("Choose another session")
         }
+    }
+    Spacer(Modifier.height(12.dp))
+    preview.blocks.forEach { block ->
+        PreviewBlockCard(block, state.weightUnit)
+        Spacer(Modifier.height(8.dp))
     }
 }
 
