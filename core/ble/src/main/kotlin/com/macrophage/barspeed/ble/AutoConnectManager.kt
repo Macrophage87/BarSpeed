@@ -337,9 +337,12 @@ class AutoConnectManager(
      * Wake every reconnect loop the moment the phone's Bluetooth comes on
      * (UX review 2026-11-06, ble-devices F5).
      *
-     * NOT_EXPORTED because nothing outside the system should be able to
-     * drive this; protected system broadcasts such as this one are delivered
-     * to such receivers. From API 31 the broadcast is gated on
+     * EXPORTED, because ACTION_STATE_CHANGED is a protected broadcast that
+     * only the system may send, so exporting opens nothing to other apps.
+     * NOT_EXPORTED was used first; below API 33 `ContextCompat` implements it
+     * by requiring an app-defined permission of the sender, and whether the
+     * system's Bluetooth broadcast satisfies that was in doubt (coordinator
+     * review). From API 31 the broadcast is gated on
      * BLUETOOTH_CONNECT, which the app needs for any link at all; without it
      * the receiver simply hears nothing and the loops keep their backoff, as
      * before. That it is delivered, and how soon after the tile is tapped,
@@ -358,7 +361,7 @@ class AutoConnectManager(
             appContext,
             receiver,
             IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED),
-            ContextCompat.RECEIVER_NOT_EXPORTED,
+            ContextCompat.RECEIVER_EXPORTED,
         )
         adapterReceiver = receiver
     }
