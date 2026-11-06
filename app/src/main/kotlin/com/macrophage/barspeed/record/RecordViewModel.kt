@@ -144,6 +144,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.ZoneId
@@ -1728,6 +1730,25 @@ private data class ArmedLiveness(
     val analysedArmedAtMs: Long,
     val secondaryArmedAtMs: Long,
 )
+
+/**
+ * Hold the bar sensors' battery reads for exactly as long as the screen is
+ * IN_SET (ble-devices F2, coordinator review): a WitMotion battery read is a
+ * command written to the unit, and capture must be faithful.
+ *
+ * A mirror of the stage rather than a call on each way out of a set, so every
+ * way out releases it -- endSet, CANCEL SET, a discard from the exit dialog,
+ * and any path added later -- without each having to remember to. Leaving
+ * IN_SET releases, which reads both units once: the rest-start read.
+ * `beginSet` also holds directly, before the stage write this collector
+ * reacts to, so no read can land between the two; `onCleared` releases, so a
+ * screen torn down mid-set cannot leave the hold stuck.
+ */
+private fun CoroutineScope.holdBatteryDuringSets(autoConnect: AutoConnectManager, state: StateFlow<RecordState>) {
+    launch {
+        state.map { it.stage == Stage.IN_SET }.distinctUntilChanged().collect { autoConnect.holdBatteryRefresh(it) }
+    }
+}
 
 /**
  * Mirror all three links' connection state onto the screen state.
@@ -4983,6 +5004,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         viewModelScope.mirrorLinkStates(autoConnect, stateFlow)
+        viewModelScope.holdBatteryDuringSets(autoConnect, stateFlow)
         // A refused foreground start is reported by the service, which no
         // ViewModel owns, so it reaches the screen through the process-wide
         // holds rather than through beginSet's return (#53).
@@ -5208,6 +5230,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // about a workout they have carried on with.
         // A close the set drops goes with its frozen copy, as startNextSet's does.
         if (gate.sessionClose != before.sessionClose) closer.discard()
+        autoConnect.holdBatteryRefresh(true) // No battery read into a capture (ble-devices F2).
         stateFlow.value = startedFromReadyState(gate).copy(askingSessionRpe = false)
         val s = stateFlow.value
         val exercise = s.currentExercise
@@ -6459,6 +6482,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * survive this screen going away; see [finishSession].
      */
     override fun onCleared() {
+        autoConnect.holdBatteryRefresh(false)
         voice?.shutdown()
         voice = null
         holds.release(RecordingHold.SESSION)
