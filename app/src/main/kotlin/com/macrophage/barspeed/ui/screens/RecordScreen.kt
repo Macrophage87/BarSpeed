@@ -3329,7 +3329,7 @@ internal const val END_SET_EARLY_CAPTION =
 @Composable
 private fun EndSetUnratedButton(viewModel: RecordViewModel) {
     OutlinedButton(
-        onClick = { viewModel.endSet() },
+        onClick = confirmTap { viewModel.endSet() },
         modifier = Modifier.fillMaxWidth().height(64.dp),
     ) {
         Text("END SET", style = MaterialTheme.typography.titleLarge)
