@@ -663,6 +663,73 @@ class JournalRecoveryTest {
         assertTrue(orphan.directory.exists(), "the capture went while a write was outstanding")
     }
 
+    /**
+     * Whole-branch review of 0.2.0, round 1, CAP-B1. The holds were read
+     * once, before the decode and re-analysis, which on a large capture
+     * takes seconds; a set write or a `beginSet` that started in that window
+     * was not seen, and the set was placed on a stale answer -- two sets at
+     * one position in a continued session, or a set attached to a session
+     * closed under it. The holds are now read when the set is placed: after
+     * the decode, at the clock read the target is asked with. The fixture
+     * has a write begin exactly there.
+     */
+    @Test
+    fun `a write that begins while the capture is decoded is seen before the set is placed`() = runTest {
+        val dao = ownSession(endedAtMs = null)
+        val orphan = journaled()
+        var placing = false
+        val clock = {
+            placing = true
+            now
+        }
+        val recovery = JournalRecovery(SessionRepository(dao, FakeExerciseDao()), store(), nowMs = clock)
+        val outcome = recovery.recover(orphan) { if (placing) setOf(RecordingHold.SET_WRITE) else emptySet() }
+        assertEquals(RecoveryOutcome.Waiting(setOf(RecordingHold.SET_WRITE)), outcome)
+        assertEquals(2, dao.sets.size, "a set was placed on holds read before the decode")
+        assertTrue(orphan.directory.exists(), "the capture went with nothing written")
+    }
+
+    /**
+     * Whole-branch review of 0.2.0, round 1, CAP-B1. The recovery holds
+     * RECOVERY_WRITE while it runs, so every other writer and the restore
+     * can see it; its own hold is not a write it waits for.
+     */
+    @Test
+    fun `a recovery's own hold is not what it waits for`() = runTest {
+        val dao = ownSession(endedAtMs = null)
+        val orphan = journaled()
+        val outcome = recovery(dao).recover(orphan) { setOf(RecordingHold.RECOVERY_WRITE) }
+        assertEquals(RecoveryOutcome.Stored(7L, assertIs<RecoveryOutcome.Stored>(outcome).setId, false), outcome)
+    }
+
+    /**
+     * Whole-branch review of 0.2.0, round 1, migrations N3 (L13 round 4,
+     * Lens A N1). A stored capture whose re-analysis would refuse it fell
+     * through to that re-analysis while a write was outstanding and was told
+     * "No count of its reps survived" rather than to wait; under Home a held
+     * hold can be a leaked SESSION, so that could last until a force-stop.
+     * A stored set's capture now waits, whatever its re-analysis would say.
+     */
+    @Test
+    fun `a stored set whose re-analysis would refuse it waits while a write is outstanding`() = runTest {
+        val pulley = squat.copy(travelRatio = 2.0)
+        val sensorFacts =
+            facts.copy(
+                exercise = pulley,
+                geometry = SetGeometryPolicy.describe(pulley, null),
+                counter = RepCounter.SENSOR,
+            )
+        val dao = ownSession(endedAtMs = null)
+        dao.sets += row(3, 7, 2, startedAtMs, startedAtMs + 50_000L)
+        val orphan = journaled(header = header(facts = sensorFacts), marks = emptyList())
+        assertEquals(
+            RecoveryOutcome.Waiting(setOf(RecordingHold.SET_WRITE)),
+            recovery(dao).recover(orphan, setWriteHeld),
+        )
+        assertEquals(3, dao.sets.size)
+        assertTrue(orphan.directory.exists(), "the capture went while a write was outstanding")
+    }
+
     /** The journal is removed only after the row write lands; a write that fails leaves the only copy. */
     @Test
     fun `a write that fails keeps the capture`() = runTest {

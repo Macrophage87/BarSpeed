@@ -303,7 +303,7 @@ class JournalRecoveryPolicyTest {
     @Test
     fun `a wait names what it waits for`() {
         val saving = JournalRecoveryPolicy.waitNote(setOf(RecordingHold.SESSION, RecordingHold.SET_WRITE))
-        assertTrue("being saved" in saving, saving)
+        assertEquals(SAVING, saving)
         val recording = JournalRecoveryPolicy.waitNote(setOf(RecordingHold.SESSION))
         assertFalse("in a moment" in recording, recording)
         assertFalse("still recording" in recording, "a held SESSION under Home is no set recording: $recording")
@@ -312,10 +312,49 @@ class JournalRecoveryPolicyTest {
         assertTrue("force-stop" in recording, recording)
     }
 
+    /**
+     * Whole-branch review of 0.2.0, round 1, UI-B2. The note covers a
+     * session close as much as a set-end write, so "A set is still being
+     * saved" was false on a close alone -- reachable by finishing a session,
+     * going Home while the close runs and tapping PUT IT BACK -- and L9's
+     * restore note said "a set or session" for the same hold. One reading,
+     * one wording; a second recovery waits on the first the same way.
+     */
+    @Test
+    fun `a wait on a session close or another recovery says a set or session is saving`() {
+        assertEquals(SAVING, JournalRecoveryPolicy.waitNote(setOf(RecordingHold.SESSION_CLOSE)))
+        assertEquals(SAVING, JournalRecoveryPolicy.waitNote(setOf(RecordingHold.RECOVERY_WRITE)))
+        assertEquals(SAVING, JournalRecoveryPolicy.SAVING_NOTE)
+    }
+
+    /**
+     * Whole-branch review of 0.2.0, round 1, CAP-B1. A recovery holds
+     * RECOVERY_WRITE for as long as it runs, so the resume offer, a session
+     * close and RESTORE can see it; it must not then wait for its own hold.
+     * Everything else held is still waited for, the record screen's own
+     * hold included.
+     */
+    @Test
+    fun `a recovery does not wait for its own hold, and waits for every other`() {
+        assertFalse(JournalRecoveryPolicy.mustWait(setOf(RecordingHold.RECOVERY_WRITE)), "it waited on itself")
+        assertEquals(emptySet(), JournalRecoveryPolicy.outstanding(setOf(RecordingHold.RECOVERY_WRITE)))
+        for (other in RecordingHold.entries - RecordingHold.RECOVERY_WRITE) {
+            val held = setOf(RecordingHold.RECOVERY_WRITE, other)
+            assertTrue(JournalRecoveryPolicy.mustWait(held), "a recovery decided while $other was held")
+            assertEquals(setOf(other), JournalRecoveryPolicy.outstanding(held), "the note would not name $other")
+        }
+        assertFalse(JournalRecoveryPolicy.mustWait(emptySet()))
+    }
+
     @Test
     fun `every refusal has its own note`() {
         val notes = RecoveryRefusal.entries.map(JournalRecoveryPolicy::refusalNote)
         assertEquals(notes.size, notes.toSet().size)
         assertTrue(notes.all { it.isNotBlank() })
+    }
+
+    private companion object {
+        /** L9's restore note's reading of the same holds (`rescuedRestoreNote`). */
+        const val SAVING = "A set or session is still saving -- try again in a moment"
     }
 }

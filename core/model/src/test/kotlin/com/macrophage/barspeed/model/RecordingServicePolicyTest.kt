@@ -171,4 +171,21 @@ class RecordingServicePolicyTest {
         }
         assertFalse(RecordingServicePolicy.mayEndProcess(RecordingHold.entries.toSet()))
     }
+
+    /**
+     * Whole-branch review of 0.2.0, round 1, CAP-B1 and UI-B2. A recovery
+     * putting an interrupted set back is a set write that finishes on its
+     * own, so every reader of "still saving" -- the resume offer, the
+     * rescued card's note, the recovery's own wait note -- must count it;
+     * the record screen's own hold alone is not a write.
+     */
+    @Test
+    fun `a recovery is a write that finishes on its own`() {
+        assertTrue(RecordingServicePolicy.writing(setOf(RecordingHold.RECOVERY_WRITE)), "a recovery is not saving")
+        assertTrue(RecordingServicePolicy.writing(setOf(RecordingHold.SET_WRITE)))
+        assertTrue(RecordingServicePolicy.writing(setOf(RecordingHold.SESSION_CLOSE)))
+        assertFalse(RecordingServicePolicy.writing(setOf(RecordingHold.SESSION)), "the screen's hold read as a write")
+        assertFalse(RecordingServicePolicy.writing(emptySet()))
+        assertFalse(RecordingHold.RECOVERY_WRITE.armsService, "a recovery from Home re-arms the service")
+    }
 }

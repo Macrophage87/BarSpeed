@@ -70,6 +70,21 @@ class RescuedCardTest {
         assertTrue(text.endsWith("This cannot be undone."), text)
     }
 
+    /**
+     * Whole-branch review of 0.2.0, round 1, UI-B1 (L9's #112 against the
+     * card's older text). The same card draws RESTORE IT IN PLACE whenever
+     * the rescue is restorable, and DISCARD on every state, so the dialog
+     * read before destroying a whole training history may not say nothing
+     * can put the files back: the button beside it can. What stays true with
+     * and without RESTORE is that a DISCARD cannot be undone.
+     */
+    @Test
+    fun `the complete discard warning does not deny the restore beside it`() {
+        val text = rescuedDiscardWarning(complete)
+        assertFalse("nothing here can put them back" in text, text)
+        assertTrue("once they are discarded nothing can put them back" in text, text)
+    }
+
     @Test
     fun `the fragment discard warning says no database file was saved and that the sidecar may matter`() {
         val text = rescuedDiscardWarning(fragment)
@@ -322,6 +337,19 @@ class RescuedCardTest {
      * note must not tell the lifter to wait; it names what does clear the
      * holds, the process ending.
      */
+    /**
+     * Whole-branch review of 0.2.0, round 1, CAP-B1. A recovery putting an
+     * interrupted set back holds RECOVERY_WRITE, which disables RESTORE; it
+     * finishes on its own, so the note says to wait, not to force-stop.
+     */
+    @Test
+    fun `a restorable rescue held by a recovery says RESTORE comes back when it has saved`() {
+        assertEquals(
+            "Can't restore yet: a set or session is still saving. RESTORE works again once it has finished.",
+            rescuedRestoreNote(RestoreVerdict.Restorable(19), 20, setOf(RecordingHold.RECOVERY_WRITE)),
+        )
+    }
+
     @Test
     fun `a restorable rescue held only by the record screen's hold says how to clear it`() {
         assertEquals(
