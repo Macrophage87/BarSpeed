@@ -149,6 +149,17 @@ class LiftingApp : Application() {
     lateinit var container: AppContainer
         private set
 
+    /**
+     * Why [container] could not be built, or null when it was. Set, the
+     * activity draws only `DatabaseFailureScreen` and touches nothing in the
+     * container, which was never assigned. UX review 2026-11-06,
+     * data-layer F3: `AppDatabase.build` refuses to open on a rescue or a
+     * restore it could not finish, and that refusal used to be a crash on
+     * every launch with no way to get the database off the phone.
+     */
+    var startupFailure: Throwable? = null
+        private set
+
     override fun onCreate() {
         super.onCreate()
         // BEFORE the container, deliberately. #272: AppDatabase.build is the
@@ -156,8 +167,18 @@ class LiftingApp : Application() {
         // a rescue -- and a crash handler installed after it would miss
         // exactly that crash. Nothing the handler reads comes from the
         // container for the same reason.
-        CrashReporting.install(CrashLogStore(File(filesDir, CrashLogPolicy.DIR)))
-        container = AppContainer(this)
+        val crashLogs = CrashLogStore(File(filesDir, CrashLogPolicy.DIR))
+        CrashReporting.install(crashLogs)
+        try {
+            container = AppContainer(this)
+        } catch (e: Exception) {
+            // Still written as a crash report, so it can be sent once the
+            // database opens again; the process lives to show the card.
+            AppLog.w("LiftingApp", "the database could not be opened", e)
+            crashLogs.write(CrashReporting.recordOf(Thread.currentThread(), e))
+            startupFailure = e
+            return
+        }
         // Auto-connect to both preferred sensors from app launch (spec 4.1).
         container.autoConnect.start()
     }

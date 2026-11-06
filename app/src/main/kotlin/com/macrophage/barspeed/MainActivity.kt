@@ -29,6 +29,7 @@ import com.macrophage.barspeed.model.RecordingHold
 import com.macrophage.barspeed.ui.LiftingTheme
 import com.macrophage.barspeed.ui.components.LocalBlePermissionUi
 import com.macrophage.barspeed.ui.components.PermissionUi
+import com.macrophage.barspeed.ui.screens.DatabaseFailureScreen
 import com.macrophage.barspeed.ui.screens.DevicesScreen
 import com.macrophage.barspeed.ui.screens.GuideScreen
 import com.macrophage.barspeed.ui.screens.HomeScreen
@@ -55,6 +56,14 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // UX review 2026-11-06, data-layer F3: with no container there is
+        // nothing to ask permissions for or navigate to, only the database to
+        // get off the phone.
+        val failure = (application as LiftingApp).startupFailure
+        if (failure != null) {
+            setContent { LiftingTheme { DatabaseFailureScreen(failure.toString()) } }
+            return
+        }
         gate.refresh(hasBlePermissions(), shouldShowBleRationale())
         ensureAsked()
         // A recreated Activity is handed the intent it was launched with
@@ -92,6 +101,7 @@ class MainActivity : ComponentActivity() {
      */
     override fun onResume() {
         super.onResume()
+        if ((application as LiftingApp).startupFailure != null) return
         gate.refresh(hasBlePermissions(), shouldShowBleRationale())
     }
 

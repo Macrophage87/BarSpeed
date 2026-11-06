@@ -9,6 +9,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.macrophage.barspeed.AppLog
 import com.macrophage.barspeed.CrashReport
+import com.macrophage.barspeed.CrashReporting
 import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.data.OrphanedSet
 import com.macrophage.barspeed.data.RecoveryOutcome
@@ -34,6 +35,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.mapLatest
@@ -116,6 +118,12 @@ data class HomeState(
     val weightUnit: WeightUnit = WeightUnit.KG,
     /** Base load for bodyweight work (pull-ups, dips); null until set. */
     val bodyWeightKg: Double? = null,
+    /**
+     * Why the history could not be read -- Room's first open, and so any
+     * migration, happens on this flow -- or null. Set, Home draws only
+     * `DatabaseFailureScreen`. UX review 2026-11-06, data-layer F3.
+     */
+    val databaseError: String? = null,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -794,6 +802,14 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 withContext(Dispatchers.Default) {
                     buildState(inputs.first, inputs.second, inputs.third, inputs.fourth)
                 }
+            }
+            // Without this a migration that throws escaped into viewModelScope
+            // and ended the process as Home drew, on every launch. The crash
+            // report is still written, for sending once the database opens.
+            .catch { e ->
+                AppLog.w(TAG, "history could not be read", e)
+                container.crashLogs.write(CrashReporting.recordOf(Thread.currentThread(), e))
+                emit(HomeState(databaseError = e.toString()))
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeState())
 

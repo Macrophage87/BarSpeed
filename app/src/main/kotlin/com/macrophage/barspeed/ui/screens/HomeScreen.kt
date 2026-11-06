@@ -102,6 +102,12 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
     // Older sessions are drawn only on request, and the choice survives a
     // rotation; Home's own figures never read them.
     var showOlder by rememberSaveable { mutableStateOf(false) }
+    // UX review 2026-11-06, data-layer F3: a database that will not open
+    // gets one screen, with the way to send it, and nothing that reads it.
+    state.databaseError?.let { error ->
+        DatabaseFailureScreen(error)
+        return
+    }
     // Re-scanned every time this screen is composed, not only on first launch:
     // a set interrupted by a crash that left the process alive would otherwise
     // stay invisible until the app was killed and started again. The same
