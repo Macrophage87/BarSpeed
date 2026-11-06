@@ -57,6 +57,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
@@ -180,6 +181,16 @@ import java.util.Locale
 private const val DEFAULT_VELOCITY_LOSS_STOP_PCT = 20.0
 private const val VEL_LOSS_OK_PCT = 10.0
 private const val TEMPO_TOLERANCE_S = 0.5
+
+/**
+ * The keyboards Record's number boxes open (UX review 2026-11-06,
+ * settings-onboarding F5, record-setup F4): a decimal pad for a load or a body
+ * weight, a digit pad for reps and hold seconds, and Done on both so the
+ * keyboard can be closed without system Back. They opened the full text
+ * keyboard, which costs a "?123" tap per entry with chalked thumbs.
+ */
+private val DecimalKeys = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done)
+private val WholeNumberKeys = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -593,6 +604,7 @@ private fun BodyWeightPromptDialog(
     val nowMs = rememberSaveable { System.currentTimeMillis() }
     val stored = BodyWeightPromptPolicy.stateOf(state.bodyWeightKg, state.bodyWeightSetAtMs, nowMs)
     var text by rememberSaveable { mutableStateOf(state.bodyWeightKg?.let { unit.inputValue(it) } ?: "") }
+    val parsed = unit.parseToKg(text)?.takeIf { it > 0 }
     AlertDialog(
         onDismissRequest = onSkip,
         title = { Text("Body weight for ${session.name}") },
@@ -619,13 +631,15 @@ private fun BodyWeightPromptDialog(
                     onValueChange = { text = it },
                     label = { Text("Body weight (${unit.suffix})") },
                     singleLine = true,
+                    keyboardOptions = DecimalKeys,
                 )
             }
         },
         // Kept TextButtons (#201): this dialog's two actions; the dialog's frame already marks them
-        // as its answers.
+        // as its answers. Save is disabled until the box parses, as BodyWeightRequiredDialog's is:
+        // it used to accept the tap and do nothing (record-setup F10).
         confirmButton = {
-            TextButton(onClick = { unit.parseToKg(text)?.takeIf { it > 0 }?.let(onSet) }) {
+            TextButton(onClick = { parsed?.let(onSet) }, enabled = parsed != null) {
                 Text("Save and start")
             }
         },
@@ -702,6 +716,7 @@ private fun BodyWeightRequiredDialog(
                     onValueChange = { text = it },
                     label = { Text("Body weight (${unit.suffix})") },
                     singleLine = true,
+                    keyboardOptions = DecimalKeys,
                 )
             }
         },
@@ -1871,7 +1886,8 @@ internal fun ChangeSetDialog(
                         value = state.loadInput,
                         onValueChange = viewModel::updateLoadInput,
                         label = { Text(loadFieldLabel(slot, state.weightUnit)) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true,
+                        keyboardOptions = DecimalKeys,
                         modifier = Modifier.weight(1f),
                     )
                     if (slot.isTimed) {
@@ -1879,6 +1895,8 @@ internal fun ChangeSetDialog(
                             value = state.durationInput,
                             onValueChange = viewModel::updateDurationInput,
                             label = { Text("Hold (s)") },
+                            singleLine = true,
+                            keyboardOptions = WholeNumberKeys,
                             modifier = Modifier.weight(1f),
                         )
                     } else {
@@ -1886,6 +1904,8 @@ internal fun ChangeSetDialog(
                             value = state.repsInput,
                             onValueChange = viewModel::updateRepsInput,
                             label = { Text("Reps") },
+                            singleLine = true,
+                            keyboardOptions = WholeNumberKeys,
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -2480,6 +2500,8 @@ private fun AdHocForm(state: RecordState, viewModel: RecordViewModel) {
                 val suffix = state.weightUnit.suffix
                 Text(if (state.currentIsTimed) "Load ($suffix, 0 = BW)" else "Load ($suffix)")
             },
+            singleLine = true,
+            keyboardOptions = DecimalKeys,
             modifier = Modifier.weight(1f),
         )
         if (state.currentIsTimed) {
@@ -2487,6 +2509,8 @@ private fun AdHocForm(state: RecordState, viewModel: RecordViewModel) {
                 value = state.durationInput,
                 onValueChange = viewModel::updateDurationInput,
                 label = { Text("Hold (s)") },
+                singleLine = true,
+                keyboardOptions = WholeNumberKeys,
                 modifier = Modifier.weight(1f),
             )
         } else {
@@ -2494,13 +2518,19 @@ private fun AdHocForm(state: RecordState, viewModel: RecordViewModel) {
                 value = state.repsInput,
                 onValueChange = viewModel::updateRepsInput,
                 label = { Text("Reps") },
+                singleLine = true,
+                keyboardOptions = WholeNumberKeys,
                 modifier = Modifier.weight(1f),
             )
+            // Text, not a number pad: a tempo takes X for an explosive
+            // stroke (#258). It still closes the keyboard on Done.
             OutlinedTextField(
                 value = state.tempoInput,
                 onValueChange = viewModel::updateTempoInput,
                 label = { Text("Tempo") },
                 placeholder = { Text("4010") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 modifier = Modifier.weight(1f),
             )
         }

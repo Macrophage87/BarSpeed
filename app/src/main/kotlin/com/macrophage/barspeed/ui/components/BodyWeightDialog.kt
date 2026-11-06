@@ -3,6 +3,7 @@ package com.macrophage.barspeed.ui.components
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -14,6 +15,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.ui.BarColors
@@ -37,6 +40,7 @@ import com.macrophage.barspeed.ui.BarColors
 @Composable
 fun BodyWeightDialog(current: Double?, unit: WeightUnit, onDismiss: () -> Unit, onSet: (Double) -> Unit) {
     var text by remember { mutableStateOf(current?.let { unit.inputValue(it) } ?: "") }
+    val parsed = unit.parseToKg(text)?.takeIf { it > 0 }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Body weight") },
@@ -53,13 +57,18 @@ fun BodyWeightDialog(current: Double?, unit: WeightUnit, onDismiss: () -> Unit, 
                     value = text,
                     onValueChange = { text = it },
                     label = { Text("Weight (${unit.suffix})") },
+                    singleLine = true,
+                    // A decimal pad with Done, not the text keyboard (UX review
+                    // 2026-11-06, settings-onboarding F5).
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
                 )
             }
         },
         // Kept TextButtons (#201): this dialog's two actions; the dialog's frame already marks them
-        // as its answers.
+        // as its answers. Save is disabled until the box parses: it used to accept the tap and do
+        // nothing (settings-onboarding F5).
         confirmButton = {
-            TextButton(onClick = { unit.parseToKg(text)?.takeIf { it > 0 }?.let(onSet) }) { Text("Save") }
+            TextButton(onClick = { parsed?.let(onSet) }, enabled = parsed != null) { Text("Save") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
