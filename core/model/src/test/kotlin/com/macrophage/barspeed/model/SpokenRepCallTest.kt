@@ -73,6 +73,33 @@ class SpokenRepCallTest {
         }
     }
 
+    /**
+     * The same for the words a sensor-counted set says at and before its
+     * target (UX review 2026-11-06, voice F5): `Rep 4, last rep` marks the
+     * leading `Rep 4` and the trailing `rep` alone, and `Rep 5, target` is
+     * read like any other rep call. Expected positions are written from the
+     * rep and the target, not read back off the cue.
+     */
+    @Test
+    fun `the sensor's target and last-rep calls are marked as rep calls`() {
+        val target = VoiceMilestonePolicy.Milestones.MARKS_TARGET
+        for (planned in listOf(null, 1, 2, 5, 12)) {
+            for (rep in 1..12) {
+                val cue = checkNotNull(VoiceMilestonePolicy.repMilestone(rep, rep - 1, planned, target))
+                val number = rep.toString()
+                val lead = listOf(word(0), cardinal(4, number))
+                val expected = if (planned != null && rep == planned - 1) {
+                    lead + word(4 + number.length + ", last ".length)
+                } else {
+                    lead
+                }
+                assertEquals(expected, SpokenRepCall.spansOf(cue), cue)
+                if (planned != null && rep == planned - 1) assertEquals("Rep $rep, last rep", cue)
+                if (planned != null && rep == planned) assertEquals("Rep $rep, target", cue)
+            }
+        }
+    }
+
     /** `rep` is a whole word or it is not a rep call. */
     @Test
     fun `a word that only contains rep is not marked`() {

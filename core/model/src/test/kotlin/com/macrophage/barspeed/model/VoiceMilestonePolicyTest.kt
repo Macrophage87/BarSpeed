@@ -137,4 +137,53 @@ class VoiceMilestonePolicyTest {
     fun `a count that falls back to zero says nothing`() {
         assertNull(VoiceMilestonePolicy.repMilestone(0, 3, 5))
     }
+
+    /** The sensor's words, owner's ruling 2026-11-06 (UX review, voice F5). */
+    private fun sensor(repCount: Int, plannedReps: Int?) = VoiceMilestonePolicy.repMilestone(
+        repCount,
+        repCount - 1,
+        plannedReps,
+        VoiceMilestonePolicy.Milestones.MARKS_TARGET,
+    )
+
+    @Test
+    fun `the sensor marks the planned count as the target and never says Done`() {
+        assertEquals("Rep 5, target", sensor(5, 5))
+    }
+
+    @Test
+    fun `the sensor names the rep before the target as the last rep`() {
+        assertEquals("Rep 4, last rep", sensor(4, 5))
+    }
+
+    @Test
+    fun `the sensor's reps before and past the target are plain`() {
+        assertEquals("Rep 3", sensor(3, 5))
+        assertEquals("Rep 6", sensor(6, 5))
+        assertEquals("Rep 12", sensor(12, 5))
+    }
+
+    @Test
+    fun `a sensor-counted single is only the target`() {
+        assertEquals("Rep 1, target", sensor(1, 1))
+        assertEquals("Rep 2", sensor(2, 1))
+    }
+
+    @Test
+    fun `a sensor-counted pair opens on the last rep`() {
+        assertEquals("Rep 1, last rep", sensor(1, 2))
+        assertEquals("Rep 2, target", sensor(2, 2))
+    }
+
+    @Test
+    fun `a sensor-counted set with no target is plain throughout`() {
+        for (rep in 1..12) assertEquals("Rep $rep", sensor(rep, null))
+    }
+
+    @Test
+    fun `the sensor's latch is the same as the tap counter's`() {
+        val target = VoiceMilestonePolicy.Milestones.MARKS_TARGET
+        assertNull(VoiceMilestonePolicy.repMilestone(5, 5, 5, target))
+        assertNull(VoiceMilestonePolicy.repMilestone(0, 3, 5, target))
+    }
 }
