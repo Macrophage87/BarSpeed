@@ -1564,27 +1564,40 @@ private fun CoroutineScope.mirroredGuidedRunner(
  * seconds and the end spoken.
  *
  * Lifted out of [RecordViewModel] for [liveFeedOf]'s reason -- that class is
- * what detekt's `LargeClass` counts against a default of 600. Behaviour is
- * unchanged: the same loop, the same constant, the same two utterances.
+ * what detekt's `LargeClass` counts against a default of 600; the lift itself
+ * changed no behaviour.
  *
- * [speak] is passed rather than the `VoiceCounter` field, for
- * [openSecondaryCollector]'s reason: the field is cleared at `onCleared` and a
- * captured reference would outlive it. Nothing is written to the cue track
- * here, which is what it was before -- a rest countdown is not part of any
- * set's record.
+ * [voice] reads the `VoiceCounter` field at each use rather than capturing it,
+ * for [openSecondaryCollector]'s reason: the field is cleared at `onCleared`
+ * and a captured reference would outlive it. Nothing is written to the cue
+ * track here, which is what it was before -- a rest countdown is not part of
+ * any set's record.
+ *
+ * ONE DUCK FOR THE WHOLE COUNTDOWN (UX review 2026-11-06, voice F9, extends
+ * #340). The voice's span is started at the first spoken digit and ended
+ * after `Rest over` is handed over, so the music ducks once for "3, 2, 1,
+ * Rest over" instead of four times in four seconds; focus goes once that
+ * last word finishes. The `finally` ends the span however the countdown
+ * stops -- START NEXT SET mid-countdown cancels this job -- so a cancelled
+ * countdown can never leave the lifter's music held down.
  */
-private fun CoroutineScope.restCountdown(stateFlow: MutableStateFlow<RecordState>, speak: (String) -> Unit): Job =
+private fun CoroutineScope.restCountdown(stateFlow: MutableStateFlow<RecordState>, voice: () -> VoiceCounter?): Job =
     launch {
-        while (stateFlow.value.restRemainingS > 0) {
-            delay(1_000)
-            val remaining = stateFlow.value.restRemainingS - 1
-            stateFlow.value = stateFlow.value.copy(restRemainingS = remaining)
-            if (stateFlow.value.audioCues) {
-                when (remaining) {
-                    in 1..RecordViewModel.REST_COUNTDOWN_FROM_S -> speak(remaining.toString())
-                    0 -> speak("Rest over")
+        try {
+            while (stateFlow.value.restRemainingS > 0) {
+                delay(1_000)
+                val remaining = stateFlow.value.restRemainingS - 1
+                stateFlow.value = stateFlow.value.copy(restRemainingS = remaining)
+                if (stateFlow.value.audioCues) {
+                    if (remaining == RecordViewModel.REST_COUNTDOWN_FROM_S) voice()?.spanStarted()
+                    when (remaining) {
+                        in 1..RecordViewModel.REST_COUNTDOWN_FROM_S -> voice()?.speak(remaining.toString())
+                        0 -> voice()?.speak("Rest over")
+                    }
                 }
             }
+        } finally {
+            voice()?.spanEnded()
         }
     }
 
@@ -6099,7 +6112,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      */
     private fun startRestCountdown() {
         restJob?.cancel()
-        restJob = viewModelScope.restCountdown(stateFlow) { voice?.speak(it) }
+        restJob = viewModelScope.restCountdown(stateFlow) { voice }
     }
 
     /**

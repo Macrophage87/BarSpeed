@@ -136,6 +136,16 @@ class VoiceCounter(context: Context) {
     fun setEnded() = synchronized(lock) { move(VoiceFocusPolicy.setEnded(focus)) }
 
     /**
+     * Hold focus across several words outside a set -- the rest countdown --
+     * so the music ducks once rather than per word; see
+     * [VoiceFocusPolicy.spanStarted].
+     */
+    fun spanStarted() = synchronized(lock) { move(VoiceFocusPolicy.spanStarted(focus)) }
+
+    /** The span is over; focus goes once the word playing now has finished. */
+    fun spanEnded() = synchronized(lock) { move(VoiceFocusPolicy.spanEnded(focus)) }
+
+    /**
      * The audio cues were switched off; [cadenceSpeaks] is whether a cadence
      * guide is running, which speaks regardless. See
      * [VoiceFocusPolicy.cuesSwitchedOff].

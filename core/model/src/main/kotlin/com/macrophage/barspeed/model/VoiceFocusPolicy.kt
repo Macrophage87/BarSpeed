@@ -4,6 +4,8 @@ package com.macrophage.barspeed.model
  * What the voice's audio-focus bookkeeping knows: whether a set is under way,
  * whether anything has been said in it, and which utterance is playing.
  *
+ * [span] is a run of words outside a set being held as one (voice F9).
+ *
  * [speaking] is the id of the utterance last handed to the engine and not yet
  * reported finished, or null. One id rather than a count, because the voice
  * speaks with QUEUE_FLUSH: a new utterance cancels the one before it, so at
@@ -14,6 +16,7 @@ data class VoiceFocusState(
     val inSet: Boolean = false,
     val spokenThisSet: Boolean = false,
     val speaking: String? = null,
+    val span: Boolean = false,
 )
 
 /** What to do with audio focus to move from what is held to what is wanted. */
@@ -53,9 +56,14 @@ enum class VoiceFocusChange { GAIN, LOSS, LOSS_TRANSIENT, LOSS_TRANSIENT_CAN_DUC
  *   the tap only where `SetEnd.terminalCall` asks for one; after a guided
  *   `Done`, and on an unguided rep set, nothing is, and focus goes at the
  *   tap. The rest that follows is outside any set.
- * - **Outside a set, per word.** The rest countdown's digits and `Rest over`
- *   take focus for each word and give it back when it finishes; they are
- *   four words a second apart, and the music comes back between them.
+ * - **Outside a set, per word** -- except as a span. A word outside a set
+ *   takes focus and gives it back when it finishes. The rest countdown's
+ *   digits and `Rest over` are four words a second apart, and per word the
+ *   music came back between them, the pumping rejected above for a set
+ *   (UX review 2026-11-06, voice F9). So the countdown is held as one span
+ *   ([VoiceFocusState.span], [spanStarted] to [spanEnded]): focus from its
+ *   first digit until its last word finishes. A span never marks a set as
+ *   spoken.
  * - **Marked spoken when a word STARTS, not when it is handed over** (#340).
  *   A word the engine refused, or failed before playing, never sounded, and
  *   must not hold the music down for the rest of the set: focus is asked
@@ -89,7 +97,8 @@ enum class VoiceFocusChange { GAIN, LOSS, LOSS_TRANSIENT, LOSS_TRANSIENT_CAN_DUC
  */
 object VoiceFocusPolicy {
     /** Whether focus is wanted in [state]: a word is playing, or a set under way has spoken. */
-    fun holds(state: VoiceFocusState): Boolean = state.speaking != null || (state.inSet && state.spokenThisSet)
+    fun holds(state: VoiceFocusState): Boolean =
+        state.speaking != null || state.span || (state.inSet && state.spokenThisSet)
 
     /** The move from [held] to [wanted]. */
     fun step(held: Boolean, wanted: Boolean): VoiceFocusStep = when {
@@ -103,6 +112,15 @@ object VoiceFocusPolicy {
 
     /** The set is over, whether it ended or was stopped. */
     fun setEnded(state: VoiceFocusState): VoiceFocusState = state.copy(inSet = false, spokenThisSet = false)
+
+    /**
+     * Several words outside a set are about to be said as one sequence -- the
+     * rest countdown -- so focus is held across their gaps (voice F9).
+     */
+    fun spanStarted(state: VoiceFocusState): VoiceFocusState = state.copy(span = true)
+
+    /** The sequence is over; focus goes once the word playing now, if any, finishes. */
+    fun spanEnded(state: VoiceFocusState): VoiceFocusState = state.copy(span = false)
 
     /**
      * Utterance [id] was handed to the engine, cancelling any before it.

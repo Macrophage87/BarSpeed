@@ -190,6 +190,32 @@ class VoiceFocusPolicyTest {
         assertEquals(List(3) { listOf(VoiceFocusStep.REQUEST, VoiceFocusStep.ABANDON) }.flatten(), steps)
     }
 
+    /**
+     * The rest countdown held as one span (UX review 2026-11-06, voice F9,
+     * extends #340): "3", "2", "1" and "Rest over" are four words a second
+     * apart, and letting go after each pumped the music four times in four
+     * seconds. Held from the first digit, ONE request and ONE abandon, and
+     * the abandon waits for the last word to finish.
+     */
+    @Test
+    fun `the rest countdown held as a span ducks once`() {
+        val hold: (VoiceFocusState) -> VoiceFocusState = VoiceFocusPolicy::spanStarted
+        val release: (VoiceFocusState) -> VoiceFocusState = VoiceFocusPolicy::spanEnded
+        val steps = walk(
+            hold, say("3"), done("3"), say("2"), done("2"), say("1"), done("1"), say("Rest over"), release,
+        )
+        assertEquals(listOf(VoiceFocusStep.REQUEST), steps, "held through the gaps and the last word")
+        val after = walk(hold, say("3"), done("3"), say("Rest over"), release, done("Rest over"))
+        assertEquals(listOf(VoiceFocusStep.REQUEST, VoiceFocusStep.ABANDON), after)
+    }
+
+    /** A span outside a set never marks a set as spoken, so the next set starts clean. */
+    @Test
+    fun `a released span leaves the next set holding nothing until it speaks`() {
+        val released = VoiceFocusPolicy.spanEnded(VoiceFocusPolicy.spanStarted(idle))
+        assertFalse(VoiceFocusPolicy.holds(VoiceFocusPolicy.setStarted(released)))
+    }
+
     @Test
     fun `focus already where it is wanted is left alone`() {
         assertEquals(VoiceFocusStep.KEEP, VoiceFocusPolicy.step(held = false, wanted = false))
