@@ -27,7 +27,7 @@ Open the session (tap it in History on Home, or **View session & export** at the
 end of a workout), then **Raw zip**:
 
 - under **Share**, pick robocoach (or wherever you hand it files), or
-- under **Save to phone**, save it (defaults to Downloads).
+- under **Save to phone**, pick where to save it.
 
 The zip holds a CSV per set and sensor, `meta.json` (described by
 [`docs/schemas/raw-meta.schema.json`](docs/schemas/raw-meta.schema.json)) and
@@ -62,10 +62,11 @@ You can also open a `.json` plan from Files or share it to BarSpeed.
   peak concentric velocity, velocity-loss %, and rule-based verdicts; plus a
   preview of the next planned set, editable before you start it (deviations are
   recorded as such).
-- **Two sensors**: pair each unit once in Devices and label it A or B (the app
-  cannot tell two unlabelled streams apart), and mount it on the bar or on the
-  weight stack. The app reconnects to every paired unit in parallel from then
-  on; a missing HR strap never blocks the IMUs.
+- **Two sensors**: pair each unit once in Devices and mount it on the bar or on
+  the weight stack. The app labels the two units A and B itself (in pairing
+  order), and a tap on a unit's label swaps the pair if the stickers turn out
+  the other way round. The app reconnects to every paired unit in parallel from
+  then on; a missing HR strap never blocks the IMUs.
 - **HRV**: R-R intervals from the strap (standard BLE, incl. Garmin HRM 600)
   drive a live RMSSD readout on the rest screen and a per-session HRV stored,
   shown in history, and included in exports for recovery analysis.
@@ -74,9 +75,11 @@ You can also open a `.json` plan from Files or share it to BarSpeed.
   summarized, and only activated when you approve it.
 - **Voice counting (on by default)**: the phone counts each second of the eccentric
   and concentric out loud (hit that 4-second lowering without watching the
-  screen), calls each rep at lockout ("rep 3"), "last rep" going into the
-  final planned rep, "done" when you hit the count, and counts down the last
-  seconds of rest.
+  screen), calls each rep at lockout ("rep 3"), and counts down the last
+  seconds of rest. On a set you count by hand it says "last rep" going into the
+  final planned rep and "done" when you hit the count; on a sensor-counted set
+  it marks the target instead ("Rep 4, last rep", "Rep 5, target") and never
+  says "done", so you end the set yourself.
 - **Exports**: the raw zip robocoach reads (per-set sensor CSVs, `meta.json`
   and the full `session.json` analysis in one archive), plus token-efficient
   session JSON for LLM analysis (optionally with per-rep detail incl. drive
