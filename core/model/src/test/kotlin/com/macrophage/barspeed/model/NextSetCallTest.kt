@@ -23,6 +23,29 @@ class NextSetCallTest {
         assertEquals("Next: Bench press, 102.5 kilos, 5", phrase(loadKg = 102.5))
     }
 
+    /**
+     * Whole-release review: a dumbbell pair is loaded per hand, and the card
+     * says "2 × 20 kg"; the voice said the total, "40 kilos", which reads as
+     * two 40s.
+     */
+    @Test
+    fun `a pair of implements says the load on each, as the card does`() {
+        assertEquals(
+            "Next: DB bench press, 20 kilos each, 8",
+            NextSetCall.phrase("DB bench press", false, false, WeightUnit.KG, 40.0, 8, null, null, implementCount = 2),
+        )
+        assertEquals(
+            "Next: Farmer carry, 44.1 pounds each, 30 seconds",
+            NextSetCall.phrase("Farmer carry", false, true, WeightUnit.LB, 40.0, null, 30, null, implementCount = 2),
+        )
+        // One implement, or none declared, is the total as before.
+        assertEquals(
+            "Next: KB swing, 24 kilos, 15",
+            NextSetCall.phrase("KB swing", false, false, WeightUnit.KG, 24.0, 15, null, null, implementCount = 1),
+        )
+        assertEquals("Next: Bench press, 100 kilos, 5", phrase())
+    }
+
     @Test
     fun `the load is said in the lifter's unit`() {
         assertEquals("Next: Bench press, 220.5 pounds, 5", phrase(unit = WeightUnit.LB))
