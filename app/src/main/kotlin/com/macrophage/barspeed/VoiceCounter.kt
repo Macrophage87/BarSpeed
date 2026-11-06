@@ -31,10 +31,13 @@ import java.util.Locale
  * this class, and none can say what the engine or the platform did with what
  * it is handed.
  *
- * - **How a rep call is read.** [speak] hands the engine the text it was
- *   given, unchanged, with a `TtsSpan` over each span [SpokenRepCall] marks:
- *   TYPE_TEXT reading `rep` over the word, TYPE_CARDINAL over its number. The
- *   cue track never sees this; the caller recorded its text before calling.
+ * - **How a rep call is read.** [speak] hands the engine
+ *   [SpokenRepCall.utterance] of the text it was given -- the word `rep`
+ *   lower-cased, since the owner's engine ignored the span alone and still
+ *   said "representative" -- with a `TtsSpan` over each span [SpokenRepCall]
+ *   marks: TYPE_TEXT reading `rep` over the word, TYPE_CARDINAL over its
+ *   number. The cue track never sees this; the caller recorded its text
+ *   before calling.
  * - **Ducking music.** Speech plays with USAGE_ASSISTANCE_NAVIGATION_GUIDANCE
  *   and CONTENT_TYPE_SPEECH, and AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK is asked
  *   for with the same attributes over the span [VoiceFocusPolicy] decides --

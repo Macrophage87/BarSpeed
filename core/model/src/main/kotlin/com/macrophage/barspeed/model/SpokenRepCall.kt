@@ -15,10 +15,14 @@ package com.macrophage.barspeed.model
  * `VoiceCounter` in `:app` turns each [Span] into a platform `TtsSpan` over
  * the same characters. Whether an engine honours it is a `[Field]` question.
  *
- * **The text is marked, never changed.** `RecordViewModel.speakCues` writes
- * the cue it was handed to the cue buffer and the journal BEFORE it speaks,
- * and this returns positions rather than a new string, so `Rep 3` stays
- * `Rep 3` in `voiceCues` and in the cue CSV.
+ * **The cue is never changed; the handed text is.** `RecordViewModel.speakCues`
+ * writes the cue it was handed to the cue buffer and the journal BEFORE it
+ * speaks, so `Rep 3` stays `Rep 3` in `voiceCues` and in the cue CSV. What
+ * the engine is handed is [utterance]: the same text with the word
+ * lower-cased. The owner, 2026-11-06, first live session on v0.2.2, which
+ * carried the spans alone: *"it kept saying "representative" and not
+ * "rep"."* His engine did not honour the span, so the text now carries the
+ * reading too, and the span stays for an engine that does.
  *
  * WHAT IS MARKED. The word `rep`, in any case, wherever it stands as a whole
  * word -- `Rep 3` and `Last rep` both -- read as [WORD]; and the number that
@@ -59,9 +63,16 @@ object SpokenRepCall {
     }.toList()
 
     /**
-     * The text the engine is handed for [utterance]: the same characters at
-     * the same positions, so every [Span] of [spansOf] still covers what it
-     * marks.
+     * The text the engine is handed for [utterance]: every whole-word `rep`
+     * [spansOf] finds, in whatever case, written as [WORD], and every other
+     * character unchanged. The word keeps its length, so every [Span] of
+     * [spansOf] still covers what it marks in the result.
      */
-    fun utterance(utterance: String): String = utterance
+    fun utterance(utterance: String): String {
+        val words = spansOf(utterance).filter { it.reading == Reading.WORD }
+        if (words.isEmpty()) return utterance
+        val handed = StringBuilder(utterance)
+        for (word in words) handed.replace(word.start, word.end, WORD)
+        return handed.toString()
+    }
 }

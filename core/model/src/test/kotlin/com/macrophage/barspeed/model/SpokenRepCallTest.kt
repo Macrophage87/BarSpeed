@@ -6,9 +6,9 @@ import kotlin.test.assertEquals
 /**
  * Which characters of an utterance [SpokenRepCall] marks for the engine (#339).
  *
- * Positions only: nothing here, and nothing in [SpokenRepCall], can change the
- * text, which is what keeps the recorded cue `Rep N`. Whether an engine reads
- * a marked span the way it is marked is not testable here; it is `[Field]`.
+ * Positions, and the text the engine is handed. Neither can change the
+ * recorded cue, which keeps `Rep N`. Whether an engine reads what it is
+ * handed the way it is marked is not testable here; it is `[Field]`.
  */
 class SpokenRepCallTest {
     private fun word(start: Int) = SpokenRepCall.Span(start, start + 3, SpokenRepCall.Reading.WORD, "rep")
