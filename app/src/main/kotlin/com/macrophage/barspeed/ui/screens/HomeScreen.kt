@@ -1,5 +1,6 @@
 package com.macrophage.barspeed.ui.screens
 
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -41,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -54,6 +56,8 @@ import com.macrophage.barspeed.data.SessionEntity
 import com.macrophage.barspeed.model.ArmedDelivery
 import com.macrophage.barspeed.model.ByteSize
 import com.macrophage.barspeed.model.ConnectionState
+import com.macrophage.barspeed.model.HomeHero
+import com.macrophage.barspeed.model.HomeHeroPolicy
 import com.macrophage.barspeed.model.JournalRecoveryPolicy
 import com.macrophage.barspeed.model.RecordingHold
 import com.macrophage.barspeed.model.RecoveryRefusal
@@ -180,7 +184,7 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
             // Below both: a crash report is a diagnostic about the app, where
             // the two cards above it are the lifter's own data.
             CrashReportNotice(crashReports, busyCrashReports, viewModel::shareCrashReport, viewModel::deleteCrashReport)
-            HeroCard(state) { navController.navigate("record") }
+            HeroCard(state) { route -> navController.navigate(route) }
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                 StatTile(
@@ -287,8 +291,31 @@ private fun HomeSensorDot(label: String, state: ConnectionState, delivery: Armed
     }
 }
 
+/**
+ * The record route each hero tap opens (UX review 2026-11-06, home-nav F2,
+ * F3). CONTINUE goes straight down the dialog's "Continue it" path, a named
+ * next session straight to its preview, and everything else to the picker;
+ * `RecordViewModel.applyHomeEntry` carries the entry out.
+ */
+private fun heroRoute(hero: HomeHero): String = when (hero) {
+    is HomeHero.Continue -> "record?entry=continue"
+    is HomeHero.Next -> "record?entry=preview&planSession=${Uri.encode(hero.sessionName)}"
+    HomeHero.Loading, HomeHero.NoPlan, HomeHero.Pick -> "record"
+}
+
+/**
+ * What to do today, in one card: continue the open session, start the next
+ * plan session, or pick one. Every decision is [HomeHeroPolicy]'s.
+ *
+ * The plan-wide totals this card used to draw ("N sessions · N distinct
+ * exercises · N sets") answered a question nobody asks at the rack; the
+ * line under the plan name is now about the session at hand (home-nav F3).
+ * While the plan source has not answered, the card draws no plan copy at all
+ * rather than "No active plan" (home-nav F4).
+ */
 @Composable
-private fun HeroCard(state: HomeState, onStart: () -> Unit) {
+private fun HeroCard(state: HomeState, onNavigate: (String) -> Unit) {
+    val hero = state.hero
     val shape = RoundedCornerShape(16.dp)
     Column(
         Modifier
@@ -307,19 +334,9 @@ private fun HeroCard(state: HomeState, onStart: () -> Unit) {
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(vertical = 4.dp),
             )
-            Text(
-                // "distinct exercises", not bare "exercises": this counts
-                // DISTINCT movement ids across the whole plan, while the
-                // record screen's "Up next" summary and the session picker
-                // card both say "exercises" for a BLOCK count scoped to one
-                // session -- two different questions sharing one word would
-                // read as one number to a lifter comparing them (#227 item
-                // 3). See HomeState.planExerciseCount's KDoc.
-                "${state.planSessionCount} sessions · ${state.planExerciseCount} distinct exercises · " +
-                    "${state.planSetCount} sets",
-                style = MaterialTheme.typography.bodySmall,
-                color = BarColors.Sub,
-            )
+        } else if (hero == HomeHero.Loading) {
+            // Holds the card's height without claiming either answer.
+            Text(" ", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(vertical = 4.dp))
         } else {
             SectionCaption("No active plan", color = BarColors.Volt)
             Text(
@@ -327,15 +344,37 @@ private fun HeroCard(state: HomeState, onStart: () -> Unit) {
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(vertical = 4.dp),
             )
-            Text(
-                "Import a JSON plan from Claude on the Plans screen.",
-                style = MaterialTheme.typography.bodySmall,
-                color = BarColors.Sub,
-            )
+            if (hero == HomeHero.NoPlan) {
+                Text(
+                    "Import a JSON plan from Claude on the Plans screen.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = BarColors.Sub,
+                )
+            }
+        }
+        HomeHeroPolicy.detail(hero)?.let { detail ->
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
         }
         Spacer(Modifier.height(12.dp))
-        Button(onClick = onStart, modifier = Modifier.fillMaxWidth().height(48.dp)) {
-            Text("START SESSION", style = MaterialTheme.typography.titleMedium)
+        Button(onClick = { onNavigate(heroRoute(hero)) }, modifier = Modifier.fillMaxWidth().height(48.dp)) {
+            Text(
+                HomeHeroPolicy.buttonLabel(hero),
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        // Kept TextButtons (#201): the way past the primary, not a next step of its own.
+        when (hero) {
+            is HomeHero.Continue ->
+                TextButton(onClick = { onNavigate("record?entry=new") }) {
+                    Text("Start a new session", color = BarColors.Sub)
+                }
+            is HomeHero.Next ->
+                TextButton(onClick = { onNavigate("record") }) {
+                    Text("Other session", color = BarColors.Sub)
+                }
+            HomeHero.Loading, HomeHero.NoPlan, HomeHero.Pick -> Unit
         }
     }
 }

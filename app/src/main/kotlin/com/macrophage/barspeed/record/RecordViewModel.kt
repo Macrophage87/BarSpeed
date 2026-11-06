@@ -3011,6 +3011,87 @@ internal fun startedNextSetState(s: RecordState): RecordState? {
 }
 
 /**
+ * What Home's hero opened Record for (UX review 2026-11-06, home-nav F2, F3):
+ * continue the open session, start a new one past it, or preview the next
+ * plan session. Carried as the `entry` argument of the record route.
+ */
+enum class RecordEntry {
+    CONTINUE,
+    NEW,
+    PREVIEW,
+    ;
+
+    companion object {
+        fun parse(value: String?): RecordEntry? = entries.firstOrNull { it.name.equals(value, ignoreCase = true) }
+    }
+}
+
+/** What [homeEntryStep] says to do now about a [RecordEntry]. */
+enum class HomeEntryStep {
+    /** Not yet: the offer or the plan this entry needs has not arrived. */
+    WAIT,
+
+    /** Nothing more to do: no entry, or the lifter has already moved on. */
+    DROP,
+
+    /** Take the dialog's "Continue it" path. */
+    CONTINUE,
+
+    /** Take the dialog's "Start a new one" path. */
+    START_NEW,
+
+    /** Open the named plan session's preview, as its card would. */
+    PREVIEW,
+}
+
+/**
+ * What to do about Home's [entry] given the screen's state [s] (UX review
+ * 2026-11-06, home-nav F2, F3). A free function, outside [RecordViewModel],
+ * so `app/src/test` reaches it and the class does not grow.
+ *
+ * Anything the lifter does first wins: once the screen has left SETUP the
+ * entry is dropped. CONTINUE waits for the offer AND, on a plan row, for the
+ * row's session to be among the loaded plan sessions: `continueOffered` reads
+ * that list, and acting before the plan arrived would read the row as gone
+ * from the plan and leave it as "Start a new one" leaves it. PREVIEW waits
+ * for the named session the same way.
+ */
+internal fun homeEntryStep(entry: RecordEntry?, s: RecordState, planSessionName: String?): HomeEntryStep {
+    if (entry == null || s.stage != Stage.SETUP) return HomeEntryStep.DROP
+    val offer = s.resumeOffer
+    return when (entry) {
+        RecordEntry.CONTINUE -> when {
+            offer == null -> HomeEntryStep.WAIT
+            offer.planSessionName != null && s.planSessions.none { it.name == offer.planSessionName } ->
+                HomeEntryStep.WAIT
+            else -> HomeEntryStep.CONTINUE
+        }
+        RecordEntry.NEW -> if (offer == null) HomeEntryStep.WAIT else HomeEntryStep.START_NEW
+        RecordEntry.PREVIEW ->
+            if (s.planSessions.any { it.name == planSessionName }) HomeEntryStep.PREVIEW else HomeEntryStep.WAIT
+    }
+}
+
+/**
+ * Carry out [homeEntryStep]'s answer for Home's [entry]; true once nothing is
+ * left to do. An extension rather than a member, so [RecordViewModel] stays
+ * inside detekt's LargeClass bound; it calls only the screen's own public
+ * entry points ([RecordViewModel.continueSession],
+ * [RecordViewModel.declineResume], [RecordViewModel.openPreview]).
+ */
+fun RecordViewModel.applyHomeEntry(entry: RecordEntry?, planSessionName: String?): Boolean {
+    val s = state.value
+    when (homeEntryStep(entry, s, planSessionName)) {
+        HomeEntryStep.WAIT -> return false
+        HomeEntryStep.DROP -> Unit
+        HomeEntryStep.CONTINUE -> continueSession()
+        HomeEntryStep.START_NEW -> declineResume()
+        HomeEntryStep.PREVIEW -> s.planSessions.firstOrNull { it.name == planSessionName }?.let { openPreview(it) }
+    }
+    return true
+}
+
+/**
  * Ask, once, whether an earlier visit left a session open that the lifter may
  * want to continue (#48); every decision is [SessionResumePolicy.offer]'s.
  *

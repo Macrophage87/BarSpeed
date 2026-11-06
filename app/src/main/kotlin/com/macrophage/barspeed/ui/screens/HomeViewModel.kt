@@ -16,16 +16,23 @@ import com.macrophage.barspeed.data.RecoveryOutcome
 import com.macrophage.barspeed.data.RescuedDatabase
 import com.macrophage.barspeed.data.SessionEntity
 import com.macrophage.barspeed.model.ExportNaming
+import com.macrophage.barspeed.model.HomeHero
+import com.macrophage.barspeed.model.HomeHeroPolicy
 import com.macrophage.barspeed.model.JournalRecoveryPolicy
+import com.macrophage.barspeed.model.LatestSession
+import com.macrophage.barspeed.model.PlanSessionDef
 import com.macrophage.barspeed.model.RecordingHold
 import com.macrophage.barspeed.model.RecordingServicePolicy
 import com.macrophage.barspeed.model.RecoveryRefusal
 import com.macrophage.barspeed.model.RestoreVerdict
+import com.macrophage.barspeed.model.ResumeLanding
 import com.macrophage.barspeed.model.SessionHeartRate
+import com.macrophage.barspeed.model.SessionResumePolicy
 import com.macrophage.barspeed.model.VoidSetPolicy
 import com.macrophage.barspeed.model.VolumeSet
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.model.sessionTimestamp
+import com.macrophage.barspeed.record.flattenPlan
 import com.macrophage.barspeed.ui.ShareUtil
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -39,6 +46,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -86,25 +94,17 @@ data class HistoryRow(
     val heartRate: SessionHeartRate,
 )
 
-private data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
+/**
+ * The hero's half of [HomeState], built from the plan source and the sessions
+ * list alone so it never waits on the history's analysis decodes (UX review
+ * 2026-11-06, home-nav F4).
+ */
+private data class HeroPart(val planName: String? = null, val hero: HomeHero = HomeHero.Loading)
 
 data class HomeState(
     val planName: String? = null,
-    val planSessionCount: Int = 0,
-    val planSetCount: Int = 0,
-    /**
-     * DISTINCT exercise ids across the WHOLE plan, every session summed
-     * together -- not a block count and not scoped to one session.
-     *
-     * Answers a different question from the two other surfaces that draw the
-     * word "exercises": `RecordScreen.previewSummary` and the plan session
-     * picker card both count BLOCKS of the one session about to run (two
-     * blocks of the same lift count twice there; see `previewSummary`'s own
-     * KDoc for why the two agree with each other). `HeroCard` draws this one
-     * as "N distinct exercises" rather than bare "exercises" so the word does
-     * not imply it is answering the same question (#227 item 3).
-     */
-    val planExerciseCount: Int = 0,
+    /** What the hero card offers; every decision is [HomeHeroPolicy]'s. */
+    val hero: HomeHero = HomeHero.Loading,
     val weekVolumeKg: Double = 0.0,
     val weekSessions: Int = 0,
     val history: List<HistoryRow> = emptyList(),
@@ -793,25 +793,79 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      */
     val state =
         combine(
-            sessionRepository.sessions,
-            planRepository.activePlan,
-            container.settings.weightUnit,
-            container.settings.bodyWeightKg,
-        ) { sessions, planEntity, unit, bodyWeight -> Quad(sessions, planEntity, unit, bodyWeight) }
-            .mapLatest { inputs ->
-                withContext(Dispatchers.Default) {
-                    buildState(inputs.first, inputs.second, inputs.third, inputs.fourth)
+            heroPart().onStart { emit(HeroPart()) },
+            combine(
+                sessionRepository.sessions,
+                container.settings.weightUnit,
+                container.settings.bodyWeightKg,
+            ) { sessions, unit, bodyWeight -> Triple(sessions, unit, bodyWeight) }
+                .mapLatest { inputs ->
+                    withContext(Dispatchers.Default) { buildState(inputs.first, inputs.second, inputs.third) }
                 }
-            }
+                .onStart { emit(HomeState()) },
+        ) { hero, history -> history.copy(planName = hero.planName, hero = hero.hero) }
             // Without this a migration that throws escaped into viewModelScope
             // and ended the process as Home drew, on every launch. The crash
             // report is still written, for sending once the database opens.
+            // On the combined flow: the hero reads the database too.
             .catch { e ->
                 AppLog.w(TAG, "history could not be read", e)
                 container.crashLogs.write(CrashReporting.recordOf(Thread.currentThread(), e))
                 emit(HomeState(databaseError = e.toString()))
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeState())
+
+    /**
+     * The hero, from the plan source, the sessions list and the recording
+     * holds -- none of which decodes a set -- so the plan name is on screen
+     * before the history below has been built (UX review 2026-11-06, home-nav
+     * F2-F4). Whether a session is open is [SessionResumePolicy.offer]'s
+     * answer, read the way the record screen reads it on entry, and an offer
+     * Record's "Continue it" would not adopt ([continuable]) is not offered as
+     * CONTINUE.
+     */
+    private fun heroPart() =
+        combine(
+            sessionRepository.sessions,
+            planRepository.activePlan,
+            container.recordingHolds.held,
+        ) { sessions, planEntity, held -> Triple(sessions, planEntity, held) }
+            .mapLatest { (sessions, planEntity, held) ->
+                withContext(Dispatchers.Default) {
+                    val plan = planEntity?.let { planRepository.decode(it) }
+                    val nowMs = System.currentTimeMillis()
+                    val latest = sessionRepository.latestSession(nowMs - SessionResumePolicy.LOOKBACK_MS, nowMs)
+                    val offer = SessionResumePolicy.offer(latest, nowMs, RecordingServicePolicy.writing(held))
+                    val open = offer?.takeIf { continuable(it, plan?.sessions.orEmpty()) }
+                    // Newest first: the sessions query orders by start, descending.
+                    val lastDone =
+                        plan?.let { p ->
+                            sessions.firstOrNull { it.planName == p.planName && it.planSessionName != null }
+                                ?.planSessionName
+                        }
+                    HeroPart(plan?.planName, HomeHeroPolicy.hero(true, plan?.sessions, open, lastDone))
+                }
+            }
+
+    /**
+     * Whether Record's "Continue it" would adopt [offer] rather than leave it
+     * as "Start a new one" does: [SessionResumePolicy.landing] asked the way
+     * `continueOffered` asks it, against the same plan session and the same
+     * remaining slots. A plan row with every slot recorded, or whose session
+     * is gone from the plan, is not offered as CONTINUE.
+     */
+    private suspend fun continuable(offer: LatestSession, planSessions: List<PlanSessionDef>): Boolean {
+        val planSession = offer.planSessionName?.let { name -> planSessions.firstOrNull { it.name == name } }
+        val left =
+            planSession?.let { session ->
+                SessionResumePolicy.remainingSlots(
+                    sessionRepository.flattenPlan(session).map { it.exercise.id },
+                    offer.storedSets,
+                ).size
+            } ?: 0
+        return SessionResumePolicy.landing(offer.planSessionName, planSession != null, left) !=
+            ResumeLanding.NEW_SESSION
+    }
 
     fun setBodyWeight(kg: Double) {
         viewModelScope.launch { container.settings.setBodyWeightKg(kg) }
@@ -825,11 +879,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun buildState(
         sessions: List<SessionEntity>,
-        planEntity: com.macrophage.barspeed.data.PlanEntity?,
         unit: WeightUnit,
         bodyWeightKg: Double?,
     ): HomeState {
-        val plan = planEntity?.let { planRepository.decode(it) }
         val weekStartMs = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(DAYS_PER_WEEK)
 
         var weekVolumeKg = 0.0
@@ -869,10 +921,6 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             }
 
         return HomeState(
-            planName = plan?.planName,
-            planSessionCount = plan?.sessions?.size ?: 0,
-            planSetCount = plan?.sessions?.sumOf { s -> s.exercises.sumOf { it.sets.size } } ?: 0,
-            planExerciseCount = plan?.sessions?.flatMap { s -> s.exercises.map { it.exercise } }?.distinct()?.size ?: 0,
             weekVolumeKg = weekVolumeKg,
             weekSessions = weekSessions,
             history = history,

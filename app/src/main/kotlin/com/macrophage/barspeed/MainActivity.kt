@@ -26,6 +26,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.macrophage.barspeed.model.BlePermissionPolicy
 import com.macrophage.barspeed.model.RecordingHold
+import com.macrophage.barspeed.record.RecordEntry
 import com.macrophage.barspeed.ui.LiftingTheme
 import com.macrophage.barspeed.ui.components.LocalBlePermissionUi
 import com.macrophage.barspeed.ui.components.PermissionUi
@@ -168,6 +169,13 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/**
+ * The record screen's route pattern. Both arguments are optional, so a plain
+ * navigate("record") still lands there; Home's hero passes them (UX review
+ * 2026-11-06, home-nav F2, F3).
+ */
+private const val RECORD_ROUTE = "record?entry={entry}&planSession={planSession}"
+
 @Composable
 private fun AppNav(sessionLive: () -> Boolean) {
     val navController = rememberNavController()
@@ -201,7 +209,9 @@ private fun AppNav(sessionLive: () -> Boolean) {
     val context = LocalContext.current
     LaunchedEffect(arrivals) {
         if (!IncomingPlanInbox.claimArrival()) return@LaunchedEffect
-        val onRecord = runCatching { navController.getBackStackEntry("record") }.isSuccess
+        // The route PATTERN, which hasRoute matches exactly; "record" alone
+        // would have to deep-link-match the optional arguments Home passes.
+        val onRecord = runCatching { navController.getBackStackEntry(RECORD_ROUTE) }.isSuccess
         if (onRecord || sessionLive()) {
             Toast.makeText(context, "Plan received: open Plans to review it.", Toast.LENGTH_LONG).show()
         } else {
@@ -222,7 +232,28 @@ private fun AppNav(sessionLive: () -> Boolean) {
         ) { backStackEntry ->
             PlanDetailScreen(navController, backStackEntry.arguments?.getLong("planId") ?: 0L)
         }
-        composable("record") { RecordScreen(navController) }
+        composable(
+            RECORD_ROUTE,
+            arguments =
+                listOf(
+                    navArgument("entry") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                    navArgument("planSession") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
+        ) { backStackEntry ->
+            RecordScreen(
+                navController,
+                entry = RecordEntry.parse(backStackEntry.arguments?.getString("entry")),
+                planSession = backStackEntry.arguments?.getString("planSession"),
+            )
+        }
         composable(
             "session/{sessionId}",
             arguments = listOf(navArgument("sessionId") { type = NavType.LongType }),

@@ -138,10 +138,12 @@ import com.macrophage.barspeed.model.TimedSetEndPolicy
 import com.macrophage.barspeed.model.UnwrittenClose
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.record.PlannedSlot
+import com.macrophage.barspeed.record.RecordEntry
 import com.macrophage.barspeed.record.RecordState
 import com.macrophage.barspeed.record.RecordViewModel
 import com.macrophage.barspeed.record.SetFeedback
 import com.macrophage.barspeed.record.SetRating
+import com.macrophage.barspeed.record.applyHomeEntry
 import com.macrophage.barspeed.record.cardInstruction
 import com.macrophage.barspeed.record.nextSetSlot
 import com.macrophage.barspeed.record.nextSetStatements
@@ -177,8 +179,24 @@ private const val RING_WINDOW_SCALE = 1.5f
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RecordScreen(navController: NavController, viewModel: RecordViewModel = viewModel()) {
+fun RecordScreen(
+    navController: NavController,
+    entry: RecordEntry? = null,
+    planSession: String? = null,
+    viewModel: RecordViewModel = viewModel(),
+) {
     val state by viewModel.state.collectAsState()
+    // Home's hero said what this visit is for; the offer and the plan both
+    // arrive after entry, so this re-asks as each lands. See homeEntryStep.
+    // Saveable, so a rotation does not act twice; after a process death the
+    // entry is spent and the dialog asks as on a plain entry.
+    var entryDone by rememberSaveable { mutableStateOf(entry == null) }
+    LaunchedEffect(state.resumeOffer, state.planSessions, state.stage) {
+        if (!entryDone) entryDone = viewModel.applyHomeEntry(entry, planSession)
+    }
+    // CONTINUE from Home answers the dialog itself; drawing it meanwhile
+    // would flash a question the lifter has already answered.
+    val hideResumeDialog = !entryDone && entry == RecordEntry.CONTINUE
 
     // Back has two routes out of this screen — the top bar's button and the
     // system gesture — and the lifter uses whichever is nearer the thumb, so a
@@ -306,7 +324,7 @@ fun RecordScreen(navController: NavController, viewModel: RecordViewModel = view
             // time the service reports, and the rest after it is no safer.
             state.foregroundFailure?.let { ForegroundRefusalBanner(it) }
             when (state.stage) {
-                Stage.SETUP -> SetupStage(state, viewModel)
+                Stage.SETUP -> SetupStage(state, viewModel, hideResumeDialog)
                 Stage.PREVIEW -> PreviewStage(state, viewModel)
                 Stage.READY -> ReadyStage(state, viewModel)
                 Stage.IN_SET -> InSetStage(state, viewModel)
@@ -882,8 +900,8 @@ private fun PreviewBlockCard(block: PreviewBlock, unit: WeightUnit) {
 }
 
 @Composable
-private fun SetupStage(state: RecordState, viewModel: RecordViewModel) {
-    state.resumeOffer?.let { ResumeSessionDialog(it, viewModel) }
+private fun SetupStage(state: RecordState, viewModel: RecordViewModel, hideResumeDialog: Boolean = false) {
+    if (!hideResumeDialog) state.resumeOffer?.let { ResumeSessionDialog(it, viewModel) }
     // Why "Continue it" started nothing: the row had no set left to do, or its
     // session is gone from the plan (SessionResumePolicy.landing).
     state.resumeNotice?.let {
