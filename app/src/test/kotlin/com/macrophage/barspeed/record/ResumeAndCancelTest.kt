@@ -99,8 +99,7 @@ class ResumeAndCancelTest {
 private val squat = ExerciseDef("back_squat", "Back squat")
 private val deadlift = ExerciseDef("deadlift", "Deadlift")
 
-private fun resting() =
-    RecordState(stage = Stage.RESTING, queue = squatsThenDeadlifts(), queueIndex = 0, adHoc = false)
+private fun resting() = RecordState(stage = Stage.RESTING, queue = squatsThenDeadlifts(), queueIndex = 0, adHoc = false)
 
 private fun squatsThenDeadlifts() = listOf(
     slot(squat, 0, 3),
