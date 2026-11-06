@@ -128,9 +128,10 @@ private val SECTIONS =
         ),
         GuideSection(
             "Plans",
-            "Plans, then Import plan: paste the JSON or pick the file. Any problems are listed " +
-                "before anything changes. Tap a plan to see every set, and approve it to make it " +
-                "active. The prompt at the bottom of this page gets an LLM to write one.",
+            "Plans come from robocoach. Plans, then Import plan: paste the JSON or pick the " +
+                "file. Any problems are listed before anything changes. Tap a plan to see every " +
+                "set, and approve it to make it active. No robocoach plan? The prompt at the " +
+                "bottom of this page gets any LLM to write one.",
         ),
         GuideSection(
             "A set",
@@ -154,13 +155,15 @@ private val SECTIONS =
             "Voice cues are on by default. The 'Voice cues' switch on any Record screen turns " +
                 "them off or on; tempo sets still call the cadence. " +
                 "Every tempo set except an explosive lift is called stroke by stroke, sensor or " +
-                "not, after a 5-second lead-in you can change on the rest screen. " +
-                "On a bench 3010 that's 'Down, 1, 2, Up… Rep 2, 2, 3, Up…'. Rep 1 starts on the " +
-                "stroke word, not 'Rep 1'. " +
+                "not, after a lead-in: 5 seconds unless the plan says otherwise, and you can " +
+                "change it on the rest screen. " +
+                "On a bench 3010 that's 'Down, 1, 2, Up… Rep 2, 2, 3, Up…'. Rep 1 keeps its " +
+                "stroke word; from rep 2 the number takes the first word's place. " +
                 "Two-second strokes are counted too: an accessory 2011 goes " +
                 "'Up, Hold, Down, 1… Rep 2, Hold, Down, 1…'. " +
                 "Lifts that start from the bottom (press, deadlift, row) are called starting on 'Up'. " +
-                "On those, a fast tempo like 1010 names the rep as the drive ends: " +
+                "On those, a fast tempo like 1010 is the one case that names rep 1 too, " +
+                "as each drive ends: " +
                 "'Up, Rep 1… Up, Rep 2…', and the last one 'Up, Last rep'. The prep then says " +
                 "'Rep numbers mark the end of each drive'. From the top, a 1010 is called by " +
                 "stroke only, with the count on screen. " +
