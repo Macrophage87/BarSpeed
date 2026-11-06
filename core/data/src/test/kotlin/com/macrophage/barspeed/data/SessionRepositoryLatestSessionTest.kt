@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.data
 
 import com.macrophage.barspeed.model.LatestSession
+import com.macrophage.barspeed.model.StoredSet
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -122,6 +123,9 @@ class SessionRepositoryLatestSessionTest {
                 lastSetEndedAtMs = 9_000L,
                 nextOrderIdx = 3,
                 planSessionName = "Lower A",
+                // The session's own rows in orderIdx order, for where a
+                // continued plan session picks up (UX review 2026-11-06, rest F1).
+                storedSets = List(2) { StoredSet("back_squat", added = false, voided = false) },
             ),
             latest,
         )

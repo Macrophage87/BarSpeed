@@ -110,6 +110,7 @@ import com.macrophage.barspeed.model.SkipSetTarget
 import com.macrophage.barspeed.model.SkippedSet
 import com.macrophage.barspeed.model.StackMountSignal
 import com.macrophage.barspeed.model.Stage
+import com.macrophage.barspeed.model.StoredSet
 import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.TempoAdjustPolicy
 import com.macrophage.barspeed.model.TimedSetEndPolicy
@@ -3125,37 +3126,83 @@ private fun CoroutineScope.offerResume(
 }
 
 /**
- * The state "Continue it" leaves behind (#48): the earlier visit's row adopted
- * as this session's, and the next set numbered after its last.
+ * The earlier visit's row adopted as this session's, and the next set numbered
+ * after its last (#48). [continueOffered] is the only caller.
  *
- * The stage stays SETUP. The lifter still chooses the plan session or an
- * ad-hoc start, and the set recorded next goes into the adopted row because
- * [RecordState.sessionId] is already set -- the first-set path is the only one
- * that opens a row, and it is not taken. Where the queue starts is not
- * guessed: the earlier visit's position in it was never stored.
+ * On its own this leaves the stage at SETUP, which is where an ad-hoc row
+ * continues, and where a plan row falls back to when its own plan session is
+ * not in the active plan any more or every one of its slots is already
+ * recorded: the lifter chooses there, and the set recorded next goes into the
+ * adopted row because [RecordState.sessionId] is already set -- the first-set
+ * path is the only one that opens a row, and it is not taken.
  *
- * TWO CONSEQUENCES, NAMED RATHER THAN DESIGNED AWAY. Nothing limits the pick
- * to the adopted row's own plan session: a lifter who continues and then picks
- * another session records its sets into the earlier row, whose own
- * `planSessionName` stays the earlier one (each set row carries the name of
- * the session it was recorded under). And a plan's queue starts again at its
- * first slot, so a lifter who picks the same session faces slots the earlier
- * visit already recorded. The prompt says both
- * ([SessionResumePolicy.body]); which pick to allow is the owner's call.
- *
- * AND THE SKIPPED-SET LIST, named for the same reason. A continued session's
- * close writes only the skips taken on this visit ([RecordState.skippedSets]
- * starts empty on each visit and `endSession` stores it as the row's list); the
- * earlier visit's were in its memory and are gone. And because the queue
- * starts again, a skip taken to pass a slot the earlier visit recorded is
- * stored as a skip of a set the row also holds (`SkipSetControl` refuses a
- * block opener, so only non-opening slots can be passed this way). Both are
- * left to the owner with the pick rule.
+ * THE SKIPPED-SET LIST, named rather than designed away. A continued
+ * session's close writes only the skips taken on this visit
+ * ([RecordState.skippedSets] starts empty on each visit and `endSession` stores
+ * it as the row's list); the earlier visit's were in its memory and are gone,
+ * and a slot the earlier visit skipped comes back as a slot to do.
  */
 private fun resumedState(s: RecordState): RecordState {
     val offer = s.resumeOffer ?: return s
     val next = offer.nextOrderIdx
     return s.copy(resumeOffer = null, sessionId = offer.sessionId, setsCompleted = next, resumedAtOrderIdx = next)
+}
+
+/**
+ * "Continue it" (#48; owner's ruling 2026-11-06, UX review rest F1, home-nav
+ * F1, setup F1, reliability F3): a plan row goes straight back to its OWN plan
+ * session, on the first planned set it holds no row for.
+ *
+ * It used to stop at SETUP, where the lifter picked a session again -- any
+ * session, whose sets then went into this row -- and the plan's queue started
+ * again at slot 0, so getting back to his place meant skipping sets he had
+ * done (each skip exported as dropped work) or lifting them again. Now no
+ * other session can be picked into the row: the queue is the row's own
+ * session's, with every slot the row already holds a set for taken out by
+ * [SessionResumePolicy.remainingSlots]. Something else is "Start a new one".
+ *
+ * Through the preview stage rather than straight to READY for one reason: the
+ * body-weight prompt is drawn there, and [askOrStartSession] still asks it.
+ * When it does not ask, the start is immediate and READY is the first frame
+ * the lifter sees.
+ *
+ * The offer is cleared only once the queue is built, so the dialog stays up
+ * (and modal) meanwhile: nothing else can be picked in that window, and a
+ * second tap on Continue, or a Start a new one, finds a different offer and
+ * this one gives way.
+ */
+private fun CoroutineScope.continueOffered(
+    repository: SessionRepository,
+    state: MutableStateFlow<RecordState>,
+    onStart: (PlanSessionDef) -> Unit,
+) = launch {
+    val offer = state.value.resumeOffer ?: return@launch
+    val planSession = offer.planSessionName?.let { name -> state.value.planSessions.firstOrNull { it.name == name } }
+    val remaining = planSession?.let { resumedQueue(repository.flattenPlan(it), offer.storedSets) }.orEmpty()
+    if (state.value.resumeOffer != offer) return@launch
+    val adopted = resumedState(state.value)
+    if (planSession == null || remaining.isEmpty()) {
+        state.value = adopted
+        return@launch
+    }
+    state.value = previewState(adopted, planSession, remaining)
+    askOrStartSession(state, planSession, System.currentTimeMillis(), onStart)
+}
+
+/**
+ * [queue] with every slot [stored] already fills taken out, in plan order;
+ * which slots those are is [SessionResumePolicy.remainingSlots]'s decision.
+ *
+ * The plan's own numbering stays on each slot, as it does after a skip, so the
+ * set the lifter lands on still reads "Set 3 of 4". The "move the sensor" flag
+ * is recomputed for the new neighbours, as SWITCH EXERCISE recomputes it, and
+ * is off on the first slot, as it is on the first slot of any session.
+ */
+internal fun resumedQueue(queue: List<PlannedSlot>, stored: List<StoredSet>): List<PlannedSlot> {
+    val kept = SessionResumePolicy.remainingSlots(queue.map { it.exercise.id }, stored).map { queue[it] }
+    return kept.mapIndexed { i, slot ->
+        slot.copy(isExerciseChange = i > 0 && kept[i - 1].exercise.id != slot.exercise.id)
+    }
 }
 
 /**
@@ -6002,8 +6049,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         stateFlow.value = closedState(stateFlow.value)
     }
 
-    /** "Continue it" on the resume prompt (#48); every decision is [resumedState]'s. */
-    fun continueSession() = resumedState(stateFlow.value).let { stateFlow.value = it }
+    /** "Continue it" on the resume prompt (#48); every decision is [continueOffered]'s. */
+    fun continueSession() = viewModelScope.continueOffered(sessionRepository, stateFlow, ::startPlanSession)
 
     /** "Start a new one": the earlier row is left exactly as it is (#48). */
     fun declineResume() = stateFlow.value.copy(resumeOffer = null).let { stateFlow.value = it }

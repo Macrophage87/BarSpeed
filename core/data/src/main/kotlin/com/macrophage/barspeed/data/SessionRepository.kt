@@ -22,6 +22,7 @@ import com.macrophage.barspeed.model.SessionHeartRate
 import com.macrophage.barspeed.model.SessionRpe
 import com.macrophage.barspeed.model.SkippedSet
 import com.macrophage.barspeed.model.StoredExerciseRow
+import com.macrophage.barspeed.model.StoredSet
 import com.macrophage.barspeed.model.VoiceCue
 import com.macrophage.barspeed.model.VoidSetPolicy
 import kotlinx.coroutines.Dispatchers
@@ -808,6 +809,9 @@ class SessionRepository(
             lastSetEndedAtMs = sets.maxOfOrNull { it.endedAtMs },
             nextOrderIdx = (sets.maxOfOrNull { it.orderIdx } ?: -1) + 1,
             planSessionName = row.planSessionName,
+            // Where a continued plan session picks up (UX review 2026-11-06,
+            // rest F1); SessionResumePolicy.remainingSlots reads these.
+            storedSets = sets.map { StoredSet(it.exerciseId, added = it.added, voided = it.voided) },
         )
     }
 

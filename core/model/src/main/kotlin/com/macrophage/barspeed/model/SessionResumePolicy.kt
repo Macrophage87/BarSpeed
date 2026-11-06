@@ -3,7 +3,9 @@ package com.macrophage.barspeed.model
 /**
  * The newest session row, as the resume question needs it (#48).
  *
- * [lastSetEndedAtMs] is null only where the row has no set at all, and
+ * [storedSets] is every set row it holds, in `orderIdx` order, as much of each
+ * as [SessionResumePolicy.remainingSlots] reads. [lastSetEndedAtMs] is null
+ * only where the row has no set at all, and
  * [nextOrderIdx] is one past the highest `orderIdx` the row holds -- the slot
  * the next set recorded into this session must take, so a continued session
  * cannot write two sets at one position. That holds against the one other
@@ -21,7 +23,15 @@ data class LatestSession(
     val lastSetEndedAtMs: Long?,
     val nextOrderIdx: Int,
     val planSessionName: String?,
+    val storedSets: List<StoredSet> = emptyList(),
 )
+
+/**
+ * One set row a session already holds, as [SessionResumePolicy.remainingSlots]
+ * needs it: which exercise, whether it was a set the lifter appended beyond the
+ * plan (`added`), and whether it was later marked not performed (`voided`).
+ */
+data class StoredSet(val exerciseId: String, val added: Boolean, val voided: Boolean)
 
 /**
  * Whether walking back into Record should ask "Continue this session?" (#48).
@@ -115,6 +125,36 @@ object SessionResumePolicy {
     fun closeRestHr(resumedAtOrderIdx: Int?, setsCompleted: Int, samples: List<HrSample>): List<HrSample> =
         if (resumedAtOrderIdx != null && setsCompleted <= resumedAtOrderIdx) emptyList() else samples
 
+    /**
+     * Which slots of a plan session's queue a continued row still has to do,
+     * as indexes into the queue in queue order; the first is where the lifter
+     * lands (owner's ruling 2026-11-06, UX review rest F1).
+     *
+     * [queueExerciseIds] is the session's queue as flattened from the plan,
+     * one exercise id per slot. [stored] is the set rows the continued row
+     * holds. A row stores no plan slot index, only its exercise and its
+     * `orderIdx`, so the match is by count: each exercise's first N slots in
+     * queue order are taken as done, where N is how many rows of that
+     * exercise the row holds. It is exact while the lifter worked each exercise's
+     * slots in order, which is the only order the queue offers; SWITCH
+     * EXERCISE moves whole exercises, so sets taken out of order between
+     * exercises are still counted right.
+     *
+     * Not counted: an `added` row, which filled no planned slot, and a
+     * `voided` row, which the lifter marked as not performed. What it cannot
+     * see: a slot the earlier visit SKIPPED is not stored until the close, so
+     * it comes back; and a skip inside an exercise moves that exercise's
+     * count onto the slot it passed rather than the one done.
+     */
+    fun remainingSlots(queueExerciseIds: List<String>, stored: List<StoredSet>): List<Int> {
+        val done = stored.filter { !it.added && !it.voided }.groupingBy { it.exerciseId }.eachCount().toMutableMap()
+        return queueExerciseIds.indices.filter { i ->
+            val left = done[queueExerciseIds[i]] ?: 0
+            if (left > 0) done[queueExerciseIds[i]] = left - 1
+            left == 0
+        }
+    }
+
     /** The prompt's title. */
     const val TITLE = "Continue this session?"
 
@@ -126,19 +166,23 @@ object SessionResumePolicy {
 
     /**
      * The prompt's body, for [latest] and its start time as the screen
-     * renders it, [startedAt].
+     * renders it, [startedAt]: what the row is, then what each answer does.
      *
-     * It says what continuing does that the lifter cannot see from the
-     * prompt alone: the sets go into this row whichever session is picked
-     * next, so the row keeps its own plan session's name over sets recorded
-     * under another, and a plan's queue starts again at its first slot,
-     * because where the earlier visit stood in it was never stored.
+     * A plan row continues in its own session at the first set it has no row
+     * for ([remainingSlots]); an ad-hoc row (no plan session name) takes the
+     * next sets as they are recorded. It used to warn that a plan started
+     * again from its first set, which stopped being true with the owner's
+     * ruling of 2026-11-06.
      */
     fun body(latest: LatestSession, startedAt: String): String {
-        val name = latest.planSessionName?.let { " ($it)" } ?: ""
         val sets = if (latest.setCount == 1) "1 set" else "${latest.setCount} sets"
-        return "You left a session$name open, started at $startedAt, with $sets saved. Continue it and the " +
-            "sets you record next are added to it, whichever session you pick; a plan starts again from its " +
-            "first set. Start a new one and it stays as it is, with no end time."
+        val name = latest.planSessionName
+        return if (name != null) {
+            "$name, started at $startedAt, has $sets saved. Continue it to pick up at the next set you " +
+                "haven't done, or start a new one and leave it as it is."
+        } else {
+            "A session started at $startedAt has $sets saved. Continue it and your next sets are added to it, " +
+                "or start a new one and leave it as it is."
+        }
     }
 }

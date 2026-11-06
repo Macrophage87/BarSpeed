@@ -2,6 +2,7 @@ package com.macrophage.barspeed.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -27,23 +28,35 @@ class SessionResumePolicyTest {
         )
 
     /**
-     * The prompt says what continuing does and what declining leaves, and it
-     * says declining leaves the row with no end time -- which is true: nothing
-     * on that path writes to it.
+     * The prompt names the session, its start and its sets, and says what each
+     * answer does in two short sentences. Declining leaves the row as it is,
+     * which is true: nothing on that path writes to it.
      */
     @Test
     fun `the body names the session, its sets, and what each answer does`() {
         val body = SessionResumePolicy.body(open, "18:05")
-        assertTrue("(Lower A)" in body, body)
+        assertTrue("Lower A" in body, body)
         assertTrue("started at 18:05" in body, body)
         assertTrue("2 sets saved" in body, body)
-        assertTrue("added to it" in body, body)
-        assertTrue("no end time" in body, body)
+        assertTrue("next set you haven't done" in body, body)
+        assertTrue("leave it as it is" in body, body)
     }
 
     @Test
     fun `one set is one set`() {
         assertTrue("1 set saved" in SessionResumePolicy.body(open.copy(setCount = 1), "18:05"))
+    }
+
+    /**
+     * An ad-hoc row has no plan to pick up in, so its body promises only that
+     * the next sets are added to it.
+     */
+    @Test
+    fun `an ad-hoc row's body says the next sets are added to it`() {
+        val body = SessionResumePolicy.body(open.copy(planSessionName = null), "18:05")
+        assertTrue("started at 18:05" in body, body)
+        assertTrue("added to it" in body, body)
+        assertTrue("leave it as it is" in body, body)
     }
 
     // ---- whether to ask -----------------------------------------------------
@@ -140,14 +153,84 @@ class SessionResumePolicyTest {
     }
 
     /**
-     * The prompt says what continuing does to the queue and to the row's name
-     * (#48, review round 1): the queue starts again at its first slot, and
-     * the sets go into this row whichever session is picked next.
+     * UX review 2026-11-06, rest F1. The prompt used to warn that a plan
+     * "starts again from its first set" and that the sets went in "whichever
+     * session you pick". Continuing now picks the row's own session and lands
+     * on the first set not yet done, so neither warning is true any more.
      */
     @Test
-    fun `the body says the plan starts again and the sets go into this session whatever is picked`() {
+    fun `the body no longer warns that the plan starts again`() {
         val body = SessionResumePolicy.body(open, "18:05")
-        assertTrue("whichever session you pick" in body, body)
-        assertTrue("starts again from its first set" in body, body)
+        assertFalse("first set" in body, body)
+        assertFalse("whichever session" in body, body)
+    }
+
+    // ---- where a continued plan session picks up -----------------------------
+
+    private fun stored(exerciseId: String, added: Boolean = false, voided: Boolean = false) =
+        StoredSet(exerciseId = exerciseId, added = added, voided = voided)
+
+    /**
+     * THE DEFECT (UX review 2026-11-06, rest F1, home-nav F1, setup F1,
+     * reliability F3). Continue it, pick the session, and the queue started at
+     * slot 0 however many sets the row already held. Two squats and one bench
+     * of a 3 + 3 session leave squat 3 next and bench 2 and 3 behind it.
+     */
+    @Test
+    fun `the first slot not yet recorded is next, and the recorded ones are gone`() {
+        val queue = listOf("squat", "squat", "squat", "bench", "bench", "bench")
+        val remaining =
+            SessionResumePolicy.remainingSlots(queue, listOf(stored("squat"), stored("squat"), stored("bench")))
+        assertEquals(listOf(2, 4, 5), remaining)
+        assertEquals(2, remaining.first())
+    }
+
+    /** A row holding nothing of the session leaves the whole queue, slot 0 first. */
+    @Test
+    fun `a row with no set of the session leaves every slot`() {
+        assertEquals(listOf(0, 1, 2), SessionResumePolicy.remainingSlots(listOf("a", "a", "b"), emptyList()))
+        assertEquals(
+            listOf(0, 1, 2),
+            SessionResumePolicy.remainingSlots(listOf("a", "a", "b"), listOf(stored("other"))),
+        )
+    }
+
+    /**
+     * An appended set filled no planned slot, and a set marked not performed
+     * was not done, so neither takes a slot off the queue.
+     */
+    @Test
+    fun `an added or a voided set takes no planned slot`() {
+        val queue = listOf("a", "a", "a")
+        assertEquals(
+            listOf(1, 2),
+            SessionResumePolicy.remainingSlots(
+                queue,
+                listOf(stored("a"), stored("a", added = true), stored("a", voided = true)),
+            ),
+        )
+    }
+
+    /**
+     * Sets taken out of order (SWITCH EXERCISE) are counted per exercise, so a
+     * later block that was done first is gone too, and two blocks of one
+     * exercise are filled in queue order.
+     */
+    @Test
+    fun `sets done out of order are counted per exercise, in queue order`() {
+        val queue = listOf("a", "a", "b", "b", "a", "a")
+        assertEquals(
+            listOf(1, 4, 5),
+            SessionResumePolicy.remainingSlots(queue, listOf(stored("b"), stored("b"), stored("a"))),
+        )
+        val threeAandTwoB = List(3) { stored("a") } + stored("b") + stored("b")
+        assertEquals(listOf(5), SessionResumePolicy.remainingSlots(queue, threeAandTwoB))
+    }
+
+    /** Every slot recorded leaves nothing; more rows than slots is not an error. */
+    @Test
+    fun `a fully recorded session leaves nothing`() {
+        val rows = List(3) { stored("a") } + stored("b")
+        assertEquals(emptyList(), SessionResumePolicy.remainingSlots(listOf("a", "b"), rows))
     }
 }
