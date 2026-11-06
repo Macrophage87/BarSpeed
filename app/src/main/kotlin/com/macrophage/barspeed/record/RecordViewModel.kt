@@ -1513,6 +1513,36 @@ private fun launchSetWrite(
 }
 
 /**
+ * A [GuidedCadenceRunner] on this scope whose label, countdown, counted reps
+ * and finish are mirrored into [state]; [markRep] journals each counted rep
+ * before the count moves. Out of `RecordViewModel` to keep that class under
+ * detekt's LargeClass threshold; the behaviour is the class's own.
+ */
+private fun CoroutineScope.mirroredGuidedRunner(
+    state: MutableStateFlow<RecordState>,
+    speak: (cues: List<String>, utterance: String) -> Unit,
+    markRep: () -> Unit,
+) = GuidedCadenceRunner(
+    scope = this,
+    speak = speak,
+    // `leadInRunning` off the runner's OWN constant, not a copy of the
+    // string: its first beat pushes a label before it sleeps, so this
+    // clears on the instant the lead-in ends. A hold's prep pushes
+    // nothing after it, so `startSetTimer` clears that one.
+    update = { label, remaining, total ->
+        state.value = state.value.copy(
+            guidedLabel = label, guidedCountdown = remaining, guidedPhaseTotal = total,
+            leadInRunning = label == LEAD_IN_LABEL,
+        )
+    },
+    onRepCounted = { rep ->
+        markRep()
+        state.value = state.value.copy(manualReps = rep)
+    },
+    onFinished = { state.value = state.value.copy(guidedFinished = true) },
+)
+
+/**
  * The rest countdown: one tick a second down to zero, with the last three
  * seconds and the end spoken.
  *
@@ -5405,24 +5435,10 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // Reached only from beginSet, after its setStarted, so a voice made
         // here is made inside a set and is told so (#339).
         if (voice == null) voice = VoiceCounter(getApplication()).also { it.setStarted() }
-        return GuidedCadenceRunner(
-            scope = viewModelScope,
+        return viewModelScope.mirroredGuidedRunner(
+            stateFlow,
             speak = { cues, utterance -> if (cues.isEmpty()) speakOnly(utterance) else speakCues(cues, utterance) },
-            // `leadInRunning` off the runner's OWN constant, not a copy of the
-            // string: its first beat pushes a label before it sleeps, so this
-            // clears on the instant the lead-in ends. A hold's prep pushes
-            // nothing after it, so [startSetTimer] clears that one.
-            update = { label, remaining, total ->
-                stateFlow.value = stateFlow.value.copy(
-                    guidedLabel = label, guidedCountdown = remaining, guidedPhaseTotal = total,
-                    leadInRunning = label == LEAD_IN_LABEL,
-                )
-            },
-            onRepCounted = { rep ->
-                journal?.appendRepMark(System.currentTimeMillis())
-                stateFlow.value = stateFlow.value.copy(manualReps = rep)
-            },
-            onFinished = { stateFlow.value = stateFlow.value.copy(guidedFinished = true) },
+            markRep = { journal?.appendRepMark(System.currentTimeMillis()) },
         )
     }
 
