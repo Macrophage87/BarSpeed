@@ -9,12 +9,30 @@ import kotlin.test.assertTrue
 /** UX review 2026-11-06, ble-devices F2: the battery badge beside the sensor dots. */
 class SensorBatteryTest {
     @Test
-    fun `the voltage map is the linear one WitmotionClient always used`() {
+    fun `the voltage map follows a single-cell Li-ion curve, interpolated between its points`() {
         assertEquals(0, SensorBattery.percentFromCentivolts(330))
         assertEquals(0, SensorBattery.percentFromCentivolts(340))
-        assertEquals(42, SensorBattery.percentFromCentivolts(370))
-        assertEquals(100, SensorBattery.percentFromCentivolts(410))
+        assertEquals(10, SensorBattery.percentFromCentivolts(360))
+        assertEquals(18, SensorBattery.percentFromCentivolts(364))
+        assertEquals(30, SensorBattery.percentFromCentivolts(370))
+        assertEquals(50, SensorBattery.percentFromCentivolts(380))
+        assertEquals(90, SensorBattery.percentFromCentivolts(410))
         assertEquals(100, SensorBattery.percentFromCentivolts(420))
+        assertEquals(100, SensorBattery.percentFromCentivolts(430))
+    }
+
+    @Test
+    fun `low warns from 3_64 V down, where the linear map waited for about 3_54 V`() {
+        assertTrue(SensorBattery.isLow(SensorBattery.percentFromCentivolts(364)))
+        assertFalse(SensorBattery.isLow(SensorBattery.percentFromCentivolts(365)))
+        // The old linear 3.4-4.1 V map read 3.60 V as 28%, not low.
+        assertTrue(SensorBattery.isLow(SensorBattery.percentFromCentivolts(360)))
+    }
+
+    @Test
+    fun `the curve never falls as the voltage rises`() {
+        val pcts = (300..440).map { SensorBattery.percentFromCentivolts(it) }
+        assertEquals(pcts.sorted(), pcts)
     }
 
     @Test
