@@ -869,6 +869,7 @@ abstract class AppDatabase : RoomDatabase() {
                         // point that proves a restored database opens. A
                         // restore never verified here is undone next launch.
                         override fun onOpen(db: SupportSQLiteDatabase) {
+                            checkpoint(db)
                             if (!restore.markOpened()) {
                                 Log.w(TAG, "a restored database opened but its journal stayed; next launch undoes it")
                             }
@@ -876,6 +877,34 @@ abstract class AppDatabase : RoomDatabase() {
                     },
                 )
                 .build()
+        }
+
+        /**
+         * Copy the write-ahead log into the main file and empty it, once per
+         * open. UX review 2026-11-06, data-layer F1.
+         *
+         * A migration's `user_version` bump sits in the `-wal` until a
+         * checkpoint, and this app never closes its database, so the main
+         * file's header can read the OLD version for several sessions after an
+         * upgrade (#113's measurement, in [DatabaseRescue.storedVersion]).
+         * Builds before 0.2.0 read only the main file's header when deciding
+         * whether to move a newer database aside, so a rollback to one of them
+         * inside that window decided "open" and Room then threw "no migration
+         * from 21" on every launch instead of showing the rescued card. Run
+         * here, after migrations, the main file says the version Room just
+         * wrote before any rollback can read it.
+         *
+         * Never throws: a checkpoint that cannot run (busy, or not in WAL
+         * mode) leaves things exactly as they were before this existed, and a
+         * failure here must not stop the database opening. Whether a phone
+         * ever reports busy at this point was not observed.
+         */
+        private fun checkpoint(db: SupportSQLiteDatabase) {
+            try {
+                db.query("PRAGMA wal_checkpoint(TRUNCATE)").close()
+            } catch (e: Exception) {
+                Log.w(TAG, "WAL checkpoint at open failed; the main file may lag the log", e)
+            }
         }
 
         /**
