@@ -39,5 +39,5 @@ object RepAnalysisPolicy {
      */
     const val WITHHELD_NOTE: String =
         "A carry is not measured as reps: no velocity, range or power is published for it. " +
-            "The sensor stream is kept with the set."
+            "The sensor data is kept with the set."
 }

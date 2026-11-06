@@ -426,7 +426,7 @@ object JournalRecoveryPolicy {
         RecoveryRefusal.NOT_JOURNALED -> "Recorded before this version, so it cannot be put back into History"
         RecoveryRefusal.TIMED -> "A timed set cannot be put back: its clock never stopped"
         RecoveryRefusal.NOT_REP_BASED -> "Only a rep-based lift can be put back into History"
-        RecoveryRefusal.STREAM_UNREADABLE -> "A sensor stream is damaged, so it cannot be put back"
+        RecoveryRefusal.STREAM_UNREADABLE -> "Some sensor data is damaged, so it cannot be put back"
         RecoveryRefusal.WORK_START_UNKNOWN -> "Its prep never finished on record, so it cannot be put back"
         RecoveryRefusal.NOTHING_TO_COUNT -> "No count of its reps survived, so it cannot be put back"
     }
