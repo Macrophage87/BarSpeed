@@ -747,9 +747,10 @@ private data class PendingSetWrite(
      * every one-sensor set, and non-null when a role was armed and the
      * analysis was not pointed at it -- with an empty sample list where that
      * unit produced nothing, which is the state the repository turns into "no
-     * row, and the declaration still names it", and with its handful of rows
-     * where it delivered too few frames to analyse (#209), which the
-     * repository archives like any other capture.
+     * row, and the declaration still names it", with its handful of rows
+     * where it delivered too few frames to analyse (#209), and since #242 and
+     * #287 with its whole capture where the analysis moved off it for a short
+     * span or for never moving -- each archived like any other capture.
      */
     val sensors: RecordedSensors?,
     val secondary: SecondaryCapture?,
@@ -1043,7 +1044,9 @@ private fun analysedSetOf(p: PendingSetWrite): SetAnalysis = SetAnalyzer.analyze
     // p.exercise.liftDirection() describes them
     // (#247). SensorCapturePolicy.analysedStream moves
     // the analysis onto the partner when the armed
-    // unit delivered too few frames; the geometry it
+    // unit could not stand for the set -- too few
+    // frames, or since #242 and #287 a short span or
+    // a still stream beside a moving partner; the geometry it
     // is handed is the EXERCISE's and, on a cable
     // machine, belongs to the armed unit's mount.
     // Read off the same declaration the row and the
@@ -5498,7 +5501,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 // names the role, the state that makes a flat battery readable
                 // afterwards rather than invisible -- and non-null with the
                 // rows it did send where a unit delivered too few frames to
-                // analyse (#209), which are archived like any other capture.
+                // analyse (#209) or was moved off for a short span or for
+                // never moving (#242, #287), which are archived like any
+                // other capture.
                 secondary = capture.secondary,
                 rating = rating,
                 planName = s.planName.takeIf { !s.adHoc },
