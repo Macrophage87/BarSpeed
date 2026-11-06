@@ -375,6 +375,10 @@
           "const": true,
           "description": "The lifter marked this set not performed. Absent otherwise."
         },
+        "recovered": {
+          "const": true,
+          "description": "This set was written back into History from an interrupted set's capture rather than by the set ending (#100): its end is the last journaled instant, its reps the segmenter's, and it carries no plan targets, side, tempo or rating. Absent on every other set, and on every set recorded before database v21, when nothing could write one."
+        },
         "voidReason": {
           "type": "string",
           "maxLength": 120,

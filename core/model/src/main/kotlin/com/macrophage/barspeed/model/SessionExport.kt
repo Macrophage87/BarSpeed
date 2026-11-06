@@ -3050,6 +3050,32 @@ data class SessionExport(
          *
          * PINNED. `SchemaVelocityLossRegimeContractTest` asserts this entry and
          * the decision for both lifts.
+         *
+         * 1.26 FURTHER ENTRY (#100, recovered set): ADDS ONE KEY.
+         * [SetExport.recovered] is true on a set written back into History
+         * from an interrupted set's capture -- the journal a killed process
+         * left on disk -- rather than by the set ending. Such a set is not
+         * what this document's own description calls the rest of the
+         * session: nothing ended it, so its end is the last instant that
+         * reached the disk; its reps are the segmenter's, because the live
+         * count died with the process; and it carries no plan targets, side,
+         * tempo or effort rating, because none was captured. A set whose own
+         * session had closed sits alone in a session of its own rather than
+         * in the one it was lifted in. OMITTED WHEN FALSE, `added`'s shape.
+         * NOT RETROACTIVE in the sense that matters: read from database v21's
+         * `recovered` column, which is 0 on every row an earlier build wrote,
+         * and nothing before v21 could write a recovered row, so a missing
+         * key is the truth on every older set. The raw archive's `meta.json`
+         * carries the same flag per set. Under 1.26 and not a mint: 1.26 is
+         * unreleased. ADDITIVE for a reader that ignores unknown keys; the
+         * set object is closed, so a reader validating against an earlier
+         * schema rejects the key, as it already rejects a 1.26 document on
+         * its version string. Nothing is renamed or retyped; the column is
+         * `DATABASE_VERSION` 21's, and the plan schema is untouched.
+         * `SchemaRecoveredContractTest` pins this entry and both
+         * declarations; `SchemaExportKeySetContractTest` pins the set's keys
+         * to [SetExport]; `SessionExportRecoveredTest` in `:core:data` is the
+         * export differential.
          */
         const val SCHEMA_VERSION = "1.26"
 
@@ -4217,6 +4243,24 @@ data class SetExport(
      * two builds, and one absent set leaves no minimum that is not a guess.
      */
     val analysisSchemaVersion: String? = null,
+    /**
+     * True when this set was written back into History from an interrupted
+     * set's capture rather than by the set ending (1.26, #100).
+     *
+     * A process killed mid-set leaves the set's streams on disk (#42 stage 1),
+     * and the lifter can put them back as a row. That row is not an ordinary
+     * set and is never published as one: nothing ended it, so its end is the
+     * last instant that reached the disk; its reps are the batch segmenter's,
+     * because the live count died with the process; and it carries no plan
+     * targets, side, tempo or effort rating, because none was captured. If
+     * the session it was lifted in had closed, it sits in a single-set
+     * session of its own -- a closed session's summary is never rewritten.
+     *
+     * OMITTED WHEN FALSE, [added]'s shape. A missing key is the truth on every
+     * older document: before database v21 nothing could write a recovered
+     * row, and the column reads 0 on every row an earlier build wrote.
+     */
+    val recovered: Boolean = false,
     /** Always-included summary across reps. */
     val summary: SetSummaryExport,
 ) {

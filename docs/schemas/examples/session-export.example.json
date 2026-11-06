@@ -106,8 +106,7 @@
           "reps": 5,
           "repsSource": "manual",
           "repsManual": true,
-          "plannedReps": 5,
-          "rest_s": 180,
+          "recovered": true,
           "sensors": {
             "count": 1,
             "expected": [],
