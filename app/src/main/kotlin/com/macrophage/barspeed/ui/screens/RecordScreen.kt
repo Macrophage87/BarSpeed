@@ -724,10 +724,9 @@ private fun PreviewStage(state: RecordState, viewModel: RecordViewModel) {
     ) {
         Text("START", fontWeight = FontWeight.Bold)
     }
-    // Not offered on a continued session (owner's ruling 2026-11-06): its row
-    // takes only its own plan session, and this screen is reached there only
-    // when the body-weight prompt is up. Another session is "Start a new one".
-    if (state.resumedAtOrderIdx == null) {
+    // Withheld only while a continued session's body-weight prompt is up
+    // (owner's ruling 2026-11-06): that row takes only its own plan session.
+    if (state.resumedAtOrderIdx == null || state.pendingBodyWeightSession == null) {
         Spacer(Modifier.height(8.dp))
         OutlinedButton(onClick = viewModel::abandonSetup, modifier = Modifier.fillMaxWidth()) {
             Text("Choose another session")
