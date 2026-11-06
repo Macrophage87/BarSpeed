@@ -203,10 +203,9 @@ class VoiceCounter(context: Context) {
      * init, to tell NO_ENGINE from FAILED; the manifest's `<queries>` entry
      * is what lets this see engines from API 30.
      */
-    private fun hasEngine(): Boolean =
-        appContext.packageManager
-            .queryIntentServices(Intent(TextToSpeech.Engine.INTENT_ACTION_TTS_SERVICE), 0)
-            .isNotEmpty()
+    private fun hasEngine(): Boolean = appContext.packageManager
+        .queryIntentServices(Intent(TextToSpeech.Engine.INTENT_ACTION_TTS_SERVICE), 0)
+        .isNotEmpty()
 
     private fun finished(id: String?) = synchronized(lock) { move(VoiceFocusPolicy.finished(focus, id)) }
 
