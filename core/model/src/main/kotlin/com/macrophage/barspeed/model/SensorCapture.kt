@@ -909,11 +909,13 @@ object SensorCapturePolicy {
      * Nothing in `RawStreamEntity`, `SetRecordEntity` or the archive stores the
      * address a capture came from, so a lifter who re-labels the two units
      * between recording a session and exporting it gets the NEW labelling
-     * published over the OLD capture, and no key dates it. Relabelling is a
-     * deliberate act on the Devices screen -- it is not moved by pairing, by
-     * forgetting, or by which unit happens to connect first -- so the ordinary
-     * session is labelled correctly; the exposure is real all the same and is
-     * why this is derived rather than claimed as recorded.
+     * published over the OLD capture, and no key dates it. Labels are given
+     * and moved on the Devices screen -- by a tap, and by
+     * [SensorLabelPolicy.autoAssign], which labels a pair with a label missing
+     * and relabels the later-paired of two units carrying one label. They are
+     * not moved by forgetting or by which unit happens to connect first, so
+     * the ordinary session is labelled correctly; the exposure is real all the
+     * same and is why this is derived rather than claimed as recorded.
      */
     fun unitAddresses(expected: List<SensorRole>, roleByAddress: Map<String, SensorRole>): Map<SensorRole, String> {
         val addressesByRole = roleByAddress.entries.groupBy({ it.value }, { it.key })

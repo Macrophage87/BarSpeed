@@ -12,9 +12,17 @@ package com.macrophage.barspeed.model
  *
  * Both functions return the label WRITES to make -- address to new label --
  * and never the whole map, so the caller writes exactly what changed and an
- * empty map means "write nothing". A stale label on a forgotten unit is never
- * read or written: only [pairedImuAddresses] are considered, for the reason
- * [DualSensorSetup.rolesLine] gives.
+ * empty map means "write nothing". A label on a unit that is not paired is
+ * never read or written: only [pairedImuAddresses] are considered, for the
+ * reason [DualSensorSetup.rolesLine] gives. A unit forgotten and paired again
+ * comes back with the label it had, which is why [autoAssign] resolves a
+ * collision rather than leaving it.
+ *
+ * Forgetting a unit deliberately does NOT clear its label. The export's
+ * `unitAddresses` reads the whole label store and withholds a role two
+ * addresses claim; a forgotten unit's label is what keeps a replacement given
+ * the same letter from being published as the unit that recorded the older
+ * sessions (`SensorCapturePolicy.unitAddresses`).
  */
 object SensorLabelPolicy {
     /**
@@ -23,10 +31,16 @@ object SensorLabelPolicy {
      * `DeviceRegistry`) gets A and the second B; where one already carries a
      * label the other gets the one left over.
      *
-     * Writes nothing for one unit (one sensor needs no label), for three or
-     * more (which two the lifter means is not this function's guess), and
-     * for two that already collide (that is the lifter's earlier choice and
-     * a tap on either chip resolves it, see [onChipTap]).
+     * Two that collide are resolved the same way: the first paired keeps
+     * its label and the second takes the other (whole-release review). No
+     * tap makes a collision ([onChipTap] never leaves one), so one is always
+     * a stale label -- a unit forgotten and re-paired with the label it had,
+     * beside a unit given that label in the meantime. Re-pairing puts the
+     * unit last in `DeviceRegistry`, so it is the one relabelled. Left
+     * alone, the two read as colliding and a set recorded one stream.
+     *
+     * Writes nothing for one unit (one sensor needs no label) or for three
+     * or more (which two the lifter means is not this function's guess).
      */
     fun autoAssign(pairedImuAddresses: List<String>, roleByAddress: Map<String, SensorRole>): Map<String, SensorRole> {
         val paired = pairedImuAddresses.distinct()
@@ -35,6 +49,7 @@ object SensorLabelPolicy {
         val a = roleByAddress[first]
         val b = roleByAddress[second]
         return when {
+            a != null && a == b -> mapOf(second to other(a))
             a != null && b != null -> emptyMap()
             a != null -> mapOf(second to other(a))
             b != null -> mapOf(first to other(b))

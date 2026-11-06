@@ -3268,7 +3268,26 @@ data class SessionExport(
          * untouched. `SchemaExerciseInferenceContractTest` pins this entry;
          * `ExerciseIdInferenceCharacterizationTest` pins the answers.
          *
-         * FURTHER 1.27 ENTRY (tempo notation):`tempoCompliance.prescribed`
+         * FURTHER 1.27 ENTRY (sensor labels) NO KEY CHANGES: the app gives
+         * the two bar sensors their a/b labels itself where one is missing
+         * (UX review 2026-11-06, ble-devices F3), and relabels the
+         * later-paired of two units that carry the same label -- a unit
+         * forgotten and re-paired with the label it had -- where earlier
+         * builds left both on one label and recorded one stream
+         * (whole-release review). [SensorLabelPolicy.autoAssign] is the
+         * decision. `setSensors.unitAddresses` is read from the labels when a
+         * document is written, so a relabelled unit's address moves to its
+         * new role in every document written after the relabel, older
+         * sessions included, as a tap on a label always did; its description
+         * now says labels can move without a tap. Forgetting a device still
+         * does not clear its label, so a role a forgotten unit and its
+         * replacement both claim still has no entry. Under 1.27 and not a
+         * mint: 1.27 is unreleased. No key is added, removed, renamed or
+         * retyped, `DATABASE_VERSION` does NOT move, and the plan schema is
+         * untouched. `SchemaExerciseInferenceContractTest` pins this entry's
+         * placement and wording beside the inference entry.
+         *
+         * FURTHER 1.27 ENTRY (tempo notation): `tempoCompliance.prescribed`
          * is written so it parses back (core-model review 2026-11-06, F5).
          * `Tempo.notation()` is its sole producer (`Exporters.kt`). A tempo
          * with any component that is not a whole 0-9 -- a fraction such as
@@ -4800,10 +4819,13 @@ data class SetSensorsExport(
      * pairing store read while the document is being written. Re-labelling the
      * two units between recording a session and exporting it therefore
      * publishes the NEW labelling over the OLD capture, and nothing here dates
-     * it. Labels move only by a deliberate tap on the Devices screen -- not by
-     * pairing, not by forgetting, not by which unit connects first -- so the
-     * ordinary session is labelled correctly; the exposure is why the published
-     * description says derived rather than recorded.
+     * it. Labels are given and moved on the Devices screen, and from 1.27 not
+     * only by a tap: [SensorLabelPolicy.autoAssign] labels two paired units
+     * with a label missing, and relabels the later-paired of two that carry
+     * one label. Forgetting does not clear a label and which unit connects
+     * first moves nothing, so the ordinary session is labelled correctly; the
+     * exposure is why the published description says derived rather than
+     * recorded.
      *
      * ONLY THE ROLES THE SET ARMED, which is [expected], and never more. A
      * pairing store holds labels for units a given set never used, so an entry

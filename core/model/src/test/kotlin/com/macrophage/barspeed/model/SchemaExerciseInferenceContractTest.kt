@@ -40,15 +40,23 @@ class SchemaExerciseInferenceContractTest {
     private val tempoMarker = "FURTHER 1.27 ENTRY (tempo notation)"
     private val mint = "1.27 (sensor-counted target cue)"
 
-    private fun jsonEntry(): String = versionLog().substringAfter(marker).substringBefore(tempoMarker)
+    private val labelMarker = "FURTHER 1.27 ENTRY (sensor labels)"
+    private val nextEntry = "FURTHER 1.27 ENTRY ("
 
-    /** The KDoc above `SCHEMA_VERSION`, with the comment's line prefixes folded into single spaces. */
-    private fun kdocEntry(): String {
+    private fun jsonEntry(): String = versionLog().substringAfter(marker).substringBefore(nextEntry)
+
+    /** `SessionExport.kt`'s source, with the comment's line prefixes folded into single spaces. */
+    private fun kdoc(): String {
         val source = File("src/main/kotlin/com/macrophage/barspeed/model/SessionExport.kt")
         check(source.isFile) { "SessionExport.kt not found from ${File(".").absolutePath}" }
-        val folded = source.readText().replace(Regex("\\s*\\n\\s*\\*\\s?"), " ").replace(Regex("\\s+"), " ")
+        return source.readText().replace(Regex("\\s*\\n\\s*\\*\\s?"), " ").replace(Regex("\\s+"), " ")
+    }
+
+    /** The inference entry in the KDoc above `SCHEMA_VERSION`. */
+    private fun kdocEntry(): String {
+        val folded = kdoc()
         assertEquals(1, Regex(Regex.escape(marker)).findAll(folded).count(), "the KDoc entry is not filed once")
-        return folded.substringAfter(marker).substringBefore(tempoMarker)
+        return folded.substringAfter(marker).substringBefore(nextEntry)
     }
 
     @Test
@@ -97,5 +105,29 @@ class SchemaExerciseInferenceContractTest {
             assertTrue(id in json && id in kdoc, "$id is not named in both statements")
             assertEquals(ExerciseKind.DYNAMIC, ExerciseDef.inferKind(id), id)
         }
+    }
+
+    /**
+     * The sensor-label entry (whole-release review): auto-labelling and the
+     * collision fix move `unitAddresses` for a relabelled unit, so the log
+     * says so, once in each statement and before tempo notation, and the
+     * key's description no longer claims pairing never moves a label.
+     */
+    @Test
+    fun `the sensor-label entry is filed before tempo notation and unitAddresses says labels can move`() {
+        listOf("schema" to versionLog(), "KDoc" to kdoc()).forEach { (where, text) ->
+            assertEquals(1, Regex(Regex.escape(labelMarker)).findAll(text).count(), "$where: not filed once")
+            assertTrue(text.indexOf(labelMarker) < text.indexOf(tempoMarker), "$where: filed after tempo notation")
+            val entry = text.substringAfter(labelMarker).substringBefore(nextEntry)
+            assertTrue(entry.startsWith(" NO KEY CHANGES"), "$where: ${entry.take(80)}")
+            assertTrue("unitAddresses" in entry, "$where does not name the key whose values move")
+            assertTrue("does not clear its label" in entry, "$where does not say forgetting keeps the label")
+            assertTrue("DATABASE_VERSION`? does NOT move".toRegex() in entry, "$where does not say the database stays")
+        }
+        val units = schema.getValue("\$defs").jsonObject.getValue("setSensors").jsonObject
+            .getValue("properties").jsonObject.getValue("unitAddresses").jsonObject
+            .getValue("description").jsonPrimitive.content
+        assertTrue("not by pairing" !in units, "unitAddresses still says pairing never moves a label")
+        assertTrue("Forgetting a device does not clear its label" in units, units)
     }
 }
