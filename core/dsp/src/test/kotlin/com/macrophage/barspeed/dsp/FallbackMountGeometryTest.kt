@@ -334,7 +334,7 @@ class FallbackMountGeometryTest {
         assertNull(refused.velocityLossPct, "velocity loss survived the refusal")
         assertNull(refused.tempoCompliance, "the tempo was graded against a stroke nothing identified")
         assertEquals(
-            listOf("Analysis moved to the other sensor, whose mounting is not declared — no figures for this set."),
+            listOf(SetAnalyzer.MOUNT_NOT_DECLARED_VERDICT),
             refused.verdicts,
             "the lifter is told nothing about why the set is blank",
         )

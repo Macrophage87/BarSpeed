@@ -1190,7 +1190,8 @@ object SetAnalyzer {
      * rendered either screen on a device.
      */
     const val MOUNT_NOT_DECLARED_VERDICT =
-        "Analysis moved to the other sensor, whose mounting is not declared — no figures for this set."
+        "No speed figures for this set: the main sensor didn't record it fully, and the " +
+            "other one's mounting isn't known. The rep count still stands."
 }
 
 /** Deterministic rule-based coaching verdicts shown on the rest screen. */
@@ -1203,7 +1204,7 @@ object CoachingRules {
     ): List<String> {
         val out = mutableListOf<String>()
         if (reps.isEmpty()) {
-            out += "No reps detected — check sensor placement and that the set was recorded."
+            out += "No reps detected in the sensor data. Check the sensor is switched on and clipped on firmly."
             return out
         }
         if (targets.countedReps != null && targets.countedReps != reps.size) {
