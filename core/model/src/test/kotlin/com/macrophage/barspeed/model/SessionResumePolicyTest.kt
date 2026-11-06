@@ -227,6 +227,39 @@ class SessionResumePolicyTest {
         assertEquals(listOf(5), SessionResumePolicy.remainingSlots(queue, threeAandTwoB))
     }
 
+    // ---- where "Continue it" lands -------------------------------------------
+
+    /**
+     * Focused review of batch1-resume, finding 1. A plan row with no slot
+     * left, or whose plan session is gone from the active plan, used to be
+     * adopted and dropped on SETUP, where any session could be picked into
+     * it. It is not adopted: the offer goes as "Start a new one" would.
+     */
+    @Test
+    fun `a plan row with nothing left to do, or no session to do it in, is not continued`() {
+        assertEquals(ResumeLanding.NEW_SESSION, SessionResumePolicy.landing("Lower A", inActivePlan = true, 0))
+        assertEquals(ResumeLanding.NEW_SESSION, SessionResumePolicy.landing("Lower A", inActivePlan = false, 0))
+        assertEquals(ResumeLanding.NEW_SESSION, SessionResumePolicy.landing("Lower A", inActivePlan = false, 3))
+    }
+
+    @Test
+    fun `a plan row with slots left continues in its own session, an ad-hoc row as ad hoc`() {
+        assertEquals(ResumeLanding.PLAN_SESSION, SessionResumePolicy.landing("Lower A", inActivePlan = true, 3))
+        assertEquals(ResumeLanding.AD_HOC, SessionResumePolicy.landing(null, inActivePlan = false, 0))
+    }
+
+    @Test
+    fun `the setup caption says why the row was not continued`() {
+        assertEquals(
+            "Every set of Lower A is already saved. Anything you start now is a new session.",
+            SessionResumePolicy.newSessionNotice("Lower A", inActivePlan = true),
+        )
+        assertEquals(
+            "Lower A is no longer in your plan. Anything you start now is a new session.",
+            SessionResumePolicy.newSessionNotice("Lower A", inActivePlan = false),
+        )
+    }
+
     /** Every slot recorded leaves nothing; more rows than slots is not an error. */
     @Test
     fun `a fully recorded session leaves nothing`() {

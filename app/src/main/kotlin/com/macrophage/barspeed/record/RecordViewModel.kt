@@ -88,6 +88,7 @@ import com.macrophage.barspeed.model.ResolvedGeometry
 import com.macrophage.barspeed.model.RestClockPolicy
 import com.macrophage.barspeed.model.RestControl
 import com.macrophage.barspeed.model.RestControlPolicy
+import com.macrophage.barspeed.model.ResumeLanding
 import com.macrophage.barspeed.model.SecondaryCapture
 import com.macrophage.barspeed.model.SensorCapturePolicy
 import com.macrophage.barspeed.model.SensorRole
@@ -3137,11 +3138,10 @@ private fun CoroutineScope.offerResume(
  * after its last (#48). [continueOffered] is the only caller.
  *
  * On its own this leaves the stage at SETUP, which is where an ad-hoc row
- * continues, and where a plan row falls back to when its own plan session is
- * not in the active plan any more or every one of its slots is already
- * recorded: the lifter chooses there, and the set recorded next goes into the
+ * continues: the lifter chooses there, and the set recorded next goes into the
  * adopted row because [RecordState.sessionId] is already set -- the first-set
- * path is the only one that opens a row, and it is not taken.
+ * path is the only one that opens a row, and it is not taken. A plan row is
+ * never left here; see [SessionResumePolicy.landing].
  *
  * THE SKIPPED-SET LIST, named rather than designed away. A continued
  * session's close writes only the skips taken on this visit
@@ -3177,6 +3177,11 @@ private fun resumedState(s: RecordState): RecordState {
  * (and modal) meanwhile: nothing else can be picked in that window, and a
  * second tap on Continue, or a Start a new one, finds a different offer and
  * this one gives way.
+ *
+ * A plan row with no slot left, or whose session is gone from the active
+ * plan, is not adopted (focused review of batch1-resume, finding 1): adopted,
+ * it would sit on SETUP open to any session. The offer is cleared as
+ * "Start a new one" clears it and [RecordState.resumeNotice] says why.
  */
 private fun CoroutineScope.continueOffered(
     repository: SessionRepository,
@@ -3187,13 +3192,20 @@ private fun CoroutineScope.continueOffered(
     val planSession = offer.planSessionName?.let { name -> state.value.planSessions.firstOrNull { it.name == name } }
     val remaining = planSession?.let { resumedQueue(repository.flattenPlan(it), offer.storedSets) }.orEmpty()
     if (state.value.resumeOffer != offer) return@launch
-    val adopted = resumedState(state.value)
-    if (planSession == null || remaining.isEmpty()) {
-        state.value = adopted
-        return@launch
+    when (SessionResumePolicy.landing(offer.planSessionName, planSession != null, remaining.size)) {
+        ResumeLanding.AD_HOC -> state.value = resumedState(state.value)
+        // Not adopted: the offer goes exactly as "Start a new one" takes it,
+        // the earlier row untouched, and SETUP says why.
+        ResumeLanding.NEW_SESSION -> state.value = state.value.copy(
+            resumeOffer = null,
+            resumeNotice = offer.planSessionName?.let { SessionResumePolicy.newSessionNotice(it, planSession != null) },
+        )
+        ResumeLanding.PLAN_SESSION -> {
+            val session = planSession ?: return@launch
+            state.value = previewState(resumedState(state.value), session, remaining)
+            askOrStartSession(state, session, System.currentTimeMillis(), onStart)
+        }
     }
-    state.value = previewState(adopted, planSession, remaining)
-    askOrStartSession(state, planSession, System.currentTimeMillis(), onStart)
 }
 
 /**
@@ -3816,6 +3828,11 @@ data class RecordState(
      * whether there is one to ask about.
      */
     val resumeOffer: LatestSession? = null,
+    /**
+     * The SETUP caption after "Continue it" found a plan row it could not
+     * continue ([SessionResumePolicy.newSessionNotice]), or null.
+     */
+    val resumeNotice: String? = null,
     /**
      * The `orderIdx` this visit's first set takes, where the session was
      * continued from an earlier visit (#48), or null where it was started on

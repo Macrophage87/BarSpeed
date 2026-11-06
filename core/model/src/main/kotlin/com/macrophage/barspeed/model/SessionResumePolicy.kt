@@ -33,6 +33,18 @@ data class LatestSession(
  */
 data class StoredSet(val exerciseId: String, val added: Boolean, val voided: Boolean)
 
+/** Where "Continue it" takes a row; see [SessionResumePolicy.landing]. */
+enum class ResumeLanding {
+    /** The row's own plan session, at the first slot it holds no set for. */
+    PLAN_SESSION,
+
+    /** SETUP with the row adopted, its next set numbered after its last. */
+    AD_HOC,
+
+    /** Not adopted: the row is left as it is and the next set starts a new one. */
+    NEW_SESSION,
+}
+
 /**
  * Whether walking back into Record should ask "Continue this session?" (#48).
  *
@@ -153,6 +165,33 @@ object SessionResumePolicy {
             if (left > 0) done[queueExerciseIds[i]] = left - 1
             left == 0
         }
+    }
+
+    /**
+     * Where "Continue it" takes a row (owner's ruling 2026-11-06; focused
+     * review of batch1-resume, finding 1).
+     *
+     * [planSessionName] is the row's own plan session, null on an ad-hoc row;
+     * [inActivePlan] whether the active plan still has a session of that
+     * name; [slotsLeft] how many of its slots [remainingSlots] leaves.
+     *
+     * A plan row that cannot be continued where it was -- every slot already
+     * recorded, or its session gone from the plan -- is not adopted at all:
+     * adopting it would leave the lifter on SETUP free to pick any session
+     * into it, which the ruling rules out. It is left as "Start a new one"
+     * leaves it, and [newSessionNotice] says so.
+     */
+    fun landing(planSessionName: String?, inActivePlan: Boolean, slotsLeft: Int): ResumeLanding = when {
+        planSessionName == null -> ResumeLanding.AD_HOC
+        !inActivePlan || slotsLeft == 0 -> ResumeLanding.NEW_SESSION
+        else -> ResumeLanding.PLAN_SESSION
+    }
+
+    /** The SETUP caption after a [ResumeLanding.NEW_SESSION] landing, for the row's session [name]. */
+    fun newSessionNotice(name: String, inActivePlan: Boolean): String = if (inActivePlan) {
+        "Every set of $name is already saved. Anything you start now is a new session."
+    } else {
+        "$name is no longer in your plan. Anything you start now is a new session."
     }
 
     /** The prompt's title. */

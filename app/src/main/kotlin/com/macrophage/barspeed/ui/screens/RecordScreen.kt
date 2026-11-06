@@ -877,6 +877,12 @@ private fun PreviewBlockCard(block: PreviewBlock, unit: WeightUnit) {
 @Composable
 private fun SetupStage(state: RecordState, viewModel: RecordViewModel) {
     state.resumeOffer?.let { ResumeSessionDialog(it, viewModel) }
+    // Why "Continue it" started nothing: the row had no set left to do, or its
+    // session is gone from the plan (SessionResumePolicy.landing).
+    state.resumeNotice?.let {
+        SectionCaption(it, color = BarColors.Amber)
+        Spacer(Modifier.height(8.dp))
+    }
     if (!state.imuConnected) {
         // The permission banner replaces this card's advice rather than sitting
         // beside it. Since #262 the card is the whole of what a missing sensor
