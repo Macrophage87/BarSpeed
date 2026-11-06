@@ -226,17 +226,6 @@ object RestControlPolicy {
     }
 
     /**
-     * Which of [drawn] carries the primary emphasis.
-     *
-     * Starting work outranks ending it wherever both are offered: the rest
-     * screen exists to get the lifter back under the bar, and the finish has
-     * been the quiet control beside it since that screen was built. Below
-     * that the order is what is left to do about a close -- the rating the
-     * lifter has already asked for, then a close that came back failed, then
-     * the plain finish. A state that draws nothing has no primary rather than
-     * a defaulted one.
-     */
-    /**
      * What the rest screen draws in START's slot, full width under the ring
      * (UX review 2026-11-06, rest F6, F11).
      *
@@ -254,6 +243,17 @@ object RestControlPolicy {
         RestControl.RETRY_FINISH, null -> null
     }
 
+    /**
+     * Which of [drawn] carries the primary emphasis.
+     *
+     * Starting work outranks ending it wherever both are offered: the rest
+     * screen exists to get the lifter back under the bar, and the finish has
+     * been the quiet control beside it since that screen was built. Below
+     * that the order is what is left to do about a close -- the rating the
+     * lifter has already asked for, then a close that came back failed, then
+     * the plain finish. A state that draws nothing has no primary rather than
+     * a defaulted one.
+     */
     private fun primaryOf(drawn: Set<RestControl>): RestControl? = listOf(
         RestControl.START_NEXT_SET,
         RestControl.RATE_SESSION,
