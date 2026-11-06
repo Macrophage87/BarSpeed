@@ -20,27 +20,59 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      # secrets are not usable in step-level `if`; surface via env instead.
-      KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-      PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+      # The tag reaches scripts only through this variable, quoted, never as
+      # ${{ }} text inside a run block: a dispatch input is free text.
+      RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    # Secrets live on the one step that uses each of them, never in job-level
+    # env, so no other step (third-party actions, Gradle plugins) can read them.
     steps:
       - uses: actions/checkout@v7
+
+      - name: Check the release tag
+        run: |
+          set -euo pipefail
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::release tag must look like v1.2.3" >&2
+            exit 1
+          fi
+
+      # Secrets are not usable in step-level `if`; this step reports only
+      # whether each one is set, so later gates read a boolean, not the secret.
+      - name: Check which secrets are configured
+        id: secrets
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          echo "has_keystore=$([ -n "$KEYSTORE_BASE64" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "has_play=$([ -n "$PLAY_SERVICE_ACCOUNT_JSON" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
 
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+
+      # Runs before the keystore exists, so this is an unsigned build: the unit
+      # tests, plus the minified (R8) release build that CI never exercises. A
+      # missing keep rule or a red test stops the release here, before anything
+      # is signed or uploaded to Play.
+      - name: Unit tests and minified release build
+        run: ./gradlew test :app:assembleRelease --stacktrace
 
       - name: Decode signing keystore (if configured)
-        if: ${{ env.KEYSTORE_BASE64 != '' }}
+        if: ${{ steps.secrets.outputs.has_keystore == 'true' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: echo "$KEYSTORE_BASE64" | base64 -d > app/release.keystore
 
       # Google Play takes only an Android App Bundle, never an APK. The same
       # signing config signs both, so the .aab is signed with the key the APK
       # has always used; Play treats that key as the UPLOAD key and re-signs
-      # with its own app signing key (Play App Signing).
+      # with its own app signing key (Play App Signing). That Play key is a
+      # fresh Google-generated one, so a Play install and a sideloaded GitHub
+      # APK cannot update each other.
       - name: Assemble release APK and bundle
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -53,7 +85,7 @@ jobs:
       - name: Name the APK and bundle for humans
         run: |
           set -euo pipefail
-          version="${{ github.event.inputs.tag || github.ref_name }}"
+          version="$RELEASE_TAG"
           mkdir -p release-artifacts
           cp app/build/outputs/apk/release/app-release.apk "release-artifacts/BarSpeed-${version}.apk"
           cp app/build/outputs/bundle/release/app-release.aab "release-artifacts/BarSpeed-${version}.aab"
@@ -66,7 +98,7 @@ jobs:
       - name: Name the mapping file for humans
         run: |
           set -euo pipefail
-          version="${{ github.event.inputs.tag || github.ref_name }}"
+          version="$RELEASE_TAG"
           mapping="app/build/outputs/mapping/release/mapping.txt"
           if [ ! -f "$mapping" ]; then
             echo "::error::$mapping is missing -- release build did not minify, so no mapping was produced" >&2
@@ -77,9 +109,9 @@ jobs:
           ls -l release-artifacts
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          tag_name: ${{ env.RELEASE_TAG }}
           files: |
             release-artifacts/BarSpeed-*.apk
             release-artifacts/BarSpeed-*.aab
@@ -91,11 +123,12 @@ jobs:
       # secret exists, so a release still publishes to GitHub before Play is
       # set up. Play's API cannot create an app: the first bundle for
       # com.macrophage.barspeed must be uploaded by hand in Play Console, and
-      # every later release uploads here. Pinned by SHA (v1.1.5) because the
-      # step holds the service account key.
+      # every later release uploads here. Play rejects a versionCode it has
+      # already seen, so re-running this job after a successful upload fails
+      # here; cut a new version instead.
       - name: Upload bundle to Play internal testing
-        if: ${{ env.PLAY_SERVICE_ACCOUNT_JSON != '' }}
-        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5
+        if: ${{ steps.secrets.outputs.has_play == 'true' }}
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.macrophage.barspeed
@@ -103,4 +136,9 @@ jobs:
           mappingFile: app/build/outputs/mapping/release/mapping.txt
           track: internal
           status: completed
-          releaseName: ${{ github.event.inputs.tag || github.ref_name }}
+          releaseName: ${{ env.RELEASE_TAG }}
+
+      # The decoded upload key must not outlive the job, whatever failed above.
+      - name: Delete the decoded keystore
+        if: always()
+        run: rm -f app/release.keystore
