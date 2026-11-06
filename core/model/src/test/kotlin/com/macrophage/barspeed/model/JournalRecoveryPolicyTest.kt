@@ -187,8 +187,38 @@ class JournalRecoveryPolicyTest {
 
     @Test
     fun `a capture with no analysable stream and no counted rep is refused`() {
-        assertEquals(RecoveryRefusal.NOTHING_TO_COUNT, refusal(analysable = false))
-        assertNull(refusal(analysable = false, repMarks = 5L))
+        val tallied = facts.copy(counter = RepCounter.MANUAL)
+        assertEquals(RecoveryRefusal.NOTHING_TO_COUNT, refusal(facts = tallied, analysable = false))
+        assertNull(refusal(facts = tallied, analysable = false, repMarks = 5L))
+    }
+
+    /**
+     * An explosive lift is a rep set the analyzer reads on peak velocity
+     * (#100 review round 1, Lens A B4): nothing about it stops a capture
+     * becoming a row, and refusing it narrowed the issue silently.
+     */
+    @Test
+    fun `an explosive lift can be put back`() {
+        val clean = facts.copy(exercise = facts.exercise.copy(kind = ExerciseKind.EXPLOSIVE))
+        assertNull(refusal(facts = clean))
+    }
+
+    /**
+     * The counter the set ran under decides what can count it (#100 review
+     * round 1, Lens B B1). A tally counter that tallied nothing made no
+     * count, whatever the stream says; a sensor-counted set journals no
+     * marks, so only its stream can count it.
+     */
+    @Test
+    fun `only the counter the set ran under can count it`() {
+        assertEquals(
+            RecoveryRefusal.NOTHING_TO_COUNT,
+            refusal(facts = facts.copy(counter = RepCounter.MANUAL), analysable = true, repMarks = 0L),
+        )
+        assertEquals(
+            RecoveryRefusal.NOTHING_TO_COUNT,
+            refusal(facts = facts.copy(counter = RepCounter.SENSOR), analysable = false, repMarks = 5L),
+        )
     }
 
     // ---- the count ----------------------------------------------------------
@@ -196,6 +226,26 @@ class JournalRecoveryPolicyTest {
     @Test
     fun `the sensor's count wins and is not stated`() {
         assertEquals(RecoveredCount(6, stated = false), JournalRecoveryPolicy.count(RepCounter.SENSOR, true, 6, 8))
+    }
+
+    /**
+     * RepCountPolicy.recorded's precedence, which the set's own write applies
+     * (#100 review round 1, Lens B B1): on a set the lifter or the guide
+     * counted, the tally is the stated count, an analysable stream beside it
+     * or not. Only a sensor-counted set takes the segmenter's count.
+     */
+    @Test
+    fun `a tallied set's marks are its stated count beside an analysable stream`() {
+        assertEquals(RecoveredCount(5, stated = true), JournalRecoveryPolicy.count(RepCounter.MANUAL, true, 6, 5))
+        assertEquals(RecoveredCount(6, stated = true), JournalRecoveryPolicy.count(RepCounter.METRONOME, true, 7, 6))
+        assertNull(JournalRecoveryPolicy.count(RepCounter.MANUAL, true, 6, 0))
+    }
+
+    @Test
+    fun `a sensor-counted set is counted by its stream or not at all`() {
+        assertEquals(RecoveredCount(6, stated = false), JournalRecoveryPolicy.count(RepCounter.SENSOR, true, 6, 3))
+        assertNull(JournalRecoveryPolicy.count(RepCounter.SENSOR, false, 0, 3))
+        assertNull(JournalRecoveryPolicy.count(RepCounter.NOBODY, true, 6, 3))
     }
 
     @Test

@@ -97,6 +97,27 @@ class SetJournalRecoveryFactsTest {
     }
 
     /**
+     * Facts this build cannot decode -- a field it requires is missing, or a
+     * nested definition carries a value it does not know -- are dropped to
+     * none, and the capture is still offered (#100 review round 1, Lens A
+     * N7). Before, they failed the whole header, and the directory dropped
+     * off the interrupted-set card: #42 stage 1's capture lost for a fact
+     * only #100 needs.
+     */
+    @Test
+    fun `facts this build cannot decode are dropped to none, not the capture with them`() = runTest {
+        val dir = File(root, "s900/set0-1000").apply { mkdirs() }
+        File(dir, SetJournalStore.HEADER_FILE).writeText(
+            """{"journalVersion":1,"exerciseId":"back_squat","exerciseName":"Back Squat","sessionId":null,""" +
+                """"sessionStartedAtMs":900,"startedAtMs":1000,"orderIdx":0,"imuConnected":true,""" +
+                """"facts":{"exercise":{"id":"back_squat","displayName":"Back Squat"},"loadKg":100.0}}""",
+        )
+        val orphan = store().orphans().single()
+        assertEquals("back_squat", orphan.header.exerciseId)
+        assertNull(orphan.header.facts)
+    }
+
+    /**
      * The window is the stored `prep_window` stream's own format, so the one
      * decoder reads it back and a recovered set is bounded exactly as its own
      * write would have bounded it.

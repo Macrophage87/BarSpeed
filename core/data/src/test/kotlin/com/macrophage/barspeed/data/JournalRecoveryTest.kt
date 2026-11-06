@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.data
 
 import com.macrophage.barspeed.dsp.ImuCsv
+import com.macrophage.barspeed.dsp.RestStart
 import com.macrophage.barspeed.dsp.SetAnalyzer
 import com.macrophage.barspeed.dsp.SetTargets
 import com.macrophage.barspeed.dsp.liftDirection
@@ -14,6 +15,7 @@ import com.macrophage.barspeed.model.RecoveryRefusal
 import com.macrophage.barspeed.model.RepCounter
 import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.model.SetGeometryPolicy
+import com.macrophage.barspeed.model.Tempo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -29,6 +31,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -50,6 +53,13 @@ import kotlin.test.assertTrue
  * measured: the session's `meta.json` records `prepS` 10 and no work-start
  * instant, and nothing below depends on which instant it is beyond its being
  * the one the analysis is handed.
+ *
+ * The set was guided, so its journal would also have held the guide's rep
+ * calls in `reps.csv`. Those are not in the committed fixtures for set 02,
+ * and [guideCalls] takes them from the cue track's `Rep N`, `Last rep` and
+ * `Done` instants: a FIXTURE CHOICE, grounded on set 01 of the same session,
+ * whose committed `-reps.csv` holds exactly those six cue instants and no
+ * other.
  *
  * ## What is and is not pinned
  *
@@ -83,6 +93,12 @@ class JournalRecoveryTest {
     private val cuesText = resource("field-backsquat-4011-6rep-s36-set02-cues.csv")
     private val roleA: List<ImuSample> = ImuCsv.decode(roleAText)
 
+    /** The guide's six calls, as set 01's `-reps.csv` records them: the instants of its count words. */
+    private val guideCalls: List<Long> =
+        CueCsv.decode(cuesText)
+            .filter { it.cue.startsWith("Rep ") || it.cue == "Last rep" || it.cue == "Done" }
+            .map { it.timestampMs }
+
     private val squat = ExerciseDef(id = "back_squat", displayName = "Back Squat")
     private val loadKg = 52.163122551154075
     private val startedAtMs = 1_788_251_947_376L
@@ -98,6 +114,7 @@ class JournalRecoveryTest {
             armedSensors =
             RecordedSensors(count = 2, expected = listOf(SensorRole.B, SensorRole.A), analysed = SensorRole.B),
             counter = RepCounter.METRONOME,
+            tempo = "4011",
         )
 
     private fun header(sessionId: Long? = 7L, facts: JournalSetFacts? = this.facts) = SetJournalHeader(
@@ -119,7 +136,7 @@ class JournalRecoveryTest {
         header: SetJournalHeader = header(),
         prep: Boolean = true,
         roleA: String? = roleAText,
-        marks: List<Long> = emptyList(),
+        marks: List<Long> = guideCalls,
         cues: String = cuesText,
     ): OrphanedSet {
         val store = store()
@@ -261,7 +278,7 @@ class JournalRecoveryTest {
                 roleA,
                 squat.liftDirection(),
                 loadKg,
-                SetTargets(cadenceGuided = true),
+                SetTargets(countedReps = 6, tempo = Tempo.parseOrNull("4011"), cadenceGuided = true),
                 cues = CueCsv.decode(cuesText),
                 workStartedAtMs = window.workStartedAtMs,
                 analysedUnitFellBack = true,
@@ -275,21 +292,98 @@ class JournalRecoveryTest {
 
     /**
      * Marked recovered, and nothing the lifter would have given at set end is
-     * invented: no stated count beside an analysable stream (the sensor counts
-     * reps), no live count, no rating, no plan figures.
+     * invented: no live count, no rating, no plan figures. The guide's count
+     * IS stated, because the guide stated it (#100 review round 1, Lens B B1):
+     * a guided set's own write records its tally as the count, and so does
+     * its recovery. The tempo it ran to is the journaled one.
      */
     @Test
     fun `a recovered set is marked recovered and states nothing nobody gave`() = runTest {
         val set = ready(recovery(FakeSessionDao()).prepare(journaled()))
         assertTrue(set.recovered)
-        assertNull(set.manualReps)
+        assertEquals(6, set.manualReps)
         assertNull(set.liveReps)
         assertNull(set.rpe)
         assertNull(set.plannedReps)
         assertNull(set.plannedLoadKg)
-        assertNull(set.tempo)
+        assertEquals("4011", set.tempo)
         assertEquals(loadKg, set.loadKg)
         assertEquals(startedAtMs, set.startedAtMs)
+    }
+
+    /**
+     * The verify step Lens B wrote for B1: a set the LIFTER counted, an
+     * analysable stream beside it, keeps the lifter's count as the stated
+     * one -- what `RepCountPolicy.recorded` writes for it at set end -- and
+     * the analyzer is handed that count, so "Sensor resolved X of Y" names
+     * the count the row carries.
+     */
+    @Test
+    fun `a lifter's taps are the stated count beside an analysable stream`() = runTest {
+        val tapped = facts.copy(counter = RepCounter.MANUAL, prepCase = PrepCase.NONE, tempo = null)
+        val taps = listOf(1L, 2L, 3L, 4L, 5L).map { startedAtMs + 10_000L + it * 6_000L }
+        val orphan = journaled(header(facts = tapped), prep = false, marks = taps)
+        val set = ready(recovery(FakeSessionDao()).prepare(orphan))
+        assertEquals(5, set.manualReps)
+        assertTrue(set.analysis.reps.isNotEmpty(), "the stream was not analysed")
+        val expected =
+            SetAnalyzer.analyze(
+                roleA,
+                squat.liftDirection(),
+                loadKg,
+                SetTargets(countedReps = 5),
+                cues = CueCsv.decode(cuesText),
+                analysedUnitFellBack = true,
+            )
+        assertEquals(expected, set.analysis)
+    }
+
+    /**
+     * What the frozen slot declared at START goes onto the row exactly as
+     * `endSet` writes it off that slot (#100 review round 1, Lens A B3 and
+     * N8): a planned warm-up is put back as a warm-up, not as a working set
+     * every working-set reader would count.
+     */
+    @Test
+    fun `a planned warm-up is put back as a warm-up`() = runTest {
+        val slotFacts = facts.copy(warmup = true, added = true, plannedSide = "left", plannedPrepS = 10, prepS = 8)
+        val set = ready(recovery(FakeSessionDao()).prepare(journaled(header(facts = slotFacts))))
+        assertTrue(set.warmup, "a planned warm-up was put back as a working set")
+        assertTrue(set.added)
+        assertEquals("left", set.plannedSide)
+        assertEquals(10, set.plannedPrepS)
+        assertEquals(8, set.prepS)
+    }
+
+    /**
+     * The rest runs from the instant the set's own write would start it
+     * (#100 review round 1, Lens A N1): `RestStart.of` over the journaled cue
+     * track and marks, not the last sample. On this guided set that is the
+     * guide's terminal word.
+     */
+    @Test
+    fun `the rest runs from where the set's own write would start it`() = runTest {
+        val set = ready(recovery(FakeSessionDao()).prepare(journaled()))
+        val expected = RestStart.of(CueCsv.decode(cuesText), true, guideCalls, null, set.endedAtMs)
+        assertEquals(expected, set.restStartedAtMs)
+        assertTrue(expected < set.endedAtMs, "the fixture cannot tell the two instants apart")
+    }
+
+    /**
+     * The guide's count is published as the guide's (#100 review round 1,
+     * Lens B B1), end to end through the export writer: a recovered guided
+     * set publishes `metronome`, not `manual`.
+     */
+    @Test
+    fun `a recovered guided set publishes the guide's count as the guide's`() = runTest {
+        val dao = ownSession(endedAtMs = startedAtMs - 30_000L)
+        val repository = SessionRepository(dao, FakeExerciseDao())
+        val recovery = JournalRecovery(repository, store(), nowMs = { now })
+        val outcome = assertIs<RecoveryOutcome.Stored>(recovery.recover(journaled(), writeOutstanding = false))
+        val export = assertNotNull(SessionExporter(repository).buildExport(outcome.sessionId, false))
+        val set = export.exercises.single().sets.single()
+        assertEquals("metronome", set.repsSource)
+        assertEquals(6, set.reps)
     }
 
     /** No app ended the set; its end is the last instant any stream reached the disk. */
