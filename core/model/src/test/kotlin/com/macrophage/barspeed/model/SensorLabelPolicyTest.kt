@@ -26,17 +26,42 @@ class SensorLabelPolicyTest {
     }
 
     @Test
-    fun `nothing is written for one unit, three units, a labelled pair or a collision`() {
+    fun `nothing is written for one unit, three units or a labelled pair`() {
         assertEquals(emptyMap(), SensorLabelPolicy.autoAssign(listOf(x), emptyMap()))
         assertEquals(emptyMap(), SensorLabelPolicy.autoAssign(listOf(x, y, z), emptyMap()))
         assertEquals(
             emptyMap(),
             SensorLabelPolicy.autoAssign(listOf(x, y), mapOf(x to SensorRole.B, y to SensorRole.A)),
         )
+    }
+
+    @Test
+    fun `a collision keeps the earlier-paired unit's label and gives the later one the other`() {
         assertEquals(
-            emptyMap(),
+            mapOf(y to SensorRole.B),
             SensorLabelPolicy.autoAssign(listOf(x, y), mapOf(x to SensorRole.A, y to SensorRole.A)),
         )
+        assertEquals(
+            mapOf(y to SensorRole.A),
+            SensorLabelPolicy.autoAssign(listOf(x, y), mapOf(x to SensorRole.B, y to SensorRole.B)),
+        )
+    }
+
+    /**
+     * Whole-release review: X=A, Y=B; forget Y; pair Z (gets B); forget X;
+     * re-pair Y, which still carried its stale B. Both paired units read B,
+     * `DualSensorSetup` reported the roles colliding and only one stream was
+     * recorded. Re-pairing puts Y last in the registry, so Z keeps B and Y
+     * takes A.
+     */
+    @Test
+    fun `re-pairing a unit whose stale label collides relabels it`() {
+        var roles = mapOf(x to SensorRole.A, y to SensorRole.B)
+        roles = roles + SensorLabelPolicy.autoAssign(listOf(x, z), roles) // Y forgotten, Z paired
+        assertEquals(SensorRole.B, roles[z])
+        roles = roles + SensorLabelPolicy.autoAssign(listOf(z, y), roles) // X forgotten, Y re-paired
+        assertEquals(mapOf(z to SensorRole.B, y to SensorRole.A), roles.filterKeys { it in setOf(z, y) })
+        assertEquals(DualSetupStep.READY, DualSensorSetup.step(listOf(z, y), roles))
     }
 
     @Test
