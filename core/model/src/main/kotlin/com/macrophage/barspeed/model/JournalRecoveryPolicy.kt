@@ -110,18 +110,36 @@ object JournalRecoveryPolicy {
      * whether any recording hold is still held. [alreadyStored] is
      * [alreadyStored]'s answer for this capture.
      *
-     * A SEAM ONLY, for now: every capture goes into a session of its own,
-     * which never touches a closed session and never attaches. The rule that
-     * attaches, waits and refuses a duplicate lands with its differentials.
+     * In order: nothing is decided while a write is outstanding, because it
+     * could be writing this very set or could close the session after the
+     * answer; a capture whose set is already a row is never written again;
+     * the set rejoins its own session only while that session is the one
+     * [SessionResumePolicy.offer] would offer to continue -- open, holding
+     * sets, newest, and left within [SessionResumePolicy.RESUME_WINDOW_MS] --
+     * at the next free position rather than the header's `orderIdx`, which a
+     * set recorded after the kill may hold. Everything else, a closed session
+     * above all, gets a session of its own.
+     *
+     * One boundary with the resume prompt, by construction: the offer is
+     * asked here rather than restated, so the recovery cannot call a session
+     * current that Record would not offer to continue, or the reverse.
      */
-    @Suppress("UnusedParameter")
     fun target(
         headerSessionId: Long?,
         latest: LatestSession?,
         nowMs: Long,
         writeOutstanding: Boolean,
         alreadyStored: Boolean,
-    ): RecoveryTarget = RecoveryTarget.NewSession
+    ): RecoveryTarget {
+        if (writeOutstanding) return RecoveryTarget.Wait
+        if (alreadyStored) return RecoveryTarget.AlreadyStored
+        val current = SessionResumePolicy.offer(latest, nowMs, writeOutstanding = false)
+        return if (headerSessionId != null && current != null && current.sessionId == headerSessionId) {
+            RecoveryTarget.Attach(headerSessionId, current.nextOrderIdx)
+        } else {
+            RecoveryTarget.NewSession
+        }
+    }
 
     /**
      * Whether a stored set row is the set this capture recorded: the same
