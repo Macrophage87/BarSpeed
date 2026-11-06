@@ -367,4 +367,30 @@ object RecordExitPolicy {
      * stays, into "Discard and leave"). Back asks again with the new prompt.
      */
     fun dialogFor(openedFor: ExitPrompt?, now: ExitPrompt): ExitPrompt = if (openedFor == now) now else ExitPrompt.NONE
+
+    /**
+     * Whether the record screen's top-bar sensor dots may open Devices, from
+     * the prompt Back would raise (UX review 2026-11-06, ble-devices F6).
+     *
+     * Opening Devices pushes a screen and keeps Record on the back stack, so
+     * it ends nothing by itself. It is still refused wherever the lifter has
+     * something unfinished in front of him: a set being captured
+     * ([ExitPrompt.SET_IN_PROGRESS], and [ExitPrompt.SET_NOT_STARTED] once a
+     * set has started even with no rep yet), a set write in flight or
+     * failed, and a session close in flight or failed, where the failure is
+     * what this screen has to show. Allowed with nothing at risk and while resting
+     * with the session open, which is the between-sets moment the finding
+     * asks for.
+     */
+    fun mayOpenDevices(prompt: ExitPrompt): Boolean = when (prompt) {
+        ExitPrompt.NONE, ExitPrompt.SESSION_OPEN -> true
+        ExitPrompt.SET_IN_PROGRESS,
+        ExitPrompt.SET_NOT_STARTED,
+        ExitPrompt.SET_SAVING,
+        ExitPrompt.SET_UNSAVED,
+        ExitPrompt.SESSION_CLOSING,
+        ExitPrompt.SESSION_NOT_CLOSED,
+        ExitPrompt.FINAL_REST_UNSAVED,
+        -> false
+    }
 }

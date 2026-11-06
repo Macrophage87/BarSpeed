@@ -506,4 +506,31 @@ class RecordExitPolicyTest {
             assertEquals(ExitPrompt.NONE, RecordExitPolicy.dialogFor(openedFor = null, now = opened))
         }
     }
+
+    /**
+     * The top-bar sensor dots open Devices only where stepping away loses
+     * nothing (UX review 2026-11-06, ble-devices F6): a set being captured, a
+     * set write in flight or failed, and a session close in flight or failed
+     * keep the lifter on Record.
+     */
+    @Test
+    fun `the sensor dots open Devices outside a set and while resting, never during one`() {
+        val open = ExitPrompt.entries.filter { RecordExitPolicy.mayOpenDevices(it) }.toSet()
+        assertEquals(setOf(ExitPrompt.NONE, ExitPrompt.SESSION_OPEN), open)
+    }
+
+    @Test
+    fun `a set in progress keeps the dots inert at every write state`() {
+        for (write in SetWriteState.entries) {
+            val prompt = RecordExitPolicy.promptFor(Stage.IN_SET, write, SessionCloseState.NONE)
+            assertFalse(RecordExitPolicy.mayOpenDevices(prompt), "IN_SET with $write")
+        }
+        for (cancellable in listOf(true, false)) {
+            val prompt =
+                RecordExitPolicy.promptFor(Stage.IN_SET, SetWriteState.NONE, SessionCloseState.NONE, cancellable)
+            assertFalse(RecordExitPolicy.mayOpenDevices(prompt), "IN_SET, cancellable=$cancellable")
+        }
+        val resting = RecordExitPolicy.promptFor(Stage.RESTING, SetWriteState.NONE, SessionCloseState.NONE)
+        assertTrue(RecordExitPolicy.mayOpenDevices(resting))
+    }
 }
