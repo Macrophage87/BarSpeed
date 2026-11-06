@@ -177,6 +177,15 @@ object LastSetRecordPolicy {
      */
     const val WARM_UP = "Warm-up"
 
+    /**
+     * The label on the button that opens the correction popup (UX review
+     * 2026-11-06, rest F5). It read CORRECT, which reads as a verdict on the
+     * set ("this is correct") rather than an action. A sensor miscount is the
+     * commonest fix, so the label names it; a hold's figure is its seconds.
+     * The popup behind it still corrects everything it did before.
+     */
+    fun fixLabel(timed: Boolean): String = if (timed) "Fix time" else "Fix count"
+
     /** The separator every row on this screen already uses between a label and its answer. */
     private const val SEPARATOR = " · "
 }

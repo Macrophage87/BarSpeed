@@ -22,6 +22,9 @@ object PlateMath {
 
     private const val EPSILON = 0.05
 
+    /** The smallest plate this unit loads, in display units: 2.5 lb or 1.25 kg. */
+    fun smallestPlate(unit: WeightUnit): Double = (if (unit == WeightUnit.KG) KG_PLATES else LB_PLATES).last()
+
     /** The bar this unit assumes when the plan declares none: 45 lb or 20 kg. */
     fun defaultBar(unit: WeightUnit): Double = if (unit == WeightUnit.KG) KG_BAR else LB_BAR
 

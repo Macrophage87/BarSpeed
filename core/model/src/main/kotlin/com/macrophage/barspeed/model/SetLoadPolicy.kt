@@ -482,7 +482,10 @@ object SetLoadPolicy {
      * step that always needs a second tap to undo. Named in the DISPLAY unit
      * and converted, so the number on screen moves by a round figure whichever
      * chip the lifter is on -- 2.5 kg renders as "5.5 lb", and a lb-unit
-     * session stepping by that would read as a stutter.
+     * session stepping by that would read as a stutter. Read off
+     * [PlateMath.smallestPlate] as a pair, one per side, since UX review
+     * 2026-11-06 (rest F5), so the correction and the plate breakdown cannot
+     * disagree about the smallest change a bar takes; the figures are the same.
      *
      * NOT SNAPPED to a multiple of itself. A set recorded at 62 kg steps to
      * 64.5, not to 62.5: snapping would move a figure by up to a whole step
@@ -491,7 +494,21 @@ object SetLoadPolicy {
      * the accepted cost of the control being a stepper; an arbitrary-value
      * entry box is a bigger change and is not made here.
      */
-    fun correctionStepKg(unit: WeightUnit): Double = unit.toKg(if (unit == WeightUnit.KG) 2.5 else 5.0)
+    fun correctionStepKg(unit: WeightUnit): Double = unit.toKg(2 * PlateMath.smallestPlate(unit))
+
+    /**
+     * The load correction's larger step, in kilograms: one 45 lb or 20 kg
+     * plate's worth (UX review 2026-11-06, rest F5). A wrong big plate was
+     * nine taps of [correctionStepKg] in pounds and eight in kilograms; this is
+     * one. Named in the display unit and converted, for [correctionStepKg]'s
+     * reason. Not snapped either, and floored the same way, because it goes
+     * through [correctedAddedKg] like the fine step.
+     */
+    fun correctionBigStepKg(unit: WeightUnit): Double = unit.toKg(if (unit == WeightUnit.KG) 20.0 else 45.0)
+
+    /** What the larger step's buttons read: "-45 lb" / "+45 lb", "-20 kg" / "+20 kg". */
+    fun correctionBigStepLabel(unit: WeightUnit, up: Boolean): String =
+        (if (up) "+" else "\u2212") + unit.format(correctionBigStepKg(unit))
 
     /**
      * The ADDED load the finished set stands at after one tap of the
