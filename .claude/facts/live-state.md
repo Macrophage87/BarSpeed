@@ -39,7 +39,7 @@ read live rather than quoted. There is still **no review requirement**, and a re
 (e199119) reached `main` before `enforce_admins` was turned on. GitHub is a partial backstop
 now, not none; this loop is still the primary gate.
 
-**`Build, lint, test` is a four-way contract** — `ci.yml:14` (`jobs.build.name`), both
+**`Build, lint, test` is a four-way contract** — `ci.yml:17` (`jobs.build.name`), both
 `scripts/protect-branch.ps1` and `scripts/protect-branch.sh`, and the live required-status
 context on `main`. Renaming the CI job silently disables the only automated gate this repo has,
 and nothing verifies the coupling: neither script is invoked by any workflow. Treat the literal
@@ -83,7 +83,7 @@ rebased without asking each round. The boundary does not widen by inference:
 ## 3. Reading CI — never infer anything from the NUMBER of runs
 
 `ci.yml` fires on `push` (for `main` and `claude/**`) **and** on `pull_request`, and
-`concurrency: ci-${{ github.ref }}` with `cancel-in-progress: true` (`ci.yml:8-10`) means a
+`concurrency: ci-${{ github.ref }}` with `cancel-in-progress: true` (`ci.yml:11-13`) means a
 second push cancels the first push's in-flight run outright. So one SHA can carry one, two or
 three runs for reasons that have nothing to do with which refs it lives on, and a cancelled run
 reports `conclusion: cancelled`, which is neither pending nor pass.
@@ -152,7 +152,7 @@ will reach for), `end_of_line = lf`.
 Write every total as `<N>, measured at <40-char SHA> by <command>`. Bare numbers go stale on
 every rebase and this entry is the proof, now three times over.
 
-**CI's command is unrestricted `./gradlew test`** (`ci.yml:31`). That is the number that matters.
+**CI's command is unrestricted `./gradlew test`** (`ci.yml:34`). That is the number that matters.
 `-PjvmOnly test` is a faster subset that drops `:app`, `:core:ble` and `:core:data` from the
 build graph entirely (`settings.gradle.kts:27`), so it omits `:core:data`'s real, executed test
 runs — not merely uncompiled sources.
@@ -350,7 +350,7 @@ toolchain" error as a missing JDK, never a build-file defect.
 ```
 export JAVA_HOME="/c/Program Files/Eclipse Adoptium/jdk-21.0.12.8-hotspot"
 export ANDROID_HOME="$HOME/AppData/Local/Android/Sdk"
-./gradlew test                       # CI's command (ci.yml:31), all 7 modules -- re-measure, name your SHA
+./gradlew test                       # CI's command (ci.yml:34), all 7 modules -- re-measure, name your SHA
 ./gradlew -PjvmOnly test             # faster subset; drops :app, :core:ble, :core:data
 ./gradlew ktlintCheck detekt         # unrestricted, all 7 -- this is what CI runs FIRST
 ./gradlew :app:lintDebug
@@ -483,7 +483,7 @@ definition; do not restate it.
 
 Two constraints belong with it:
 
-- **Push c2 and let its CI run complete before pushing c3.** `ci.yml:8-10` sets
+- **Push c2 and let its CI run complete before pushing c3.** `ci.yml:11-13` sets
   `cancel-in-progress: true`, so pushing c3 cancels c2's in-flight run outright and the red is
   destroyed rather than merely superseded.
 - **c3's "touches no `docs/schemas/`" rule has one carve-out.** A *deliberate* contract change is
