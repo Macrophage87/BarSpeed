@@ -4,5 +4,6 @@
     <string name="notification_channel_recording">Recording</string>
     <string name="recording_notification_title">Recording session</string>
     <string name="recording_notification_text">Tracking bar speed and heart rate</string>
+    <string name="recording_notification_text_no_hr">Tracking bar speed</string>
     <string name="fgs_special_use_subtype">Keeps a lifting set recording to completion when the barbell sensor permission has been denied</string>
 </resources>

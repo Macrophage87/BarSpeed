@@ -14,6 +14,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.macrophage.barspeed.model.BlePermissionPolicy
+import com.macrophage.barspeed.model.ConnectionState
 import com.macrophage.barspeed.model.FgsTypeChoice
 import com.macrophage.barspeed.model.ForegroundStartFailure
 import com.macrophage.barspeed.model.ForegroundStartPolicy
@@ -170,6 +171,19 @@ class RecordingService : Service() {
         ContextCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_CONNECT) ==
             PackageManager.PERMISSION_GRANTED
 
+    /**
+     * Names heart rate only while a strap is connected. The text said "bar speed
+     * and heart rate" on every session, strap or none (UX review 2026-11-06,
+     * copy F11). Read when the notification is built, which is on every
+     * `beginSet` (see [onStartCommand]), so it follows the strap set by set.
+     */
+    private fun notificationText(): Int =
+        if ((application as LiftingApp).container.autoConnect.hrmState.value is ConnectionState.Connected) {
+            R.string.recording_notification_text
+        } else {
+            R.string.recording_notification_text_no_hr
+        }
+
     private fun buildNotification(): Notification {
         val contentIntent =
             PendingIntent.getActivity(
@@ -181,7 +195,7 @@ class RecordingService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher)
             .setContentTitle(getString(R.string.recording_notification_title))
-            .setContentText(getString(R.string.recording_notification_text))
+            .setContentText(getString(notificationText()))
             .setOngoing(true)
             .setContentIntent(contentIntent)
             .build()
