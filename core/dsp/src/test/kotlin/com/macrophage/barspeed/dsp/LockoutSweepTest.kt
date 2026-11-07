@@ -38,19 +38,30 @@ class LockoutSweepTest {
     }
     private val owner = mapOf(1 to 5, 4 to 2, 5 to 3, 6 to 3, 7 to 3)
 
-    private val streams: List<Pair<List<ImuSample>, (Int) -> Int>> by lazy {
+    private class Stream(val name: String, val samples: List<ImuSample>, val score: (Int) -> Int)
+
+    private val streams: List<Stream> by lazy {
         v022.map { path ->
             val set = path.substringAfter("/set").take(2).toInt()
-            load(path) to { n: Int -> owner[set]?.let { abs(n - it) } ?: 0 }
-        } + s46.map { load(it) to { n: Int -> if (n in 4..5) 0 else minOf(abs(n - 4), abs(n - 5)) } } +
-            listOf(load("/field-backsquat-99hz-6rep.csv") to { n: Int -> abs(n - 6) })
+            Stream(path, load(path)) { n: Int -> owner[set]?.let { abs(n - it) } ?: 0 }
+        } + s46.map { path ->
+            Stream(path, load(path)) { n: Int -> if (n in 4..5) 0 else minOf(abs(n - 4), abs(n - 5)) }
+        } + Stream("/field-backsquat-99hz-6rep.csv", load("/field-backsquat-99hz-6rep.csv")) { n: Int -> abs(n - 6) }
     }
 
-    private fun miss(config: DspConfig): Int = streams.sumOf { (samples, score) ->
+    private fun calls(stream: Stream, config: DspConfig): Int {
         val tracker = StreamingSetTracker.forLift(LiftDirection())
         val counter = LockoutRepCounter(LiftDirection(), config)
-        score(samples.count { counter.feed(tracker.feed(it), it.timestampMs) is RepCall.Speak })
+        return stream.samples.count { counter.feed(tracker.feed(it), it.timestampMs) is RepCall.Speak }
     }
+
+    private fun miss(config: DspConfig): Int = streams.sumOf { it.score(calls(it, config)) }
+
+    /** Every stream whose call count [config] moves off the defaults', as default to moved. */
+    private fun moved(config: DspConfig): Map<String, Pair<Int, Int>> = streams
+        .map { Triple(it.name, calls(it, base), calls(it, config)) }
+        .filter { it.second != it.third }
+        .associate { it.first to (it.second to it.third) }
 
     private val base = DspConfig()
 
@@ -63,6 +74,17 @@ class LockoutSweepTest {
             listOf(1, 0, 0, 1, 2),
             listOf(0.18, 0.20, 0.22, 0.24, 0.25).map { miss(base.copy(lockoutMinRise = it)) },
         )
+    }
+
+    /**
+     * WHICH stream each edge of the rise band fails on: 0.18 calls one more
+     * on 2026-11-06 set 5's role b, and 0.24 one fewer on set 7's role a. Any
+     * other stream that moves is named here too.
+     */
+    @Test
+    fun `the rise band's edges fail on a re-rack and a real rep`() {
+        assertEquals(mapOf("/live-squat-v022/set05-imu-b.csv" to (3 to 4)), moved(base.copy(lockoutMinRise = 0.18)))
+        assertEquals(mapOf("/live-squat-v022/set07.csv" to (3 to 2)), moved(base.copy(lockoutMinRise = 0.24)))
     }
 
     @Test

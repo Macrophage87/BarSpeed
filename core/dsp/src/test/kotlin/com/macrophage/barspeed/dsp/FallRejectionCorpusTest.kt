@@ -3,6 +3,7 @@ package com.macrophage.barspeed.dsp
 import com.macrophage.barspeed.model.RepCounter
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * THE CORPUS TABLE for issue #335: every committed IMU stream's live count
@@ -81,14 +82,26 @@ class FallRejectionCorpusTest {
     }
 
     /**
-     * What the APP counts on every committed stream, through
-     * `LiveRepCounters.forCounted(SENSOR)`, is the predicate column above,
-     * stream by stream. A DIFFERENTIAL: red on the eight streams that move
-     * until the app's counter reads [CycleRule.fallRejectsFor].
+     * What the APP counts on every committed stream that is not a squat,
+     * through `LiveRepCounters.forCounted(SENSOR)`, is the predicate column
+     * above, stream by stream.
+     *
+     * A squat is not counted by this rule in the app: since the owner's
+     * 2026-11-06 session it arms [LockoutRepCounter] (`LiftDirection.squat`),
+     * which is asserted here, and whose counts on these streams
+     * `LockoutCorpusTest` and `SquatLiveCountFieldTest` pin.
      */
     @Test
-    fun `the app counts the predicate's column on every committed stream`() {
-        val app = streams.associate { (stream, direction) ->
+    fun `the app counts the predicate's column on every stream but a squat`() {
+        val (squats, others) = streams.partition { (_, direction) -> direction.squat }
+        assertEquals(10 + 5, squats.size, "squat streams: 10 captures and 5 partners")
+        for ((stream, direction) in squats) {
+            assertTrue(
+                LiveRepCounters.forCounted(RepCounter.SENSOR, direction) is LockoutRepCounter,
+                "$stream arms the lockout counter",
+            )
+        }
+        val app = others.associate { (stream, direction) ->
             val counter = LiveRepCounters.forCounted(RepCounter.SENSOR, direction)
                 ?: error("a sensor-counted set must arm a counter")
             val tracker = StreamingSetTracker.forLift(direction)
@@ -96,6 +109,7 @@ class FallRejectionCorpusTest {
                 counter.feed(tracker.feed(sample), sample.timestampMs) is RepCall.Speak
             }
         }
-        assertEquals(rows.associate { it.stream to it.after }, app, "the app's live count, stream by stream")
+        val expected = rows.filter { row -> others.any { it.first == row.stream } }.associate { it.stream to it.after }
+        assertEquals(expected, app, "the app's live count, stream by stream")
     }
 }
