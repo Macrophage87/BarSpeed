@@ -356,4 +356,58 @@ data class DspConfig(
      * removes reach 0.35 and 0.51.
      */
     val cycleDescentMps: Double = 0.9,
+    /**
+     * `LockoutRepCounter`'s bias tracker: the time constant of the running
+     * mean taken off the smoothed drive-frame acceleration before it is
+     * integrated, s.
+     *
+     * The lockout rule reads a leaky velocity, and a leaky integrator settles
+     * a constant acceleration bias b at -b x [lockoutVelocityTauS]: on
+     * field-46's squats that offset made every descent read long and every
+     * ascent short. Removing a running mean first keeps the rise a real rep
+     * makes.
+     *
+     * FITTED AND SWEPT on the squat streams `LockoutSweepTest` names: 1.0
+     * and 1.2 miss nothing there; 0.7 and 1.5 miss one, 2.0 three.
+     */
+    val lockoutBiasTauS: Double = 1.0,
+    /**
+     * `LockoutRepCounter`'s leaky integrator: the time constant the velocity
+     * it integrates decays with, s. Not a measured bar velocity.
+     *
+     * FITTED AND SWEPT (`LockoutSweepTest`). 1.5-2.5 miss nothing; 1.0 and
+     * 3.0 miss one.
+     */
+    val lockoutVelocityTauS: Double = 2.0,
+    /**
+     * The leaky velocity below which the eccentric has begun, m/s, in the
+     * DRIVE frame (negative is the eccentric). SWEPT (`LockoutSweepTest`):
+     * 0.15-0.30 miss nothing, so the squat streams do not constrain it.
+     */
+    val lockoutDescentMps: Double = 0.2,
+    /**
+     * The leaky velocity above which the concentric has begun, after an
+     * eccentric, m/s. FITTED AND SWEPT (`LockoutSweepTest`): 0.15-0.20 miss
+     * nothing; 0.10 misses three, 0.25 one.
+     */
+    val lockoutAscentMps: Double = 0.15,
+    /**
+     * The leaky velocity the concentric must fall back under for the rep to
+     * be at LOCKOUT, m/s: the call is made on that sample. CHOSEN, then
+     * SWEPT (`LockoutSweepTest`): 0.02-0.05 miss nothing; 0.10 misses one.
+     */
+    val lockoutEndMps: Double = 0.05,
+    /**
+     * The RISE a cycle needs to be called: the positive part of the leaky
+     * velocity integrated from the eccentric's start to lockout. An integral
+     * of a high-passed acceleration, not a measured bar height, so it is
+     * named without a unit of length.
+     *
+     * FITTED AND SWEPT (`LockoutSweepTest`), and the narrowest band of the
+     * six: 0.20 and 0.22 miss nothing; 0.18 calls a re-rack (2026-11-06 set
+     * 5, role b) and 0.24 already drops a real rep (set 7, role a). Real reps
+     * and set-up motion are separated by a few hundredths here. It is the
+     * number to look at when a re-rack is called or a grinding rep missed.
+     */
+    val lockoutMinRise: Double = 0.22,
 )

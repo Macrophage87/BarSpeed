@@ -31,10 +31,13 @@ import java.util.Locale
  * this class, and none can say what the engine or the platform did with what
  * it is handed.
  *
- * - **How a rep call is read.** [speak] hands the engine the text it was
- *   given, unchanged, with a `TtsSpan` over each span [SpokenRepCall] marks:
- *   TYPE_TEXT reading `rep` over the word, TYPE_CARDINAL over its number. The
- *   cue track never sees this; the caller recorded its text before calling.
+ * - **How a rep call is read.** [speak] hands the engine
+ *   [SpokenRepCall.utterance] of the text it was given -- the word `rep`
+ *   lower-cased, since with the span alone the owner's engine still said
+ *   "representative" -- with a `TtsSpan` over each span [SpokenRepCall]
+ *   marks: TYPE_TEXT reading `rep` over the word, TYPE_CARDINAL over its
+ *   number. The cue track never sees this; the caller recorded its text
+ *   before calling.
  * - **Ducking music.** Speech plays with USAGE_ASSISTANCE_NAVIGATION_GUIDANCE
  *   and CONTENT_TYPE_SPEECH, and AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK is asked
  *   for with the same attributes over the span [VoiceFocusPolicy] decides --
@@ -248,8 +251,9 @@ class VoiceCounter(context: Context) {
         }
     }
 
-    private fun marked(text: String): CharSequence {
-        val spans = SpokenRepCall.spansOf(text)
+    private fun marked(cue: String): CharSequence {
+        val spans = SpokenRepCall.spansOf(cue)
+        val text = SpokenRepCall.utterance(cue)
         if (spans.isEmpty()) return text
         return SpannableString(text).apply {
             for (span in spans) {

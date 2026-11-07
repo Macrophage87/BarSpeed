@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.dsp
 
 import com.macrophage.barspeed.model.CountingPolicy
+import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.LiveCounter
@@ -114,6 +115,23 @@ class LiveRepCountersTest {
         )
         listOf(RepCounter.MANUAL, RepCounter.METRONOME, RepCounter.NOBODY).forEach { counter ->
             assertNull(LiveRepCounters.forCounted(counter, direction), "$counter arms no live counter")
+        }
+    }
+
+    /**
+     * A squat's own definition reaches the lockout counter, and a bench
+     * press's and an RDL's -- lowering-first too -- keep the cycle counter.
+     * Through `ExerciseDef.liftDirection`, which is how `RecordViewModel`
+     * builds the direction it arms with (owner's choice, 2026-11-06).
+     */
+    @Test
+    fun `a squat arms the lockout counter and every other lift the cycle counter`() {
+        fun armed(id: String) =
+            LiveRepCounters.forCounted(RepCounter.SENSOR, ExerciseDef.resolvedById(id).liftDirection())
+        assertTrue(armed("back_squat") is LockoutRepCounter, "back squat")
+        assertTrue(armed("front_squat") is LockoutRepCounter, "front squat")
+        for (id in listOf("bench_press", "romanian_deadlift", "deadlift", "overhead_press")) {
+            assertTrue(armed(id) is CycleRepCounter, id)
         }
     }
 

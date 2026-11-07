@@ -68,6 +68,20 @@ enum class LiveCounter {
      * asserts it nowhere.
      */
     CYCLE,
+
+    /**
+     * `LockoutRepCounter`: an eccentric, then a concentric, called at the
+     * concentric's end -- the lockout -- off a leaky velocity with its bias
+     * taken off. A concentric with no eccentric before it, the unrack, is
+     * never a rep, and nothing waits for a floor.
+     *
+     * Built for the owner's first v0.2.2 session (2026-11-06), where the
+     * full-cycle rule counted the walk-out as rep 1, called every rep while
+     * the next was under way and the last as the bar was racked, and dropped
+     * two of five reps on the empty bar. `LockoutRepCounter`'s KDoc carries
+     * the mechanism and what it was measured on.
+     */
+    LOCKOUT,
 }
 
 /**
@@ -157,9 +171,23 @@ object LiveCounterPolicy {
      * are kept rather than deleted, stated so it is not read as oversight:
      * reverting this decision is one row, and each carries a corpus pin that
      * re-derives what it did (`LiveRepCallCorpusTest`, `LiveCountDifferentialTest`).
+     *
+     * ## [squat]
+     *
+     * [ExerciseDef.isSquat], carried as `LiftDirection.squat` in `:core:dsp`.
+     * A squat runs [LiveCounter.LOCKOUT] since the owner's 2026-11-06
+     * session, where the full-cycle rule called his walk-out as rep 1, every
+     * squat a rep late and the last on the rack, and dropped two of five reps
+     * on the empty bar. Every other lift runs [LiveCounter.CYCLE], which every
+     * paragraph above is about.
+     *
+     * THE OWNER CHOSE SQUATS ONLY over every lowering-first lift
+     * (2026-11-06). The lockout rule was fitted on his back squat alone, and
+     * on the bench press and Romanian deadlift captures held it misses 12
+     * reps against the full-cycle rule's 6 (`LockoutCorpusTest`).
      */
-    fun counterFor(counter: RepCounter): LiveCounter? = when (counter) {
-        RepCounter.SENSOR -> LiveCounter.CYCLE
+    fun counterFor(counter: RepCounter, squat: Boolean): LiveCounter? = when (counter) {
+        RepCounter.SENSOR -> if (squat) LiveCounter.LOCKOUT else LiveCounter.CYCLE
         RepCounter.MANUAL, RepCounter.METRONOME, RepCounter.NOBODY -> null
     }
 }

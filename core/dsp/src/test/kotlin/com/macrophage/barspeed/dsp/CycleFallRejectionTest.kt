@@ -5,6 +5,7 @@ import com.macrophage.barspeed.model.RepCounter
 import com.macrophage.barspeed.model.StartPhase
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * Which lifts the full-cycle counter's FALL rejection guards: the predicate
@@ -136,16 +137,18 @@ class CycleFallRejectionTest {
     /**
      * THE APP'S COUNTER, through `LiveRepCounters.forCounted(SENSOR)`, makes
      * the same calls as the counter built by the predicate: the early FALL
-     * is ignored on an eccentric-first lift and drops the drive on a
-     * concentric-first one. A DIFFERENTIAL, red until the app's counter reads
-     * [CycleRule.fallRejectsFor].
+     * is ignored on an eccentric-first lift that is not a squat and drops
+     * the drive on a concentric-first one. A squat is not counted by this
+     * rule in the app at all: it arms [LockoutRepCounter] since the owner's
+     * 2026-11-06 session.
      */
     @Test
-    fun `the app's counter ignores an early FALL on an eccentric-first lift`() {
+    fun `the app's counter ignores an early FALL on an eccentric-first lift that is not a squat`() {
         fun app(direction: LiftDirection) = LiveRepCounters.forCounted(RepCounter.SENSOR, direction)
             ?: error("a sensor-counted set must arm a counter")
         assertEquals(listOf(3.2), pullWithEarlyFall().calls(app(eccentricFirst)), "eccentric-first")
         assertEquals(emptyList(), pullWithEarlyFall().calls(app(concentricFirst)), "concentric-first")
+        assertTrue(app(eccentricFirst.copy(squat = true)) is LockoutRepCounter, "a squat")
     }
 
     /**

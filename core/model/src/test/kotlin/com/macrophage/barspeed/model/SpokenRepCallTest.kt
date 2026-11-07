@@ -6,9 +6,9 @@ import kotlin.test.assertEquals
 /**
  * Which characters of an utterance [SpokenRepCall] marks for the engine (#339).
  *
- * Positions only: nothing here, and nothing in [SpokenRepCall], can change the
- * text, which is what keeps the recorded cue `Rep N`. Whether an engine reads
- * a marked span the way it is marked is not testable here; it is `[Field]`.
+ * Positions, and the text the engine is handed. Neither can change the
+ * recorded cue, which keeps `Rep N`. Whether an engine reads what it is
+ * handed the way it is marked is not testable here; it is `[Field]`.
  */
 class SpokenRepCallTest {
     private fun word(start: Int) = SpokenRepCall.Span(start, start + 3, SpokenRepCall.Reading.WORD, "rep")
@@ -106,5 +106,54 @@ class SpokenRepCallTest {
         for (text in listOf("Prep 3", "Reps 3", "Representative 1", "Repeat")) {
             assertEquals(emptyList(), SpokenRepCall.spansOf(text), text)
         }
+    }
+
+    /**
+     * What the engine is handed keeps every character where the cue had it,
+     * so each span [SpokenRepCall.spansOf] finds on the cue covers the same
+     * word or number of the handed text.
+     */
+    @Test
+    fun `the handed text keeps every span where the cue had it`() {
+        val cues = listOf("Rep 1", "Rep 12", "Rep 4, last rep", "Rep 5, target", "Last rep", "Done", "Down")
+        for (cue in cues) {
+            val handed = SpokenRepCall.utterance(cue)
+            assertEquals(cue.length, handed.length, cue)
+            assertEquals(SpokenRepCall.spansOf(cue), SpokenRepCall.spansOf(handed), cue)
+        }
+    }
+
+    /**
+     * The owner, 2026-11-06, on v0.2.2's first live session: *"it kept saying
+     * "representative" and not "rep"."* The TtsSpan v0.2.2 laid over the
+     * word was not honoured by his engine, so the text itself carries the
+     * reading: every rep call reaches the engine with the word lower-case,
+     * which is how the rest of the vocabulary already says it ("Last rep").
+     * The cue keeps its spelling; only the handed text changes.
+     */
+    @Test
+    fun `the engine is handed the word rep in lower case`() {
+        assertEquals("rep 1", SpokenRepCall.utterance("Rep 1"))
+        assertEquals("rep 12", SpokenRepCall.utterance("Rep 12"))
+        assertEquals("rep 4, last rep", SpokenRepCall.utterance("Rep 4, last rep"))
+        assertEquals("rep 5, target", SpokenRepCall.utterance("Rep 5, target"))
+        assertEquals("Last rep", SpokenRepCall.utterance("Last rep"))
+        assertEquals("REPS 3", SpokenRepCall.utterance("REPS 3"))
+        assertEquals("Representative 1", SpokenRepCall.utterance("Representative 1"))
+    }
+
+    /**
+     * "In whatever case" and "whole word", pinned: a capitalised or upper-case
+     * rep call is lowered whatever follows it, and a word that merely
+     * contains the letters keeps its spelling.
+     */
+    @Test
+    fun `every case of the whole word is lowered and nothing else is`() {
+        assertEquals("rep 3", SpokenRepCall.utterance("REP 3"))
+        assertEquals("rep 2", SpokenRepCall.utterance("rEp 2"))
+        assertEquals("rep.", SpokenRepCall.utterance("Rep."))
+        assertEquals("Prep 3", SpokenRepCall.utterance("Prep 3"))
+        assertEquals("Reps 3", SpokenRepCall.utterance("Reps 3"))
+        assertEquals("Last rep", SpokenRepCall.utterance("Last Rep"))
     }
 }
