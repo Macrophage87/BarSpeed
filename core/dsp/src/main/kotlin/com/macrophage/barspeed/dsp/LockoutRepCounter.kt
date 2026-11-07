@@ -79,9 +79,10 @@ import kotlin.math.exp
  *   miscounted.
  * - THE LIVE BAR OFTEN HAS NO FIGURE. The call is made at lockout, and
  *   `LiveRepFigures` matches it against the tracker's drive runs at that
- *   sample, before the tracker has closed the concentric's run: on the
- *   2026-11-06 role a streams 3 of 25 calls get a figure, against 8 of 27
- *   under [CycleRepCounter]. The count is unaffected.
+ *   sample, before the tracker has closed the concentric's run. A one-off
+ *   replay of the 2026-11-06 role a streams in review gave a figure for 3 of
+ *   25 calls, against 8 of 27 under [CycleRepCounter]; no test pins those
+ *   figures. The count is unaffected.
  * - A REP CUT SHORT IS NOT CALLED until its concentric ends, and a failed
  *   rep that is caught and lowered never rises far enough to be.
  */

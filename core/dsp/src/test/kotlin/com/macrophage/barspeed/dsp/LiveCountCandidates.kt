@@ -406,6 +406,14 @@ internal object DriveImpulseCandidate {
  */
 internal object CandidateCorpus {
     private val ECC = LiftDirection(startsWith = StartPhase.ECCENTRIC)
+
+    /**
+     * A back squat: [ECC] with `squat` set, as `ExerciseDef.liftDirection`
+     * sets it for `back_squat`. Only `LiveRepCounters.forCounted` reads the
+     * flag, so every candidate built directly from this direction is
+     * unchanged; a test asking what the APP arms gets the lockout counter.
+     */
+    private val SQUAT = ECC.copy(squat = true)
     private val CON = LiftDirection(startsWith = StartPhase.CONCENTRIC)
 
     /**
@@ -531,19 +539,19 @@ internal object CandidateCorpus {
         Capture("field-assistedpullup-3010-s37-set08", CON),
         Capture("field-assistedpullup-3010-s37-set09", CON),
         Capture("field-assistedpullup-3010-s37-set10", CON),
-        Capture("field-backsquat-10hz", ECC),
-        Capture("field-backsquat-10hz-set5", ECC),
-        Capture("field-backsquat-4011-6rep-s36-set01", ECC),
-        Capture("field-backsquat-99hz-6rep", ECC),
+        Capture("field-backsquat-10hz", SQUAT),
+        Capture("field-backsquat-10hz-set5", SQUAT),
+        Capture("field-backsquat-4011-6rep-s36-set01", SQUAT),
+        Capture("field-backsquat-99hz-6rep", SQUAT),
         // Field-46's five straight back squats, issue #335. Each set's own
         // `meta.json` declares `startsWith: "eccentric"`, `concentric: "up"`,
         // vertical, off the stack -- the ECC block. No truth: see [UNSETTLED].
-        Capture("field-backsquat-straight-s46-set01", ECC),
-        Capture("field-backsquat-straight-s46-set02", ECC),
-        Capture("field-backsquat-straight-s46-set03", ECC),
-        Capture("field-backsquat-straight-s46-set04", ECC),
-        Capture("field-backsquat-straight-s46-set05", ECC),
-        Capture("field-backsquat-wrapping-s36-set01", ECC),
+        Capture("field-backsquat-straight-s46-set01", SQUAT),
+        Capture("field-backsquat-straight-s46-set02", SQUAT),
+        Capture("field-backsquat-straight-s46-set03", SQUAT),
+        Capture("field-backsquat-straight-s46-set04", SQUAT),
+        Capture("field-backsquat-straight-s46-set05", SQUAT),
+        Capture("field-backsquat-wrapping-s36-set01", SQUAT),
         Capture("field-bench-3010-6rep-s37-set05", ECC),
         Capture("field-bench-3010-6rep-s37-set06", ECC),
         Capture("field-bench-3010-6rep-s42-set05", ECC),
