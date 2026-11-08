@@ -152,14 +152,11 @@ class SquatLiveCountFieldTest {
      * A DIFFERENTIAL, re-baselined twice. #335 took it from v0.1.57's 5, 1,
      * 2, 1 and 5 (kept by name above) to 6, 4, 5, 5, 5 on role a and 4, 5, 4,
      * 5 and 6 on role b, once the FALL rejection was held to concentric-first
-     * lifts. Now an eccentric-first lift is counted at its lockout by
-     * `LockoutRepCounter`, after the owner's 2026-11-06 session showed the
-     * full-cycle rule calling the walk-out and every rep a rep late, and both
-     * units read 5, 5, 4, 4 and 5 -- every set inside the owner's bound of at
-     * least 4, most likely 5, where role a's set 1 and role b's sets 1, 3 and
-     * 5 were outside it. Red until `LiveCounterPolicy` selects
-     * [com.macrophage.barspeed.model.LiveCounter.LOCKOUT] for an
-     * eccentric-first set.
+     * lifts. Now a squat is counted at its lockout by `LockoutRepCounter`,
+     * after the owner's 2026-11-06 session showed the full-cycle rule calling
+     * the walk-out and every rep a rep late, and both units read 5, 5, 4, 4
+     * and 5 -- every set inside the owner's bound of at least 4, most likely
+     * 5, where role a's set 1 (6) and role b's set 5 (6) were outside it.
      */
     @Test
     fun `the app counts the five squats live`() {

@@ -92,8 +92,8 @@ class LockoutCorpusTest {
      * full-cycle rule -- but 4 of the full-cycle rule's are the four holds'
      * phantoms, and a hold is never sensor-counted in the app. Without them
      * it is 15 against 14, and on the bench and RDL rows alone 12 against 6:
-     * off the squat this rule is WORSE on every capture the corpus holds,
-     * all of them tempo'd.
+     * off the squat this rule is WORSE in sum on the captures the corpus
+     * holds, all of them tempo'd. All three sums are pinned.
      */
     @Test
     fun `against the full-cycle rule on the scored eccentric-first captures`() {
@@ -108,5 +108,13 @@ class LockoutCorpusTest {
         val lockoutMiss = scored.sumOf { (c, t) -> kotlin.math.abs(count(c.fixture, c.direction) - t.reps!!) }
         val cycleMiss = scored.sumOf { (c, t) -> kotlin.math.abs(cycle(c.fixture, c.direction) - t.reps!!) }
         assertEquals(15 to 18, lockoutMiss to cycleMiss)
+        fun miss(
+            rows: List<Pair<CandidateCorpus.Capture, CandidateCorpus.Truth>>,
+            counter: (String, LiftDirection) -> Int,
+        ) = rows.sumOf { (c, t) -> kotlin.math.abs(counter(c.fixture, c.direction) - t.reps!!) }
+        val lifted = scored.filterNot { "hold" in it.first.fixture }
+        assertEquals(15 to 14, miss(lifted, ::count) to miss(lifted, ::cycle), "without the holds")
+        val benchAndRdl = scored.filter { "bench" in it.first.fixture || "rdl" in it.first.fixture }
+        assertEquals(12 to 6, miss(benchAndRdl, ::count) to miss(benchAndRdl, ::cycle), "bench and RDL rows")
     }
 }

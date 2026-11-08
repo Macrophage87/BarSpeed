@@ -113,17 +113,22 @@ class LockoutRepCounterTest {
     }
 
     /**
-     * What the bias tracker costs, pinned rather than argued: a FAST descent
-     * stopped hard with no concentric after it -- 0.5 s at -2 m/s^2 and
-     * 0.5 s at +2 -- reads, once the running mean is taken off, as a rise
-     * past [DspConfig.lockoutMinRise], and is called. Every re-rack of the
-     * squat corpus is slower and rises 0.19 or less; a faster one would be
-     * a phantom.
+     * What the bias tracker costs, pinned rather than argued: a descent that
+     * STOPS, with no concentric after it, reads -- once the running mean is
+     * taken off -- as a descent and a rise, and a deep enough one is called.
+     * Not only a fast one: 0.7 s at -1 m/s^2 and 0.7 s at +1, a 0.49 m
+     * descent at ordinary squat speed, is called, as is 0.5 s at -2 and +2.
+     * A squat dumped onto the safeties, or a sit that stays on a box, can be
+     * counted this way. A shallower stop, 0.4 s at -1 and +1 (0.16 m), is
+     * not (release review, 2026-11-08).
      */
     @Test
-    fun `a fast descent stopped hard is called -- the bias tracker's cost`() {
-        val stopped = Stream().hold(1.0, 0.0).hold(1.5, -2.0).hold(2.0, 2.0).hold(5.0, 0.0)
-        assertEquals(listOf(1), stopped.calls().map { it.second })
+    fun `a descent that stops is called once it is deep enough -- the bias tracker's cost`() {
+        fun stop(halfS: Double, accel: Double) =
+            Stream().hold(1.0, 0.0).hold(1.0 + halfS, -accel).hold(1.0 + 2 * halfS, accel).hold(6.0, 0.0)
+        assertEquals(listOf(1), stop(0.5, 2.0).calls().map { it.second }, "0.5 s at 2 m/s^2")
+        assertEquals(listOf(1), stop(0.7, 1.0).calls().map { it.second }, "0.7 s at 1 m/s^2, 0.49 m")
+        assertEquals(emptyList(), stop(0.4, 1.0).calls(), "0.4 s at 1 m/s^2, 0.16 m")
     }
 
     /** The window a call carries is the concentric: from the ascent's start to the call. */

@@ -125,9 +125,10 @@ class SpokenRepCallTest {
 
     /**
      * The owner, 2026-11-06, on v0.2.2's first live session: *"it kept saying
-     * "representative" and not "rep"."* The TtsSpan v0.2.2 laid over the
-     * word was not honoured by his engine, so the text itself carries the
-     * reading: every rep call reaches the engine with the word lower-case,
+     * "representative" and not "rep"."* With the TtsSpan v0.2.2 laid over
+     * the word, his engine still said "representative" -- whether the span
+     * reached it and was refused is not known -- so the text itself carries
+     * the reading: every rep call reaches the engine with the word lower-case,
      * which is how the rest of the vocabulary already says it ("Last rep").
      * The cue keeps its spelling; only the handed text changes.
      */

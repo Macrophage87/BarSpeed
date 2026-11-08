@@ -22,7 +22,8 @@ import kotlin.math.exp
  * - EVERY CALL IS A REP LATE. A real rep is closed by the NEXT descent's
  *   fall, so its number is spoken while the next rep is under way, and the
  *   last rep's number comes as the bar is racked. With the walk-out counted,
- *   the 185 lb triples read 4, the last call on the rack.
+ *   two of the three 185 lb triples (sets 5 and 7) read 4, the last call on
+ *   the rack.
  * - LIGHT REPS ARE DROPPED. On the empty bar a contact at the bottom of rep
  *   4 rejected it, and rep 5 was replaced by the re-rack's drive and then
  *   dropped by the rack's contact: 4 calls, one of them the walk-out, for 5
@@ -38,10 +39,10 @@ import kotlin.math.exp
  *   off it, so a bias the integrator would turn into a standing velocity is
  *   gone;
  * - that is integrated into a LEAKY velocity, decaying with
- *   [DspConfig.lockoutVelocityTauS]. Both decays are exact exponentials in
- *   the frame gap, so a long gap between frames forgets rather than
- *   overshoots. It is not the bar's velocity: it forgets
- *   in seconds, so it cannot run away the way the tracker's does.
+ *   [DspConfig.lockoutVelocityTauS]. Both decays are exponentials in the
+ *   frame interval rather than a forward step. It is not the bar's
+ *   velocity: it forgets in seconds, so it cannot run away the way the
+ *   tracker's does.
  *
  * Then a three-state machine. IDLE until the leaky velocity falls under
  * -[DspConfig.lockoutDescentMps] -- the eccentric has begun; DOWN until it
@@ -83,8 +84,20 @@ import kotlin.math.exp
  *   replay of the 2026-11-06 role a streams in review gave a figure for 3 of
  *   25 calls, against 8 of 27 under [CycleRepCounter]; no test pins those
  *   figures. The count is unaffected.
- * - A REP CUT SHORT IS NOT CALLED until its concentric ends, and a failed
- *   rep that is caught and lowered never rises far enough to be.
+ * - A DESCENT THAT STOPS CAN BE CALLED. Taking the running mean off makes
+ *   a descent with no concentric after it read as a descent and a rise, so
+ *   a squat dumped onto the safeties, or a sit that stays on a box, can be
+ *   counted -- at ordinary squat speed, not only a fast one
+ *   (`LockoutRepCounterTest`). The failure this counter fixes, the rack
+ *   counted, has this second door.
+ * - A REP CUT SHORT IS NOT CALLED until its concentric ends.
+ * - FRAMES, NOT SECONDS. The smoothing window is
+ *   [DspConfig.cycleSmoothFrames] frames, 0.1 s at the 100 Hz every fitted
+ *   stream ran at, but 1 s at 10 Hz, where synthetic reviews dropped reps.
+ *   And through the tracker the frame interval is its reconstructed uniform
+ *   clock, so a BLE dropout is spliced out of time rather than decayed: a
+ *   rep whose frames are lost can be lost with them. [CycleRepCounter]
+ *   shares both.
  */
 class LockoutRepCounter(
     direction: LiftDirection = LiftDirection(),

@@ -19,8 +19,8 @@ import kotlin.test.assertEquals
  *
  * What it says, and what the [DspConfig] KDocs repeat: the defaults miss
  * nothing; [DspConfig.lockoutMinRise] has the narrowest band -- 0.20 to
- * 0.22 miss nothing, 0.18 calls a re-rack and 0.24 already drops a real
- * rep (2026-11-06 set 7, role a).
+ * 0.22 miss nothing, 0.18 makes one extra call (2026-11-06 set 5, role b)
+ * and 0.24 drops a rep the owner counted (set 7, role a).
  */
 class LockoutSweepTest {
     private fun load(path: String): List<ImuSample> = ImuCsv.decode(
@@ -82,7 +82,7 @@ class LockoutSweepTest {
      * other stream that moves is named here too.
      */
     @Test
-    fun `the rise band's edges fail on a re-rack and a real rep`() {
+    fun `the rise band's edges add one call and drop one`() {
         assertEquals(mapOf("/live-squat-v022/set05-imu-b.csv" to (3 to 4)), moved(base.copy(lockoutMinRise = 0.18)))
         assertEquals(mapOf("/live-squat-v022/set07.csv" to (3 to 2)), moved(base.copy(lockoutMinRise = 0.24)))
     }

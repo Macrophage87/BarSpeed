@@ -404,10 +404,11 @@ data class DspConfig(
      * named without a unit of length.
      *
      * FITTED AND SWEPT (`LockoutSweepTest`), and the narrowest band of the
-     * six: 0.20 and 0.22 miss nothing; 0.18 calls a re-rack (2026-11-06 set
-     * 5, role b) and 0.24 already drops a real rep (set 7, role a). Real reps
-     * and set-up motion are separated by a few hundredths here. It is the
-     * number to look at when a re-rack is called or a grinding rep missed.
+     * six: 0.20 and 0.22 miss nothing; 0.18 makes one extra call (2026-11-06
+     * set 5, role b) and 0.24 drops a rep the owner counted (set 7, role a).
+     * The default sits on the band's upper edge. Calls and non-calls are
+     * separated by a few hundredths here, so it is the number to look at
+     * when a phantom is called or a grinding rep missed.
      */
     val lockoutMinRise: Double = 0.22,
 )

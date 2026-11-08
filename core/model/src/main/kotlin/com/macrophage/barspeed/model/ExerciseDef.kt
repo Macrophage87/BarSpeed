@@ -86,6 +86,10 @@ data class ExerciseDef(
      * (2026-11-06), so every other squat here is reached by name, not by
      * measurement; on bench press and Romanian deadlift captures that counter
      * did worse than the full-cycle one, which is why it stops at the word.
+     *
+     * A squat a plan declares `"kind": "explosive"` (a speed squat) is not
+     * one here, and keeps the full-cycle counter, walk-out call and all:
+     * the lockout counter was fitted on rep squats only.
      */
     val isSquat: Boolean
         get() = kind == ExerciseKind.DYNAMIC && startsWith == StartPhase.ECCENTRIC && tokens(id).name("squat")

@@ -112,7 +112,7 @@ class SquatLockoutFieldTest {
         assertEquals(expected, sets.map { calls(app(), name(it)).size }, "role a")
         assertEquals(expected, sets.map { calls(app(), "${name(it)}-imu-b").size }, "role b")
         val owner = mapOf(1 to 5, 4 to 2, 5 to 3, 6 to 3, 7 to 3)
-        owner.forEach { (set, reps) -> assertEquals(reps, expected[set - 1], "set $set against the owner's count") }
+        owner.forEach { (set, reps) -> assertEquals(reps, calls(app(), name(set)).size, "set $set against the owner") }
     }
 
     /**
@@ -120,8 +120,9 @@ class SquatLockoutFieldTest {
      * v0.2.2 called four times, one of them a drive no rep made -- the
      * walk-out's, closed by the first descent -- and its fourth on the rack.
      * The app now calls three on each. Only the count is pinned: on set 5
-     * v0.2.2's first call and the app's first lockout land within 30 ms of
-     * each other, so no timing claim here separates them.
+     * v0.2.2's first call and the app's first lockout were measured within
+     * 30 ms of each other on role a (a one-off replay, not pinned), so no
+     * timing claim here separates them.
      */
     @Test
     fun `the 185 lb sets v0_2_2 called four on are called three`() {
