@@ -86,6 +86,9 @@ class SchemaSquatLockoutContractTest {
                 "the unrack is never a rep",
                 "onto the safeties or a sit that stays on a box",
                 "v0.1.55 to v0.2.2",
+                "explosive",
+                "keeps the full-cycle detector",
+                "at the bottom where it stopped",
                 "5, 5, 4, 2, 3, 3 and 3",
             ).forEach { assertTrue(it.lowercase() in text.lowercase(), "$name does not state: $it") }
         }

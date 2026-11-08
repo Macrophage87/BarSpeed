@@ -92,7 +92,7 @@ import kotlin.math.exp
  *   counted, has this second door.
  * - A REP CUT SHORT IS NOT CALLED until its concentric ends.
  * - FRAMES, NOT SECONDS. The smoothing window is
- *   [DspConfig.cycleSmoothFrames] frames, 0.1 s at the 100 Hz every fitted
+ *   [DspConfig.cycleSmoothFrames] frames, 0.1 s at the 99-100 Hz every fitted
  *   stream ran at, but 1 s at 10 Hz, where synthetic reviews dropped reps.
  *   And through the tracker the frame interval is its reconstructed uniform
  *   clock, so a BLE dropout is spliced out of time rather than decayed: a
