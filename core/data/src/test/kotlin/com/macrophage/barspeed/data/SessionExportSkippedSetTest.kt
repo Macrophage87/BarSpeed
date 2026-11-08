@@ -275,7 +275,7 @@ class SessionExportSkippedSetTest {
     @Test
     fun `a document carrying a skip declares the version that describes it`() = runTest {
         assertEquals(
-            "1.27",
+            "1.28",
             document(session(encoded(SkippedSet("back_squat", 4))))
                 .getValue("schemaVersion").jsonPrimitive.content,
             "the exported document does not declare the version the skip key rides under",

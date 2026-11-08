@@ -65,7 +65,7 @@ class SchemaExerciseInferenceContractTest {
         assertEquals(1, Regex(Regex.escape(marker)).findAll(log).count(), "the entry is not filed once")
         assertTrue(log.indexOf(marker) > log.indexOf(mint), "the further entry is filed before the mint it extends")
         assertTrue(log.indexOf(marker) < log.indexOf(tempoMarker), "filed after the tempo-notation entry")
-        val tempoTail = log.substringAfter(tempoMarker)
+        val tempoTail = log.substringAfter(tempoMarker).substringBefore(" 1.28 (squat lockout count)")
         assertTrue("NOT RETROACTIVE" !in tempoTail, "tempo notation's tail gained a NOT RETROACTIVE")
     }
 

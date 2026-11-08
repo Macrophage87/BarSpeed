@@ -3305,8 +3305,19 @@ data class SessionExport(
          * (`prescribed` stays a string, and gains a description saying
          * this), `DATABASE_VERSION` does NOT move, and the plan schema is
          * untouched. PINNED by `SchemaTempoNotationContractTest`.
+         *
+         * 1.28 (squat lockout count) MINTS NO KEY: from v0.2.3 a squat the
+         * sensor counts is counted live by `LockoutRepCounter`, called at
+         * lockout, and every other sensor-counted lift by the full-cycle
+         * detector as before; the descriptions of `repsSource`, `liveReps`
+         * and `countTrusted`, and `PLAN_PROMPT`'s copy, say so. A MINT and
+         * not a further 1.27 entry: v0.2.2 shipped 1.27. NOT RETROACTIVE: a
+         * squat recorded by v0.1.55 to v0.2.2 keeps the full-cycle count it
+         * was recorded with. No key is added, removed, renamed or retyped,
+         * `DATABASE_VERSION` does NOT move, and the plan schema is untouched.
+         * PINNED by `SchemaSquatLockoutContractTest`.
          */
-        const val SCHEMA_VERSION = "1.27"
+        const val SCHEMA_VERSION = "1.28"
 
         /**
          * `"1.10"` is not the number 1.1 -- a reader that parses this field as
@@ -3317,7 +3328,7 @@ data class SessionExport(
                 "1.0", "1.1", "1.2", "1.3", "1.4", "1.5",
                 "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "1.12", "1.13", "1.14", "1.15",
                 "1.16", "1.17", "1.18", "1.19", "1.20", "1.21", "1.22", "1.23", "1.24", "1.25",
-                "1.26", "1.27",
+                "1.26", "1.27", "1.28",
             )
 
         /**

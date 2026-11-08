@@ -98,7 +98,7 @@ class SchemaInversionSourceContractTest {
     fun `the published example names a source for every published inversion`() {
         val example = document("examples/session-export.example.json")
         // At or after 1.26, which published the key; the tip literal is SchemaSensorTargetCueContractTest's.
-        assertTrue(example.getValue("schemaVersion").jsonPrimitive.content in setOf("1.26", "1.27"))
+        assertTrue(example.getValue("schemaVersion").jsonPrimitive.content in setOf("1.26", "1.27", "1.28"))
         val sources = example.getValue("exercises").jsonArray
             .flatMap { it.jsonObject.getValue("sets").jsonArray }
             .mapNotNull { it.jsonObject["geometry"]?.jsonObject }

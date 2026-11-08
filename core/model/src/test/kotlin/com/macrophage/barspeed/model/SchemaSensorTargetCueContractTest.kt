@@ -17,8 +17,9 @@ import kotlin.test.assertTrue
  * `VoiceMilestonePolicyTest`'s. Here: the version-log entry is filed once,
  * says no key moved and that neither string is terminal; the voiceCues
  * description dates all three periods of what a sensor-counted set says, and
- * quotes the strings the policy actually produces; and the tip literal and
- * the example's version are 1.27. The tip literal moves at every mint.
+ * quotes the strings the policy actually produces; and 1.27 is still
+ * accepted. The tip literal lived here until 1.28 moved it to
+ * `SchemaSquatLockoutContractTest`.
  */
 class SchemaSensorTargetCueContractTest {
     private fun document(name: String): JsonObject = Json.parseToJsonElement(
@@ -37,20 +38,14 @@ class SchemaSensorTargetCueContractTest {
 
     private val sensor = CountingPolicy.milestones(RepCounter.SENSOR)
 
+    /** RENAMED from `the exporter writes 1_27, which the schema and the example carry, ...` at 1.28. */
     @Test
-    fun `the exporter writes 1_27, which the schema and the example carry, and 1_26 is still readable`() {
+    fun `1_27 is accepted by the code and the schema, and 1_26 is still readable`() {
         val enum = schema.getValue("properties").jsonObject.getValue("schemaVersion").jsonObject
             .getValue("enum").jsonArray.map { it.jsonPrimitive.content }
-        assertEquals("1.27", SessionExport.SCHEMA_VERSION, "the version the exporter writes")
-        assertTrue("1.27" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "the version written is not accepted")
-        assertTrue("1.27" in enum, "the published schema rejects the version the exporter writes")
+        assertTrue("1.27" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "1.27, shipped in v0.2.2, left the accepted set")
+        assertTrue("1.27" in enum, "the published schema rejects 1.27")
         assertTrue("1.26" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "1.26, shipped in v0.2.1, left the accepted set")
-        assertEquals(SessionExport.SUPPORTED_SCHEMA_VERSIONS, enum.toSet(), "the accepted versions drifted")
-        assertEquals(
-            "1.27",
-            document("examples/session-export.example.json").getValue("schemaVersion").jsonPrimitive.content,
-            "the example declares a version other than the tip",
-        )
     }
 
     @Test
