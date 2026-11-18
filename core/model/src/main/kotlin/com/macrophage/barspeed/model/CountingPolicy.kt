@@ -247,12 +247,14 @@ object CountingPolicy {
      * "MANUAL COUNT" for a count that stops after a few frames. Those sets
      * keep the lifter's tally, as before.
      *
-     * What is CAPTURED does not change: both streams are archived whichever
-     * way this answers, and the set's figures stay
+     * What is CAPTURED does not change: both collectors run whichever way
+     * this answers -- a stream that delivered nothing gets no raw-stream row,
+     * as before -- and the set's figures stay
      * [SensorCapturePolicy.analysedStream]'s answer over the whole set. WHO
      * THE COUNT IS RECORDED FROM does: a set this turns from
      * [RepCounter.MANUAL] to [RepCounter.SENSOR] is written from the live
-     * count and published as `sensor` rather than from the lifter's tally as
+     * count and published as `sensor` -- `corrected` where the lifter's
+     * `+1 REP` taps adjusted it -- rather than from the lifter's tally as
      * `manual`.
      */
     fun sensorLinked(armedConnected: Boolean, partnerConnected: Boolean, mountSpecific: Boolean): Boolean =
