@@ -1762,11 +1762,11 @@ private fun CoroutineScope.holdBatteryDuringSets(autoConnect: AutoConnectManager
  *
  * `imuConnected`, `imuConnecting` and `imuState` still mean THE ARMED SENSOR
  * -- the link to the preferred address -- and nothing else; since #207 that is
- * not always the stream the set's figures come from. They have four consumers
- * between them -- the dot, the SETUP advice, whether an explosive lift is
- * sensor-counted, and the set journal's header -- and the correct answer for a
- * second sensor differs at each, so the second link gets its own fields rather
- * than widening these (#156).
+ * not always the stream the set's figures come from. The second link gets its
+ * own fields rather than widening these (#156). `RecordState.sensorCanCount`
+ * reads both links' connected flags, with the roster and the set's mount, to
+ * say whether a sensor can count a set; `CountingPolicy.counterFor` still
+ * decides who does.
  */
 private fun CoroutineScope.mirrorLinkStates(autoConnect: AutoConnectManager, state: MutableStateFlow<RecordState>) {
     launch {
@@ -1924,7 +1924,7 @@ private fun counterAtStart(s: RecordState, exercise: ExerciseDef): RepCounter = 
     hasTempo = tempoTextAtStart(s)?.let { Tempo.parseOrNull(it) } != null,
     isTimed = s.currentIsTimed,
     kind = exercise.kind,
-    imuConnected = s.imuConnected,
+    imuConnected = s.sensorCanCount,
 )
 
 /** The prep the coming set runs, null where it runs none; see [tempoTextAtStart]. */
@@ -4208,12 +4208,13 @@ data class RecordState(
      * The second accelerometer's link, issue #156.
      *
      * [imuConnected] and [imuState] are NOT redefined to mean "any IMU" or
-     * "all IMUs". They have four consumers between them -- the dot, the SETUP
-     * advice, whether an explosive lift is sensor-counted, and the set
-     * journal's header, which exists so that a capture of zero samples can be
-     * read correctly -- and the right answer differs per consumer, so one flag
-     * cannot serve both sensors. These are separate fields and every existing
-     * reader is untouched.
+     * "all IMUs". They had four consumers between them -- the dot, the SETUP
+     * advice, whether a set is sensor-counted, and the set journal's header,
+     * which exists so that a capture of zero samples can be read correctly --
+     * and the right answer differs per consumer, so one flag cannot serve both
+     * sensors. These are separate fields. The third consumer reads
+     * [sensorCanCount] since the owner's 2026-11-18 report, which asks this
+     * link as well as the armed one; the other three are untouched.
      */
     val imuStateB: ConnectionState = ConnectionState.Disconnected,
     val imuConnectedB: Boolean = false,
@@ -4578,6 +4579,24 @@ data class RecordState(
         get() = currentSlot?.exercise?.kind
             ?: exerciseOptions.firstOrNull { it.id == selectedExerciseId }?.kind
             ?: ExerciseKind.DYNAMIC
+
+    /**
+     * Whether a sensor is there to count a set of [currentExercise] started
+     * now: [CountingPolicy.sensorLinked], asked of the armed link, the second
+     * labelled unit's link on a set armed for two, and the set's own geometry.
+     *
+     * Read by `beginSet` for the set's counter and its voice, and by the START
+     * SET label, so the two read one answer about the sensor. The label still
+     * takes the exercise's kind by its own fallbacks, which predates this.
+     * [imuConnected] keeps meaning the armed link alone for its other readers,
+     * the dot, the SETUP advice and the journal header (#156).
+     */
+    val sensorCanCount: Boolean
+        get() = CountingPolicy.sensorLinked(
+            armedConnected = imuConnected,
+            partnerConnected = roster.secondary != null && imuConnectedB,
+            mountSpecific = currentExercise.liftDirection().mountSpecific,
+        )
 }
 
 /**
@@ -5369,7 +5388,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // sets the sensor counts` asserts that this and the counter above are
         // one decision over every shape.
         sensorVoiceRuns =
-            SetVoicePolicy.sensorCounts(guidedTempo != null, s.currentIsTimed, exercise.kind, s.imuConnected)
+            SetVoicePolicy.sensorCounts(guidedTempo != null, s.currentIsTimed, exercise.kind, s.sensorCanCount)
         sensorSpeaksPhaseSeconds = sensorCounted && guidedTempo != null
         // The live rep counter (#145), armed for the first time here. Handed the
         // set's counter and the direction the tracker beside it was built from,

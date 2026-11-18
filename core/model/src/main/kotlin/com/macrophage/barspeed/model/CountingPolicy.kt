@@ -215,6 +215,60 @@ object CountingPolicy {
         RepCounter.NOBODY -> "START SET"
     }
 
+    /**
+     * Whether a sensor is there to count the coming set -- the `imuConnected`
+     * that [counterFor] and `SetVoicePolicy.sensorCounts` are handed at the
+     * start of a set.
+     *
+     * [armedConnected] is the link to the preferred unit, the one a set is
+     * armed to analyse. [partnerConnected] is the second labelled unit's link;
+     * the caller passes false unless the set is armed for two, and nothing
+     * here checks that. [mountSpecific] is
+     * `LiftDirection.mountSpecific` for the set's own declaration.
+     *
+     * UNTIL THIS EXISTED ONLY THE ARMED LINK WAS ASKED. On a dual setup whose
+     * preferred unit's link was down -- a flat battery, a unit out of range --
+     * every straight-reps set (a DYNAMIC or EXPLOSIVE lift, untimed, with no
+     * tempo the voice counts) started as [RepCounter.MANUAL] with the
+     * partner's link up, and it stayed that way set after set: no rep was
+     * called on those sets, the ring read "MANUAL COUNT", and nothing on the
+     * screen moved the count back to a sensor while the preferred unit stayed
+     * down. The owner's report,
+     * 2026-11-18.
+     *
+     * THE PARTNER COUNTS ONLY WHERE THE DECLARATION NAMES NO MOUNT. A partner
+     * that is streaming while the armed unit delivers nothing takes the live
+     * feed within [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES] frames
+     * ([LiveFeedPolicy]), and what the count does at that switch is
+     * [LiveFallbackPolicy.atSwitch]'s answer: a mount-free declaration --
+     * a barbell lift as the app seeds it -- describes the partner as well as the armed unit and
+     * the count CONTINUES on the partner's stream. A mount-specific one (a
+     * stack, an inversion, a pulley ratio) has no live measurement that can
+     * answer for the partner on a straight-reps set and is WITHHELD at the
+     * switch, so arming such a set as [RepCounter.SENSOR] would only trade
+     * "MANUAL COUNT" for a count that stops after a few frames. Those sets
+     * keep the lifter's tally, as before.
+     *
+     * What is CAPTURED does not change: both collectors run whichever way
+     * this answers -- a stream that delivered nothing gets no raw-stream row,
+     * as before -- and the set's figures stay
+     * [SensorCapturePolicy.analysedStream]'s answer over the whole set. WHO
+     * THE COUNT IS RECORDED FROM does: a set this turns from
+     * [RepCounter.MANUAL] to [RepCounter.SENSOR] is written from the live
+     * count and published as `sensor` -- `corrected` where the lifter's
+     * `+1 REP` taps or a later rep override adjusted it -- rather than from
+     * the lifter's tally as `manual`. A set the app was killed during is
+     * RECOVERED as a sensor set too: `JournalRecoveryPolicy.count` takes the
+     * batch segmenter's count, published as `analysis`, rather than the
+     * journaled taps, and refuses the set as nothing to count where the
+     * stream is too short to analyse or the segmenter finds no rep. Before
+     * this answer such a set's taps, where there was at least one, were
+     * recovered as `manual`. That is the path every sensor set already takes,
+     * and it is a write the lifter cannot redo.
+     */
+    fun sensorLinked(armedConnected: Boolean, partnerConnected: Boolean, mountSpecific: Boolean): Boolean =
+        armedConnected || (partnerConnected && !mountSpecific)
+
     /** Whether a set of this kind has reps for a sensor to count at all. */
     private fun countsReps(kind: ExerciseKind): Boolean = kind == ExerciseKind.DYNAMIC ||
         kind == ExerciseKind.EXPLOSIVE

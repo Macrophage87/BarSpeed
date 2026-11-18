@@ -317,4 +317,24 @@ class CountingPolicyTest {
                     to RepCounter.NOBODY,
             )
     }
+
+    /**
+     * The owner's 2026-11-18 report: one unit of a pair down and every
+     * straight-reps set fell to the lifter's count. The inputs are link
+     * states, not frame arrival. The partner now stands in for it wherever
+     * the declaration names no mount; all eight inputs are literals.
+     */
+    @Test
+    fun `a streaming partner stands in for a quiet armed unit on a mount-free lift`() {
+        fun linked(armed: Boolean, partner: Boolean, mount: Boolean) =
+            CountingPolicy.sensorLinked(armed, partner, mount)
+        assertEquals(true, linked(armed = true, partner = true, mount = false))
+        assertEquals(true, linked(armed = true, partner = false, mount = false))
+        assertEquals(true, linked(armed = false, partner = true, mount = false))
+        assertEquals(false, linked(armed = false, partner = false, mount = false))
+        assertEquals(true, linked(armed = true, partner = true, mount = true))
+        assertEquals(true, linked(armed = true, partner = false, mount = true))
+        assertEquals(false, linked(armed = false, partner = true, mount = true))
+        assertEquals(false, linked(armed = false, partner = false, mount = true))
+    }
 }
