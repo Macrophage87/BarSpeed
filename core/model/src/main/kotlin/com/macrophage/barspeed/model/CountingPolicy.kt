@@ -217,8 +217,8 @@ object CountingPolicy {
 
     /**
      * Whether a sensor is there to count the coming set -- the `imuConnected`
-     * that [counterFor], [sensorCounts] and `SetVoicePolicy.sensorCounts` are
-     * handed at the start of a set.
+     * that [counterFor] and `SetVoicePolicy.sensorCounts` are handed at the
+     * start of a set.
      *
      * [armedConnected] is the link to the preferred unit, the one a set is
      * armed to analyse. [partnerConnected] is the second labelled unit's link;
@@ -239,7 +239,7 @@ object CountingPolicy {
      * feed within [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES] frames
      * ([LiveFeedPolicy]), and what the count does at that switch is
      * [LiveFallbackPolicy.atSwitch]'s answer: a mount-free declaration --
-     * every barbell lift -- describes the partner as well as the armed unit and
+     * a barbell lift as the app seeds it -- describes the partner as well as the armed unit and
      * the count CONTINUES on the partner's stream. A mount-specific one (a
      * stack, an inversion, a pulley ratio) has no live measurement that can
      * answer for the partner on a straight-reps set and is WITHHELD at the
@@ -254,8 +254,14 @@ object CountingPolicy {
      * THE COUNT IS RECORDED FROM does: a set this turns from
      * [RepCounter.MANUAL] to [RepCounter.SENSOR] is written from the live
      * count and published as `sensor` -- `corrected` where the lifter's
-     * `+1 REP` taps adjusted it -- rather than from the lifter's tally as
-     * `manual`.
+     * `+1 REP` taps or a later rep override adjusted it -- rather than from
+     * the lifter's tally as `manual`. A set the app was killed during is
+     * RECOVERED as a sensor set too: `JournalRecoveryPolicy.count` takes the
+     * batch segmenter's count, published as `analysis`, rather than the
+     * journaled taps, and refuses the set as nothing to count where the
+     * segmenter finds no rep. Before this answer such a set's taps were
+     * recovered as `manual`. That is the path every sensor set already takes,
+     * and it is a write the lifter cannot redo.
      */
     fun sensorLinked(armedConnected: Boolean, partnerConnected: Boolean, mountSpecific: Boolean): Boolean =
         armedConnected || (partnerConnected && !mountSpecific)

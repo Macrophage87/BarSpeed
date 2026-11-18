@@ -1763,8 +1763,8 @@ private fun CoroutineScope.holdBatteryDuringSets(autoConnect: AutoConnectManager
  * `imuConnected`, `imuConnecting` and `imuState` still mean THE ARMED SENSOR
  * -- the link to the preferred address -- and nothing else; since #207 that is
  * not always the stream the set's figures come from. The second link gets its
- * own fields rather than widening these (#156); `RecordState.imuStateB` says
- * which reader asks both.
+ * own fields rather than widening these (#156). `RecordState.sensorCanCount`
+ * is the one reader that combines the two links into one answer.
  */
 private fun CoroutineScope.mirrorLinkStates(autoConnect: AutoConnectManager, state: MutableStateFlow<RecordState>) {
     launch {
