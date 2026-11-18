@@ -221,8 +221,9 @@ object CountingPolicy {
      * handed at the start of a set.
      *
      * [armedConnected] is the link to the preferred unit, the one a set is
-     * armed to analyse. [partnerConnected] is the second labelled unit's link,
-     * and is true only on a set armed for two. [mountSpecific] is
+     * armed to analyse. [partnerConnected] is the second labelled unit's link;
+     * the caller passes false unless the set is armed for two, and nothing
+     * here checks that. [mountSpecific] is
      * `LiftDirection.mountSpecific` for the set's own declaration.
      *
      * UNTIL THIS EXISTED ONLY THE ARMED LINK WAS ASKED. On a dual setup whose
@@ -246,9 +247,13 @@ object CountingPolicy {
      * "MANUAL COUNT" for a count that stops after a few frames. Those sets
      * keep the lifter's tally, as before.
      *
-     * Nothing here changes what is recorded. Both streams are captured
-     * whichever way this answers, and the set's figures stay
-     * [SensorCapturePolicy.analysedStream]'s answer over the whole set.
+     * What is CAPTURED does not change: both streams are archived whichever
+     * way this answers, and the set's figures stay
+     * [SensorCapturePolicy.analysedStream]'s answer over the whole set. WHO
+     * THE COUNT IS RECORDED FROM does: a set this turns from
+     * [RepCounter.MANUAL] to [RepCounter.SENSOR] is written from the live
+     * count and published as `sensor` rather than from the lifter's tally as
+     * `manual`.
      */
     fun sensorLinked(armedConnected: Boolean, partnerConnected: Boolean, mountSpecific: Boolean): Boolean =
         armedConnected || (partnerConnected && !mountSpecific)
