@@ -215,6 +215,44 @@ object CountingPolicy {
         RepCounter.NOBODY -> "START SET"
     }
 
+    /**
+     * Whether a sensor is there to count the coming set -- the `imuConnected`
+     * that [counterFor], [sensorCounts] and `SetVoicePolicy.sensorCounts` are
+     * handed at the start of a set.
+     *
+     * [armedConnected] is the link to the preferred unit, the one a set is
+     * armed to analyse. [partnerConnected] is the second labelled unit's link,
+     * and is true only on a set armed for two. [mountSpecific] is
+     * `LiftDirection.mountSpecific` for the set's own declaration.
+     *
+     * UNTIL THIS EXISTED ONLY THE ARMED LINK WAS ASKED. On a dual setup whose
+     * preferred unit had gone quiet -- a flat battery, a unit out of range --
+     * every set started as [RepCounter.MANUAL] with the partner streaming, and
+     * it stayed that way set after set: the lifter heard no rep called, saw
+     * "MANUAL COUNT", and nothing on the screen moved the count back to a
+     * sensor while the preferred unit stayed down. The owner's report,
+     * 2026-11-18.
+     *
+     * THE PARTNER COUNTS ONLY WHERE THE DECLARATION NAMES NO MOUNT. A partner
+     * that is streaming while the armed unit delivers nothing takes the live
+     * feed within [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES] frames
+     * ([LiveFeedPolicy]), and what the count does at that switch is
+     * [LiveFallbackPolicy.atSwitch]'s answer: a mount-free declaration --
+     * every barbell lift -- describes the partner as well as the armed unit and
+     * the count CONTINUES on the partner's stream. A mount-specific one (a
+     * stack, an inversion, a pulley ratio) has no live measurement that can
+     * answer for the partner on a straight-reps set and is WITHHELD at the
+     * switch, so arming such a set as [RepCounter.SENSOR] would only trade
+     * "MANUAL COUNT" for a count that stops after a few frames. Those sets
+     * keep the lifter's tally, as before.
+     *
+     * Nothing here changes what is recorded. Both streams are captured
+     * whichever way this answers, and the set's figures stay
+     * [SensorCapturePolicy.analysedStream]'s answer over the whole set.
+     */
+    fun sensorLinked(armedConnected: Boolean, partnerConnected: Boolean, mountSpecific: Boolean): Boolean =
+        armedConnected || (partnerConnected && !mountSpecific)
+
     /** Whether a set of this kind has reps for a sensor to count at all. */
     private fun countsReps(kind: ExerciseKind): Boolean = kind == ExerciseKind.DYNAMIC ||
         kind == ExerciseKind.EXPLOSIVE

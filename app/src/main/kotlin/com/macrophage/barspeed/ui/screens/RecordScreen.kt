@@ -1212,7 +1212,8 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
             hasTempo = tempoText?.let { Tempo.parseOrNull(it) } != null,
             isTimed = state.currentIsTimed,
             kind = kind ?: ExerciseKind.DYNAMIC,
-            imuConnected = state.imuConnected,
+            // Either armed unit, read as beginSet reads it (RecordState.sensorCanCount).
+            imuConnected = state.sensorCanCount,
         )
     // The voice switch sits ABOVE START, 24 dp clear of it. It sat 8 dp under
     // the 56 dp button, where a thumb that missed START by a few millimetres
