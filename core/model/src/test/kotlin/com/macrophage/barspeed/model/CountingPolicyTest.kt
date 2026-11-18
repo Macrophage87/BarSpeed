@@ -319,8 +319,9 @@ class CountingPolicyTest {
     }
 
     /**
-     * The owner's 2026-11-18 report: one unit of a pair down and every set
-     * fell to the lifter's count. The partner now stands in for it wherever
+     * The owner's 2026-11-18 report: one unit of a pair down and every
+     * straight-reps set fell to the lifter's count. The inputs are link
+     * states, not frame arrival. The partner now stands in for it wherever
      * the declaration names no mount; all eight inputs are literals.
      */
     @Test

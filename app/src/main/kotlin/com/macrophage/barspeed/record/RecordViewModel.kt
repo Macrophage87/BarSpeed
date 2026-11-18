@@ -1764,7 +1764,9 @@ private fun CoroutineScope.holdBatteryDuringSets(autoConnect: AutoConnectManager
  * -- the link to the preferred address -- and nothing else; since #207 that is
  * not always the stream the set's figures come from. The second link gets its
  * own fields rather than widening these (#156). `RecordState.sensorCanCount`
- * combines the two links' connected flags to decide who counts a set.
+ * reads both links' connected flags, with the roster and the set's mount, to
+ * say whether a sensor can count a set; `CountingPolicy.counterFor` still
+ * decides who does.
  */
 private fun CoroutineScope.mirrorLinkStates(autoConnect: AutoConnectManager, state: MutableStateFlow<RecordState>) {
     launch {
@@ -4584,7 +4586,8 @@ data class RecordState(
      * labelled unit's link on a set armed for two, and the set's own geometry.
      *
      * Read by `beginSet` for the set's counter and its voice, and by the START
-     * SET label, so the button cannot promise a counter the set does not arm.
+     * SET label, so the two read one answer about the sensor. The label still
+     * takes the exercise's kind by its own fallbacks, which predates this.
      * [imuConnected] keeps meaning the armed link alone for its other readers,
      * the dot, the SETUP advice and the journal header (#156).
      */

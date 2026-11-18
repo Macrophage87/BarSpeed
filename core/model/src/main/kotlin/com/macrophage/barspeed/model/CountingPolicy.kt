@@ -227,11 +227,13 @@ object CountingPolicy {
      * `LiftDirection.mountSpecific` for the set's own declaration.
      *
      * UNTIL THIS EXISTED ONLY THE ARMED LINK WAS ASKED. On a dual setup whose
-     * preferred unit had gone quiet -- a flat battery, a unit out of range --
-     * every set started as [RepCounter.MANUAL] with the partner streaming, and
-     * it stayed that way set after set: the lifter heard no rep called, saw
-     * "MANUAL COUNT", and nothing on the screen moved the count back to a
-     * sensor while the preferred unit stayed down. The owner's report,
+     * preferred unit's link was down -- a flat battery, a unit out of range --
+     * every straight-reps set (a DYNAMIC or EXPLOSIVE lift, untimed, with no
+     * tempo the voice counts) started as [RepCounter.MANUAL] with the
+     * partner's link up, and it stayed that way set after set: no rep was
+     * called on those sets, the ring read "MANUAL COUNT", and nothing on the
+     * screen moved the count back to a sensor while the preferred unit stayed
+     * down. The owner's report,
      * 2026-11-18.
      *
      * THE PARTNER COUNTS ONLY WHERE THE DECLARATION NAMES NO MOUNT. A partner
