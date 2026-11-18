@@ -1764,7 +1764,7 @@ private fun CoroutineScope.holdBatteryDuringSets(autoConnect: AutoConnectManager
  * -- the link to the preferred address -- and nothing else; since #207 that is
  * not always the stream the set's figures come from. The second link gets its
  * own fields rather than widening these (#156). `RecordState.sensorCanCount`
- * is the one reader that combines the two links into one answer.
+ * combines the two links' connected flags to decide who counts a set.
  */
 private fun CoroutineScope.mirrorLinkStates(autoConnect: AutoConnectManager, state: MutableStateFlow<RecordState>) {
     launch {

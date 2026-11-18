@@ -259,7 +259,8 @@ object CountingPolicy {
      * RECOVERED as a sensor set too: `JournalRecoveryPolicy.count` takes the
      * batch segmenter's count, published as `analysis`, rather than the
      * journaled taps, and refuses the set as nothing to count where the
-     * segmenter finds no rep. Before this answer such a set's taps were
+     * stream is too short to analyse or the segmenter finds no rep. Before
+     * this answer such a set's taps, where there was at least one, were
      * recovered as `manual`. That is the path every sensor set already takes,
      * and it is a write the lifter cannot redo.
      */
